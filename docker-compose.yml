@@ -1,21 +1,21 @@
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: iot_postgres
+    container_name: ost_app_postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: fDdiFw_KB2930otN
       POSTGRES_DB: postgres
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ost_app_pgdata:/var/lib/postgresql/data
     restart: always
 
   fastapi-gateway:
     build:
       context: .
-    container_name: iot_fastapi_gateway
+    container_name: ost_app_backend
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
@@ -33,7 +33,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: soundbox_web_ui
+    container_name: ost_app_frontend
     ports:
       - "3000:80"
     depends_on:
@@ -41,4 +41,4 @@ services:
     restart: always
 
 volumes:
-  pgdata:
+  ost_app_pgdata:
