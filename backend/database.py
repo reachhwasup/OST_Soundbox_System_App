@@ -17,7 +17,17 @@ db_pool: Optional[asyncpg.Pool] = None
 async def get_db_pool() -> asyncpg.Pool:
     global db_pool
     if db_pool is None:
-        db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=10)
+        for attempt in range(1, 11):
+            try:
+                db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=10)
+                logger.info(f"Connected to PostgreSQL database pool on attempt {attempt}.")
+                break
+            except Exception as e:
+                if attempt == 10:
+                    logger.error(f"Could not connect to PostgreSQL database after 10 attempts: {e}")
+                    raise e
+                logger.warning(f"PostgreSQL not ready yet (attempt {attempt}/10). Retrying in 1.5s...")
+                await asyncio.sleep(1.5)
     return db_pool
 
 
