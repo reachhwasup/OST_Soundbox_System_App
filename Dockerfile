@@ -15,5 +15,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 # ចម្លង Source Code ទាំងអស់ចូល Docker
 COPY . .
 
-# Default command (អាចប្តូរតាម service នីមួយៗក្នុង docker-compose)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
