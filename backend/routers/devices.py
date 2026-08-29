@@ -15,6 +15,66 @@ class DeviceRegisterSchema(BaseModel):
     device_model: str = "Y6B"
 
 
+@router.post("/register", status_code=status.HTTP_201_CREATED)
+@router.post("/", status_code=status.HTTP_201_CREATED)
+async def register_device(
+    payload: DeviceRegisterSchema,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        # Check merchant existence & permissions
+        merchant = await conn.fetchrow(
+            "SELECT id, name, user_id, owner_phone FROM merchants WHERE id = $1",
+            payload.merchant_id
+        )
+        if not merchant:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Store/Merchant not found.")
+
+        if current_user["role"] != "ADMIN":
+            if merchant["user_id"] != current_user["id"] and merchant["owner_phone"] != current_user["phone_number"]:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not own this store.")
+
+        device_sn = payload.device_sn.strip()
+        if not device_sn:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Device Serial Number cannot be empty.")
+
+        # Check if device_sn already registered
+        existing_device = await conn.fetchrow(
+            "SELECT id, merchant_id, status FROM devices WHERE device_sn = $1",
+            device_sn
+        )
+
+        chat_id = payload.telegram_chat_id.strip() if payload.telegram_chat_id and payload.telegram_chat_id.strip() else None
+
+        if existing_device:
+            # Reassign / link to this merchant and activate
+            await conn.execute("""
+                UPDATE devices 
+                SET merchant_id = $1, telegram_chat_id = $2, device_model = $3, status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
+                WHERE id = $4
+            """, payload.merchant_id, chat_id, payload.device_model or "Y6B", existing_device["id"])
+
+            return {
+                "status": "success",
+                "message": f"Soundbox '{device_sn}' linked successfully.",
+                "device_id": existing_device["id"]
+            }
+        else:
+            # Insert new device linked to merchant
+            new_id = await conn.fetchval("""
+                INSERT INTO devices (merchant_id, device_sn, device_model, telegram_chat_id, status)
+                VALUES ($1, $2, $3, $4, 'ACTIVE')
+                RETURNING id
+            """, payload.merchant_id, device_sn, payload.device_model or "Y6B", chat_id)
+
+            return {
+                "status": "success",
+                "message": f"Soundbox '{device_sn}' registered and linked successfully.",
+                "device_id": new_id
+            }
+
+
 @router.get("/")
 async def list_devices(
     search: Optional[str] = Query(None, description="Search serial number, model, telegram chat ID, or store name"),
