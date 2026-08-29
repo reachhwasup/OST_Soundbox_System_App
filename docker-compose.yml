@@ -12,53 +12,21 @@ services:
       - ost_app_pgdata:/var/lib/postgresql/data
     restart: always
 
-  mosquitto:
-    image: eclipse-mosquitto:2.0
-    container_name: ost_app_mosquitto
-    ports:
-      - "1883:1883"
-      - "9001:9001"
-    volumes:
-      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
-    restart: always
-
   fastapi-gateway:
     build:
       context: .
     container_name: ost_app_backend
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8001:8000"
     environment:
       - DATABASE_URL=postgresql://postgres:fDdiFw_KB2930otN@postgres:5432/postgres
-      - MQTT_BROKER=mosquitto
-      - MQTT_PORT=1883
-      - TELEGRAM_BOT_TOKEN=8974351475:AAHTzxM7U_XvvUuwzhcFUdtDnpbuAyzcFcQ
       - API_SECRET_KEY=your-api-key
       - ADMIN_PHONE=016441474
       - ADMIN_PASSWORD=reach1234
       - ADMIN_NAME=Admin Reach
     depends_on:
       - postgres
-      - mosquitto
-    restart: always
-
-  userbot:
-    build:
-      context: .
-    container_name: ost_app_userbot
-    command: python -m app.adapter_telegram_userbot
-    volumes:
-      - .:/app
-      - ./userbot_session.session:/app/userbot_session.session
-      - ./userbot_state.json:/app/userbot_state.json
-    environment:
-      - TELEGRAM_API_ID=34687255
-      - TELEGRAM_API_HASH=0c8a94e104d60fe54bf05605122ae878
-      - FASTAPI_USERBOT_URL=http://fastapi-gateway:8000/webhook/telegram-userbot
-      - API_SECRET_KEY=your-api-key
-    depends_on:
-      - fastapi-gateway
     restart: always
 
   frontend:
