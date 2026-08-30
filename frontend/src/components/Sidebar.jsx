@@ -17,9 +17,11 @@ import {
   ChevronRight,
   Smartphone,
   Layers,
-  KeyRound
+  KeyRound,
+  UserCheck
 } from 'lucide-react';
 import ChangePasswordModal from './ChangePasswordModal';
+import EditProfileModal from './EditProfileModal';
 
 export default function Sidebar({ activeTab, setActiveTab }) {
   const { user, logout } = useAuth();
@@ -27,6 +29,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
   const { toggleLanguage, t, isKhmer } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
 
 
   // Close sidebar on route/tab change or resize
@@ -143,14 +146,21 @@ export default function Sidebar({ activeTab, setActiveTab }) {
           </div>
 
           {/* User Profile Card in Sidebar */}
-          <div className="p-2.5 sm:p-3 mx-2.5 sm:mx-3 my-2 sm:my-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-700/60">
+          <div 
+            onClick={() => setIsEditProfileOpen(true)}
+            title={t('editProfile', 'Edit Profile')}
+            className="p-2.5 sm:p-3 mx-2.5 sm:mx-3 my-2 sm:my-2.5 bg-slate-50 hover:bg-emerald-50/70 dark:bg-slate-800/50 dark:hover:bg-emerald-950/30 rounded-xl sm:rounded-2xl border border-slate-200/80 hover:border-emerald-300 dark:border-slate-700/60 dark:hover:border-emerald-800 cursor-pointer transition group"
+          >
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 font-bold flex items-center justify-center text-xs sm:text-sm border border-emerald-200 dark:border-emerald-800 shrink-0">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-emerald-100 group-hover:bg-emerald-600 group-hover:text-white dark:bg-emerald-950/80 dark:group-hover:bg-emerald-600 text-emerald-700 dark:text-emerald-300 font-bold flex items-center justify-center text-xs sm:text-sm border border-emerald-200 dark:border-emerald-800 shrink-0 transition-colors">
                 <UserIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                  {user.full_name || user.phone_number}
+                <div className="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 truncate flex items-center justify-between">
+                  <span>{user.full_name || user.phone_number}</span>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity font-normal">
+                    {t('edit', 'Edit')}
+                  </span>
                 </div>
                 <div className="text-[10px] sm:text-[11px] text-slate-500 font-mono truncate">
                   {user.phone_number}
@@ -252,6 +262,18 @@ export default function Sidebar({ activeTab, setActiveTab }) {
               </span>
             </button>
 
+            {/* Edit Profile Button */}
+            <button
+              onClick={() => setIsEditProfileOpen(true)}
+              className="w-full flex items-center justify-between px-2.5 py-1.5 sm:px-3 sm:py-2 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 rounded-lg sm:rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 transition cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
+                <span>{t('editProfile', 'Edit Profile')}</span>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+
             {/* Change Password Button */}
             <button
               onClick={() => setIsChangePasswordOpen(true)}
@@ -281,6 +303,12 @@ export default function Sidebar({ activeTab, setActiveTab }) {
 
         </div>
       </aside>
+
+      {/* Edit Profile Modal */}
+      <EditProfileModal 
+        isOpen={isEditProfileOpen} 
+        onClose={() => setIsEditProfileOpen(false)} 
+      />
 
       {/* Change Password Modal */}
       <ChangePasswordModal 

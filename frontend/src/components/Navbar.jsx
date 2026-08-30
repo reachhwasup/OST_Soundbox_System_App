@@ -2,14 +2,16 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
-import { LogOut, User as UserIcon, Shield, Store, Volume2, Sun, Moon, Globe, KeyRound } from 'lucide-react';
+import { LogOut, User as UserIcon, Shield, Store, Volume2, Sun, Moon, Globe, KeyRound, UserCheck } from 'lucide-react';
 import ChangePasswordModal from './ChangePasswordModal';
+import EditProfileModal from './EditProfileModal';
 
 export default function Navbar({ activeTab, setActiveTab }) {
   const { user, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const { language, toggleLanguage, t, isKhmer } = useLanguage();
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
 
   if (!user) return null;
 
@@ -84,11 +86,21 @@ export default function Navbar({ activeTab, setActiveTab }) {
                 {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
               </button>
 
+              {/* Edit Profile Button */}
+              <button
+                onClick={() => setIsEditProfileOpen(true)}
+                title={t('editProfile', 'Edit Profile')}
+                className="p-1.5 sm:p-2 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-xl transition shrink-0 cursor-pointer"
+                aria-label="Edit Profile"
+              >
+                <UserCheck className="w-4 h-4" />
+              </button>
+
               {/* Change Password Button */}
               <button
                 onClick={() => setIsChangePasswordOpen(true)}
                 title={t('changePassword', 'Change Password')}
-                className="p-1.5 sm:p-2 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-xl transition shrink-0"
+                className="p-1.5 sm:p-2 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-xl transition shrink-0 cursor-pointer"
                 aria-label="Change Password"
               >
                 <KeyRound className="w-4 h-4" />
@@ -96,14 +108,15 @@ export default function Navbar({ activeTab, setActiveTab }) {
 
               {/* User Info */}
               <div 
-                onClick={() => setIsChangePasswordOpen(true)}
-                className="flex items-center space-x-1 text-left shrink-0 cursor-pointer hover:opacity-80 transition"
+                onClick={() => setIsEditProfileOpen(true)}
+                title={t('editProfile', 'Edit Profile')}
+                className="flex items-center space-x-1.5 text-left shrink-0 cursor-pointer hover:opacity-80 transition group"
               >
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 font-medium text-xs sm:text-sm border border-slate-200 dark:border-slate-700">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-100 dark:bg-slate-800 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-950/80 flex items-center justify-center text-slate-600 dark:text-slate-300 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 font-medium text-xs sm:text-sm border border-slate-200 dark:border-slate-700 transition">
                   <UserIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
                 <div className="hidden md:block">
-                  <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 max-w-[120px] truncate">
+                  <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 max-w-[120px] truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition">
                     {user.full_name || user.phone_number}
                   </div>
                   <div className="text-[10px] text-slate-500 font-mono">
@@ -116,7 +129,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
               <button
                 onClick={logout}
                 title="Log out"
-                className="p-1.5 sm:p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition shrink-0"
+                className="p-1.5 sm:p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition shrink-0 cursor-pointer"
                 aria-label="Logout"
               >
                 <LogOut className="w-4 h-4" />
@@ -126,9 +139,16 @@ export default function Navbar({ activeTab, setActiveTab }) {
         </div>
       </header>
 
-      <ChangePasswordModal
-        isOpen={isChangePasswordOpen}
-        onClose={() => setIsChangePasswordOpen(false)}
+      {/* Edit Profile Modal */}
+      <EditProfileModal 
+        isOpen={isEditProfileOpen} 
+        onClose={() => setIsEditProfileOpen(false)} 
+      />
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal 
+        isOpen={isChangePasswordOpen} 
+        onClose={() => setIsChangePasswordOpen(false)} 
       />
     </>
   );

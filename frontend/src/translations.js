@@ -29,6 +29,21 @@ export const translations = {
     passwordMinLength: "Password must be at least 6 characters.",
     passwordChangedSuccess: "Password changed successfully.",
     updatePassword: "Update Password",
+    
+    // Profile Edit
+    editProfile: "Edit Profile",
+    myProfile: "My Profile",
+    profile: "Profile",
+    accountDetails: "Account Details",
+    saveChanges: "Save Changes",
+    profileUpdatedSuccess: "Profile updated successfully.",
+    role: "Role",
+    status: "Status",
+    merchant: "Store Merchant",
+    administrator: "System Administrator",
+    memberSince: "Member Since",
+    phoneInUse: "This phone number is already registered to another account.",
+    invalidPhone: "Please enter a valid phone number.",
 
     signIn: "Sign In",
     signingIn: "Signing in...",
@@ -220,6 +235,21 @@ export const translations = {
     passwordMinLength: "ពាក្យសម្ងាត់ត្រូវមានយ៉ាងតិច ៦ តួអក្សរ។",
     passwordChangedSuccess: "ពាក្យសម្ងាត់ត្រូវបានកែប្រែដោយជោគជ័យ។",
     updatePassword: "កែប្រែពាក្យសម្ងាត់",
+    
+    // Profile Edit
+    editProfile: "កែប្រែព័ត៌មានគណនី",
+    myProfile: "គណនីរបស់ខ្ញុំ",
+    profile: "ព័ត៌មានគណនី",
+    accountDetails: "ព័ត៌មានលម្អិតគណនី",
+    saveChanges: "រក្សាទុកការកែប្រែ",
+    profileUpdatedSuccess: "ព័ត៌មានគណនីត្រូវបានធ្វើបច្ចុប្បន្នភាពដោយជោគជ័យ។",
+    role: "តួនាទី",
+    status: "ស្ថានភាព",
+    merchant: "អាជីវករ / ម្ចាស់ហាង",
+    administrator: "អ្នកគ្រប់គ្រងប្រព័ន្ធ (Admin)",
+    memberSince: "ថ្ងៃបង្កើតគណនី",
+    phoneInUse: "លេខទូរស័ព្ទនេះត្រូវបានចុះឈ្មោះដោយគណនីផ្សេងរួចហើយ។",
+    invalidPhone: "សូមបញ្ចូលលេខទូរស័ព្ទឱ្យបានត្រឹមត្រូវ។",
 
     signIn: "ចូលប្រើប្រាស់",
     signingIn: "កំពុងចូល...",

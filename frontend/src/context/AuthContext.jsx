@@ -84,8 +84,25 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateProfile = async (fullName, phoneNumber) => {
+    const res = await api.put('/api/auth/profile', {
+      full_name: fullName,
+      phone_number: phoneNumber,
+    });
+    const { access_token, user: userData } = res.data;
+    if (access_token) {
+      localStorage.setItem('token', access_token);
+      setToken(access_token);
+    }
+    if (userData) {
+      localStorage.setItem('user', JSON.stringify(userData));
+      setUser(userData);
+    }
+    return res.data;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, refreshUser, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

@@ -29,6 +29,7 @@ class LoginSchema(BaseModel):
 
 class ProfileUpdateSchema(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=255)
+    phone_number: Optional[str] = Field(None, min_length=6, max_length=50)
 
 
 class PasswordChangeSchema(BaseModel):
@@ -177,21 +178,77 @@ async def update_profile(
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     pool = await get_db_pool()
-    async with pool.acquire() as conn:
-        await conn.execute(
-            """
-            UPDATE users 
-            SET full_name = $1, updated_at = CURRENT_TIMESTAMP
-            WHERE id = $2
-            """,
-            payload.full_name.strip(), current_user["id"]
+    clean_name = payload.full_name.strip()
+    target_phone = normalize_phone_number(payload.phone_number) if payload.phone_number else current_user["phone_number"]
+
+    if not target_phone or len(target_phone) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A valid phone number is required."
         )
 
-    return {
-        "status": "success",
-        "message": "Profile updated successfully.",
-        "full_name": payload.full_name.strip()
-    }
+    async with pool.acquire() as conn:
+        # Check if phone number is changed and already taken by someone else
+        if target_phone != current_user["phone_number"]:
+            existing = await conn.fetchrow(
+                "SELECT id FROM users WHERE phone_number = $1 AND id != $2",
+                target_phone, current_user["id"]
+            )
+            if existing:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="This phone number is already registered to another account."
+                )
+
+        updated_row = await conn.fetchrow(
+            """
+            UPDATE users 
+            SET full_name = $1, phone_number = $2, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $3
+            RETURNING id, phone_number, full_name, role, status, created_at, updated_at
+            """,
+            clean_name, target_phone, current_user["id"]
+        )
+
+        # Also cascade update owner_phone in merchants if user has stores
+        if target_phone != current_user["phone_number"]:
+            await conn.execute(
+                "UPDATE merchants SET owner_phone = $1 WHERE user_id = $2",
+                target_phone, current_user["id"]
+            )
+
+        # Check store info
+        store = await conn.fetchrow(
+            "SELECT id, name, place, location, owner_phone FROM merchants WHERE user_id = $1 OR owner_phone = $2",
+            current_user["id"], target_phone
+        )
+
+        # Generate refreshed access token
+        access_token = create_access_token({
+            "sub": str(updated_row["id"]),
+            "user_id": updated_row["id"],
+            "phone_number": updated_row["phone_number"],
+            "role": updated_row["role"]
+        })
+
+        user_data = {
+            "id": updated_row["id"],
+            "phone_number": updated_row["phone_number"],
+            "full_name": updated_row["full_name"],
+            "role": updated_row["role"],
+            "status": updated_row["status"],
+            "created_at": updated_row["created_at"].isoformat() if updated_row["created_at"] else None,
+            "has_store": store is not None,
+            "store": dict(store) if store else None
+        }
+
+        return {
+            "status": "success",
+            "message": "Profile updated successfully.",
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": user_data
+        }
 
 
 @router.put("/change-password")
