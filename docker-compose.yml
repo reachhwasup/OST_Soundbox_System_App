@@ -2,7 +2,8 @@ services:
   fastapi-gateway:
     build:
       context: .
-    container_name: ost_app_backend
+    image: ios_app_backend
+    container_name: ios_app_backend
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8001:8000"
@@ -18,7 +19,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: ost_app_frontend
+    image: ios_app_frontend
+    container_name: ios_app_frontend
     ports:
       - "3000:80"
     depends_on:
