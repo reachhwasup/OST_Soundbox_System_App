@@ -35,6 +35,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isAdminDropdownOpen, setIsAdminDropdownOpen] = useState(true);
   const [currentSubTab, setCurrentSubTab] = useState(() => localStorage.getItem('soundbox_admin_tab') || 'users');
 
@@ -172,28 +173,80 @@ export default function Sidebar({ activeTab, setActiveTab }) {
             </button>
           </div>
 
-          {/* User Profile Card in Sidebar */}
-          <div 
-            onClick={() => setIsEditProfileOpen(true)}
-            title={t('editProfile', 'Edit Profile')}
-            className="p-2.5 sm:p-3 mx-2.5 sm:mx-3 my-2 sm:my-2.5 bg-slate-50 hover:bg-emerald-50/70 dark:bg-slate-800/50 dark:hover:bg-emerald-950/30 rounded-xl sm:rounded-2xl border border-slate-200/80 hover:border-emerald-300 dark:border-slate-700/60 dark:hover:border-emerald-800 cursor-pointer transition group"
-          >
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-emerald-100 group-hover:bg-emerald-600 group-hover:text-white dark:bg-emerald-950/80 dark:group-hover:bg-emerald-600 text-emerald-700 dark:text-emerald-300 font-bold flex items-center justify-center text-xs sm:text-sm border border-emerald-200 dark:border-emerald-800 shrink-0 transition-colors">
-                <UserIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          {/* User Profile Card Dropdown in Sidebar */}
+          <div className="mx-2.5 sm:mx-3 my-2 sm:my-2.5 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 overflow-hidden transition shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+              className="w-full p-2.5 sm:p-3 flex items-center justify-between text-left hover:bg-slate-100/80 dark:hover:bg-slate-800 cursor-pointer transition"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-emerald-600 text-white font-bold flex items-center justify-center text-xs sm:text-sm shadow-xs shrink-0">
+                  <UserIcon className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                    {user.full_name || user.phone_number}
+                  </div>
+                  <div className="text-[10px] sm:text-[11px] text-slate-500 font-mono truncate">
+                    {user.phone_number}
+                  </div>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 truncate flex items-center justify-between">
-                  <span>{user.full_name || user.phone_number}</span>
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity font-normal">
-                    {t('edit', 'Edit')}
+              <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${isProfileDropdownOpen ? 'rotate-180 text-emerald-600' : ''}`} />
+            </button>
+
+            {/* Profile Dropdown Menu */}
+            {isProfileDropdownOpen && (
+              <div className="p-1.5 space-y-0.5 border-t border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-900/80 animate-in fade-in slide-in-from-top-1 duration-150">
+                
+                {/* Option 1: Edit Profile / Change Name */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditProfileOpen(true);
+                    setIsProfileDropdownOpen(false);
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>{isKhmer ? 'ប្តូរឈ្មោះ & គណនី' : 'Edit Name & Profile'}</span>
+                  </div>
+                  <ChevronRight className="w-3 h-3 text-slate-400" />
+                </button>
+
+                {/* Option 2: Change Password */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsChangePasswordOpen(true);
+                    setIsProfileDropdownOpen(false);
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>{t('changePassword', 'Change Password')}</span>
+                  </div>
+                  <ChevronRight className="w-3 h-3 text-slate-400" />
+                </button>
+
+                {/* Account Status / Role Footer */}
+                <div className="px-2.5 py-1.5 mt-1 flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    <span>Status: Active</span>
+                  </div>
+                  <span className={`font-bold px-1.5 py-0.5 rounded text-[9px] uppercase ${
+                    isAdmin ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                  }`}>
+                    {isAdmin ? 'Admin' : 'Merchant'}
                   </span>
                 </div>
-                <div className="text-[10px] sm:text-[11px] text-slate-500 font-mono truncate">
-                  {user.phone_number}
-                </div>
+
               </div>
-            </div>
+            )}
           </div>
 
           {/* Navigation Links */}
@@ -356,7 +409,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
             {/* Language Switcher Button */}
             <button
               onClick={toggleLanguage}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 sm:px-3 sm:py-2 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 rounded-lg sm:rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 transition"
+              className="w-full flex items-center justify-between px-2.5 py-1.5 sm:px-3 sm:py-2 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 rounded-lg sm:rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 transition cursor-pointer"
             >
               <div className="flex items-center gap-2">
                 <Globe className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
@@ -370,7 +423,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
             {/* Theme Toggle Button */}
             <button
               onClick={toggleTheme}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 sm:px-3 sm:py-2 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 rounded-lg sm:rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 transition"
+              className="w-full flex items-center justify-between px-2.5 py-1.5 sm:px-3 sm:py-2 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 rounded-lg sm:rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 transition cursor-pointer"
             >
               <div className="flex items-center gap-2">
                 {isDark ? <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" /> : <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-600" />}
@@ -381,34 +434,10 @@ export default function Sidebar({ activeTab, setActiveTab }) {
               </span>
             </button>
 
-            {/* Edit Profile Button */}
-            <button
-              onClick={() => setIsEditProfileOpen(true)}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 sm:px-3 sm:py-2 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 rounded-lg sm:rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 transition cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
-                <span>{t('editProfile', 'Edit Profile')}</span>
-              </div>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-            </button>
-
-            {/* Change Password Button */}
-            <button
-              onClick={() => setIsChangePasswordOpen(true)}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 sm:px-3 sm:py-2 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 rounded-lg sm:rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 transition cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <KeyRound className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
-                <span>{t('changePassword', 'Change Password')}</span>
-              </div>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-            </button>
-
             {/* Logout Button */}
             <button
               onClick={logout}
-              className="w-full flex items-center justify-center gap-2 px-2.5 py-2 sm:px-3 sm:py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/50 text-rose-600 dark:text-rose-300 rounded-lg sm:rounded-xl text-xs font-bold border border-rose-200/80 dark:border-rose-900/60 transition cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 px-2.5 py-2 sm:px-3 sm:py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/50 text-rose-600 dark:text-rose-300 rounded-lg sm:rounded-xl text-xs font-bold border border-rose-200/80 dark:border-rose-900/60 transition cursor-pointer mt-1"
             >
               <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span>{t('signOut', 'Sign Out')}</span>
@@ -426,13 +455,21 @@ export default function Sidebar({ activeTab, setActiveTab }) {
       {/* Edit Profile Modal */}
       <EditProfileModal 
         isOpen={isEditProfileOpen} 
-        onClose={() => setIsEditProfileOpen(false)} 
+        onClose={() => setIsEditProfileOpen(false)}
+        onOpenChangePassword={() => {
+          setIsEditProfileOpen(false);
+          setIsChangePasswordOpen(true);
+        }}
       />
 
       {/* Change Password Modal */}
       <ChangePasswordModal 
         isOpen={isChangePasswordOpen} 
-        onClose={() => setIsChangePasswordOpen(false)} 
+        onClose={() => setIsChangePasswordOpen(false)}
+        onOpenEditProfile={() => {
+          setIsChangePasswordOpen(false);
+          setIsEditProfileOpen(true);
+        }}
       />
     </>
   );

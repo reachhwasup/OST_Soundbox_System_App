@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { User, Phone, CheckCircle2, AlertCircle, Shield, Store, Calendar, BadgeCheck, Sparkles } from 'lucide-react';
+import { User, Phone, CheckCircle2, AlertCircle, Shield, Store, Calendar, BadgeCheck, Sparkles, KeyRound, ChevronRight } from 'lucide-react';
 import Modal from './Modal';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useLanguage } from '../context/LanguageContext';
 
-export default function EditProfileModal({ isOpen, onClose }) {
+export default function EditProfileModal({ isOpen, onClose, onOpenChangePassword }) {
   const { user, updateProfile } = useAuth();
   const { t, isKhmer } = useLanguage();
   const { showToast } = useToast();
@@ -81,7 +81,7 @@ export default function EditProfileModal({ isOpen, onClose }) {
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={t('editProfile', 'Edit Profile')}
+      title={t('editProfile', 'Edit Profile & Name')}
       maxWidth="max-w-md"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -130,18 +130,23 @@ export default function EditProfileModal({ isOpen, onClose }) {
             </div>
             {formattedDate && (
               <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                <Calendar className="w-3 h-3" />
+                <Calendar className="w-3.5 h-3.5" />
                 <span>{t('memberSince', 'Member Since')}: {formattedDate}</span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Field 1: Full Name */}
+        {/* Field 1: Full Name (User can change their name) */}
         <div>
-          <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
-            {t('fullName', 'Full Name')} <span className="text-rose-500">*</span>
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300">
+              {t('fullName', 'Full Name')} <span className="text-rose-500">*</span>
+            </label>
+            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+              {isKhmer ? 'អាចកែប្រែឈ្មោះបាន' : 'Editable'}
+            </span>
+          </div>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
               <User className="w-4 h-4" />
@@ -182,6 +187,24 @@ export default function EditProfileModal({ isOpen, onClose }) {
               : 'This phone number is used for logging into your account and linking stores.'}
           </p>
         </div>
+
+        {/* Quick Shortcut to Change Password */}
+        {onOpenChangePassword && (
+          <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/60 dark:border-slate-700/50 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+              <KeyRound className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>{isKhmer ? 'ចង់ប្តូរពាក្យសម្ងាត់គណនី?' : 'Need to change your password?'}</span>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenChangePassword}
+              className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <span>{t('changePassword', 'Change Password')}</span>
+              <ChevronRight className="w-3 h-3" />
+            </button>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
