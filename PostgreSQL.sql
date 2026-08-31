@@ -1,47 +1,15 @@
 -- ====================================================================
--- OST SOUNDBOX SYSTEM - UNIFIED DATABASE SCHEMA (PostgreSQL)
+-- OST SOUNDBOX SYSTEM - PRODUCTION-MATCHED UNIFIED SCHEMA
 -- ====================================================================
 
--- 1. Custom Enum Types
-DO $$ BEGIN
-    CREATE TYPE currency_type AS ENUM ('USD', 'KHR');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE device_status AS ENUM ('ACTIVE', 'INACTIVE', 'MAINTENANCE');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE tx_status AS ENUM ('PENDING', 'PROCESSED', 'FAILED', 'DUPLICATE');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE user_role AS ENUM ('ADMIN', 'USER');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE user_status AS ENUM ('ACTIVE', 'PENDING', 'SUSPENDED');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-
--- 2. Users Table (ការគ្រប់គ្រងអ្នកប្រើប្រាស់ និងសិទ្ធិប្រើប្រាស់)
+-- 1. Users Table (Authentication & Permissions)
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     phone_number VARCHAR(50) NOT NULL UNIQUE,
     full_name VARCHAR(255),
     password_hash VARCHAR(255) NOT NULL,
-    role user_role NOT NULL DEFAULT 'USER',
-    status user_status NOT NULL DEFAULT 'ACTIVE',
+    role VARCHAR(50) NOT NULL DEFAULT 'USER',
+    status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
     last_login_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -52,12 +20,14 @@ CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 
 
--- 3. Merchants / Stores Table (ព័ត៌មានអាជីវករ និងសាខាហាង)
+-- 2. Merchants Table (Stores & Branches)
 CREATE TABLE IF NOT EXISTS merchants (
-    id SERIAL PRIMARY KEY,
+    merchant_id VARCHAR(100) PRIMARY KEY,
+    id SERIAL,
+    merchant_name VARCHAR(255) NOT NULL,
+    name VARCHAR(255),
+    owner_phone VARCHAR(50),
     user_id INT REFERENCES users(id) ON DELETE SET NULL,
-    name VARCHAR(255) NOT NULL,
-    owner_phone VARCHAR(50) NOT NULL,
     place VARCHAR(255),
     location VARCHAR(255),
     province VARCHAR(100),
@@ -73,90 +43,101 @@ CREATE INDEX IF NOT EXISTS idx_merchants_user_id ON merchants(user_id);
 CREATE INDEX IF NOT EXISTS idx_merchants_owner_phone ON merchants(owner_phone);
 
 
--- 4. Devices Table (ការគ្រប់គ្រងឧបករណ៍ Soundbox Y6B Speaker)
+-- 3. Devices Table (Soundbox Speakers & Telemetry)
 CREATE TABLE IF NOT EXISTS devices (
-    id SERIAL PRIMARY KEY,
-    merchant_id INT REFERENCES merchants(id) ON DELETE SET NULL,
-    device_sn VARCHAR(100),                          -- Serial Number របស់ Y6B
+    device_id VARCHAR(100) PRIMARY KEY,
+    id SERIAL,
+    merchant_id VARCHAR(100),
+    chat_id VARCHAR(100),
+    device_name VARCHAR(255),
+    device_sn VARCHAR(100),
     device_model VARCHAR(50) DEFAULT 'Y6B',
-    telegram_chat_id VARCHAR(100),                    -- Telegram Group Verification Code / Chat ID
-    status device_status DEFAULT 'ACTIVE',
+    telegram_chat_id VARCHAR(100),
+    is_active BOOLEAN DEFAULT TRUE,
+    status VARCHAR(50) DEFAULT 'ACTIVE',
+    battery VARCHAR(50),
+    signal VARCHAR(50),
+    version_4g VARCHAR(255),
+    version_wifi VARCHAR(255),
+    last_online TIMESTAMP WITH TIME ZONE,
     last_heartbeat TIMESTAMP WITH TIME ZONE,
-    battery VARCHAR(50),                              -- Battery percentage (e.g. '100%')
-    signal VARCHAR(50),                               -- Signal strength (e.g. 'Excellent (-47 dBm)')
-    version_4g VARCHAR(255),                          -- 4G Modem Firmware Version
-    version_wifi VARCHAR(255),                        -- WiFi ESP32 Firmware Version
-    last_online TIMESTAMP WITH TIME ZONE,             -- Last online timestamp
-    device_id VARCHAR(100),                           -- Hardware Device ID alias
-    device_name VARCHAR(255),                         -- Device Name alias
-    chat_id VARCHAR(100),                             -- Telegram Chat ID alias
-    is_active BOOLEAN DEFAULT TRUE,                   -- Active status boolean
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_devices_telegram_chat_id ON devices(telegram_chat_id);
+CREATE INDEX IF NOT EXISTS idx_devices_chat_id ON devices(chat_id);
+CREATE INDEX IF NOT EXISTS idx_devices_merchant_id ON devices(merchant_id);
 CREATE INDEX IF NOT EXISTS idx_devices_sn ON devices(device_sn);
-CREATE INDEX IF NOT EXISTS idx_devices_merchant ON devices(merchant_id);
 
 
--- 5. Transactions Table (រក្សាទុកប្រវត្តិប្រតិបត្តិការទូទាត់ និងការពារការស្រែកឌុប)
+-- 4. Transactions Table (Bank Payments & Deduplication)
 CREATE TABLE IF NOT EXISTS transactions (
-    id BIGSERIAL PRIMARY KEY,
-    device_id INT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
-    bank_name VARCHAR(50) NOT NULL,                  -- ABA, ACLEDA, WING, etc.
-    bank_tx_id VARCHAR(150) NOT NULL,                -- Transaction ID របស់ធនាគារ
+    id SERIAL PRIMARY KEY,
+    txid VARCHAR(150),
+    bank_tx_id VARCHAR(150),
+    bank_name VARCHAR(50),
+    chat_id VARCHAR(100),
+    device_id VARCHAR(100),
     amount NUMERIC(12, 2) NOT NULL,
-    currency currency_type NOT NULL DEFAULT 'USD',
+    currency VARCHAR(10) NOT NULL DEFAULT 'USD',
     payer_name VARCHAR(255),
+    raw_payload TEXT,
     raw_telegram_message TEXT,
-    status tx_status DEFAULT 'PROCESSED',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    
-    -- Unique constraint ការពារមិនឱ្យទិន្នន័យដដែលចូល ២ ដង
-    CONSTRAINT unique_bank_tx UNIQUE (bank_name, bank_tx_id)
+    status VARCHAR(50) DEFAULT 'PROCESSED',
+    device_ack BOOLEAN DEFAULT FALSE,
+    ack_status VARCHAR(50),
+    ack_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_transactions_bank_tx ON transactions(bank_name, bank_tx_id);
-CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at);
-CREATE INDEX IF NOT EXISTS idx_transactions_device ON transactions(device_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_txid ON transactions(txid);
+CREATE INDEX IF NOT EXISTS idx_transactions_device_id ON transactions(device_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at DESC);
 
 
--- 6. Telegram Group Users & Authorized Bank Bots
+-- 5. Group Users Table (Telegram Group Members)
 CREATE TABLE IF NOT EXISTS group_users (
     id SERIAL PRIMARY KEY,
     chat_id VARCHAR(50) NOT NULL,
     user_id VARCHAR(50) NOT NULL,
     username VARCHAR(100),
-    full_name VARCHAR(150),
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
+    full_name TEXT,
+    is_bot BOOLEAN DEFAULT FALSE,
     is_authorized BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT unique_chat_user UNIQUE (chat_id, user_id)
 );
 
+CREATE INDEX IF NOT EXISTS idx_group_users_lookup ON group_users(chat_id, user_id);
+
+
+-- 6. Official Bank Bots Table
 CREATE TABLE IF NOT EXISTS official_bank_bots (
-    id SERIAL PRIMARY KEY,
-    bank_name VARCHAR(50) NOT NULL,
-    bot_user_id VARCHAR(50) NOT NULL UNIQUE,
+    bot_id VARCHAR(50) PRIMARY KEY,
+    bot_name VARCHAR(100),
+    bank_name VARCHAR(50),
     is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-INSERT INTO official_bank_bots (bank_name, bot_user_id) 
+INSERT INTO official_bank_bots (bot_id, bot_name, bank_name, is_active) 
 VALUES 
-    ('ABA Bank Bot', '123456789'),
-    ('ACLEDA Bank Bot', '987654321')
-ON CONFLICT (bot_user_id) DO NOTHING;
+    ('123456789', 'ababank_bot', 'ABA Bank Bot', TRUE),
+    ('987654321', 'acleda_bot', 'ACLEDA Bank Bot', TRUE)
+ON CONFLICT (bot_id) DO NOTHING;
 
 
--- 7. Security Alerts Table (ការ Audit សុវត្ថិភាព និងការទប់ស្កាត់ Fake Payments)
+-- 7. Security Alerts Table
 CREATE TABLE IF NOT EXISTS security_alerts (
     id BIGSERIAL PRIMARY KEY,
-    device_id INT REFERENCES devices(id) ON DELETE CASCADE,
-    merchant_id INT REFERENCES merchants(id) ON DELETE CASCADE,
-    alert_type VARCHAR(50) NOT NULL,                 -- 'DUPLICATE_TX', 'UNAUTHORIZED_SENDER', 'MALFORMED_PAYMENT'
-    severity VARCHAR(20) DEFAULT 'WARNING',          -- 'WARNING', 'CRITICAL', 'INFO'
+    device_id VARCHAR(100),
+    merchant_id VARCHAR(100),
+    alert_type VARCHAR(50) NOT NULL,
+    severity VARCHAR(20) DEFAULT 'WARNING',
     bank_name VARCHAR(50),
     bank_tx_id VARCHAR(150),
     amount NUMERIC(12, 2),
