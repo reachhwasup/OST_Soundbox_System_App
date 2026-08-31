@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider } from './context/LanguageContext';
 import Sidebar from './components/Sidebar';
+import Navbar from './components/Navbar';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import UserDashboard from './pages/UserDashboard';
@@ -12,6 +13,7 @@ import { RefreshCw } from 'lucide-react';
 function MainLayout() {
   const { user, loading } = useAuth();
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(() => {
     return localStorage.getItem('soundbox_active_tab') || 'user';
   });
@@ -47,10 +49,18 @@ function MainLayout() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
       {/* Sidebar Navigation */}
-      <Sidebar activeTab={activeTab} setActiveTab={handleTabChange} />
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={handleTabChange} 
+        isMobileOpen={isMobileSidebarOpen} 
+        setIsMobileOpen={setIsMobileSidebarOpen} 
+      />
       
       {/* Main Content Area (Offset by sidebar width on tablet & desktop) */}
       <div className="md:pl-64 lg:pl-72 flex flex-col min-h-screen">
+        {/* Top App Header with Profile Dropdown & Language/Theme controls */}
+        <Navbar onOpenSidebar={() => setIsMobileSidebarOpen(true)} />
+
         <main className="flex-1">
           {showAdminView ? <AdminDashboard /> : <UserDashboard />}
         </main>
