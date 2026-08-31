@@ -14,9 +14,20 @@ function MainLayout() {
   const { user, loading } = useAuth();
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    return localStorage.getItem('soundbox_sidebar_collapsed') === 'true';
+  });
   const [activeTab, setActiveTab] = useState(() => {
     return localStorage.getItem('soundbox_active_tab') || 'user';
   });
+
+  const toggleSidebarCollapse = () => {
+    setIsSidebarCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('soundbox_sidebar_collapsed', String(next));
+      return next;
+    });
+  };
 
   const handleTabChange = (newTab) => {
     setActiveTab(newTab);
@@ -52,11 +63,15 @@ function MainLayout() {
         activeTab={activeTab} 
         setActiveTab={handleTabChange} 
         isMobileOpen={isMobileSidebarOpen} 
-        setIsMobileOpen={setIsMobileSidebarOpen} 
+        setIsMobileOpen={setIsMobileSidebarOpen}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={toggleSidebarCollapse}
       />
       
-      {/* Main Content Area (Offset by sidebar width on tablet & desktop) */}
-      <div className="md:pl-64 lg:pl-72 flex flex-col min-h-screen">
+      {/* Main Content Area (Offset by sidebar width on tablet & desktop, smoothly animating on collapse/expand) */}
+      <div className={`transition-all duration-300 flex flex-col min-h-screen ${
+        isSidebarCollapsed ? 'md:pl-20' : 'md:pl-64 lg:pl-72'
+      }`}>
         {/* Top App Header with Profile Dropdown & Language/Theme controls */}
         <Navbar onOpenSidebar={() => setIsMobileSidebarOpen(true)} />
 
