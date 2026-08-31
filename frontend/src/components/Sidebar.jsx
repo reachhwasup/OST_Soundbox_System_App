@@ -166,20 +166,6 @@ export default function Sidebar({ activeTab, setActiveTab, isMobileOpen, setIsMo
                         <span>{isKhmer ? 'អ្នកប្រើប្រាស់ & អាជីវករ' : 'Users & Merchants'}</span>
                       </button>
 
-                      {/* Sub-item: Stores & Locations */}
-                      <button
-                        type="button"
-                        onClick={() => handleAdminSubTabClick('stores')}
-                        className={`w-full flex items-center gap-2 px-2.5 py-1.5 sm:py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
-                          activeTab === 'admin' && currentSubTab === 'stores'
-                            ? 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-bold shadow-2xs'
-                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-white'
-                        }`}
-                      >
-                        <Store className="w-3.5 h-3.5 shrink-0 text-blue-500" />
-                        <span>{isKhmer ? 'ហាង និងទីតាំង' : 'Stores & Locations'}</span>
-                      </button>
-
                       {/* Sub-item: Soundboxes */}
                       <button
                         type="button"
@@ -226,7 +212,7 @@ export default function Sidebar({ activeTab, setActiveTab, isMobileOpen, setIsMo
                   )}
                 </div>
 
-                {/* Merchant Store View Switcher */}
+                {/* Merchant View Switcher */}
                 <button
                   type="button"
                   onClick={() => handleNavClick('user')}
@@ -237,8 +223,8 @@ export default function Sidebar({ activeTab, setActiveTab, isMobileOpen, setIsMo
                   }`}
                 >
                   <div className="flex items-center gap-2 sm:gap-2.5">
-                    <Store className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    <span>{t('storeBranches', 'Merchant Store View')}</span>
+                    <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />
+                    <span>{isKhmer ? 'ផ្ទាំងគ្រប់គ្រង Soundbox (Merchant)' : 'Merchant Soundbox View'}</span>
                   </div>
                   {activeTab === 'user' && <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 opacity-70" />}
                 </button>
@@ -255,8 +241,8 @@ export default function Sidebar({ activeTab, setActiveTab, isMobileOpen, setIsMo
                   className="w-full flex items-center justify-between px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold bg-emerald-600 text-white shadow-xs transition cursor-pointer"
                 >
                   <div className="flex items-center gap-2 sm:gap-2.5">
-                    <Store className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    <span>{t('storeBranches', 'Stores & Branches')}</span>
+                    <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span>{isKhmer ? 'ឧបករណ៍ Soundbox របស់ខ្ញុំ' : 'My Soundboxes'}</span>
                   </div>
                   <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 opacity-70" />
                 </button>
