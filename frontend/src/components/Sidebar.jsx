@@ -27,7 +27,6 @@ export default function Sidebar({
   const { user } = useAuth();
   const { t, isKhmer } = useLanguage();
   const [internalOpen, setInternalOpen] = useState(false);
-  const [isAdminDropdownOpen, setIsAdminDropdownOpen] = useState(true);
   const [currentSubTab, setCurrentSubTab] = useState(() => localStorage.getItem('soundbox_admin_tab') || 'users');
 
   const isOpen = isMobileOpen !== undefined ? isMobileOpen : internalOpen;
@@ -145,196 +144,103 @@ export default function Sidebar({
             </button>
           </div>
 
-          {/* Navigation Links */}
+          {/* Navigation Links (Flat, Direct Navigation without Dropdowns) */}
           <nav className={`flex-1 py-3 space-y-1.5 ${isCollapsed ? 'px-2' : 'px-2.5 sm:px-3 md:px-4'}`}>
             
             {!isCollapsed && (
               <div className="px-2 pb-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Navigation
+                {isAdmin ? (isKhmer ? 'ផ្ទាំងគ្រប់គ្រងប្រព័ន្ធ' : 'Administration') : (isKhmer ? 'ម៉ឺនុយ' : 'Navigation')}
               </div>
             )}
 
-            {/* Admin View Switcher (If user is Admin) */}
+            {/* Admin Flat Navigation Items */}
             {isAdmin && (
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 
-                {/* Collapsed State: Direct Vertical Icon Buttons */}
-                {isCollapsed ? (
-                  <div className="space-y-1.5 flex flex-col items-center">
-                    
-                    {/* Users & Merchants */}
-                    <button
-                      type="button"
-                      onClick={() => handleAdminSubTabClick('users')}
-                      title={isKhmer ? 'អ្នកប្រើប្រាស់ & អាជីវករ' : 'Users & Merchants'}
-                      className={`w-12 h-12 rounded-xl flex items-center justify-center transition cursor-pointer group relative ${
-                        currentSubTab === 'users'
-                          ? 'bg-indigo-600 text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      <Users className="w-5 h-5" />
-                    </button>
+                {/* Item 1: Users & Merchants */}
+                <button
+                  type="button"
+                  onClick={() => handleAdminSubTabClick('users')}
+                  title={isKhmer ? 'អ្នកប្រើប្រាស់ & អាជីវករ' : 'Users & Merchants'}
+                  className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
+                    isCollapsed 
+                      ? `h-12 justify-center ${currentSubTab === 'users' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
+                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'users' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                  }`}
+                >
+                  <Users className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-indigo-400'}`} />
+                  {!isCollapsed && (
+                    <span className="truncate">{isKhmer ? 'អ្នកប្រើប្រាស់ & អាជីវករ' : 'Users & Merchants'}</span>
+                  )}
+                </button>
 
-                    {/* Stores & Locations */}
-                    <button
-                      type="button"
-                      onClick={() => handleAdminSubTabClick('stores')}
-                      title={isKhmer ? 'ហាង និងទីតាំង' : 'Stores & Locations'}
-                      className={`w-12 h-12 rounded-xl flex items-center justify-center transition cursor-pointer group relative ${
-                        currentSubTab === 'stores'
-                          ? 'bg-indigo-600 text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      <Store className="w-5 h-5" />
-                    </button>
+                {/* Item 2: Stores & Locations */}
+                <button
+                  type="button"
+                  onClick={() => handleAdminSubTabClick('stores')}
+                  title={isKhmer ? 'ហាង និងទីតាំង' : 'Stores & Locations'}
+                  className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
+                    isCollapsed 
+                      ? `h-12 justify-center ${currentSubTab === 'stores' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
+                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'stores' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                  }`}
+                >
+                  <Store className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-blue-400'}`} />
+                  {!isCollapsed && (
+                    <span className="truncate">{isKhmer ? 'ហាង និងទីតាំង' : 'Stores & Locations'}</span>
+                  )}
+                </button>
 
-                    {/* Soundboxes */}
-                    <button
-                      type="button"
-                      onClick={() => handleAdminSubTabClick('devices')}
-                      title={isKhmer ? 'ឧបករណ៍ Soundbox' : 'Soundbox Devices'}
-                      className={`w-12 h-12 rounded-xl flex items-center justify-center transition cursor-pointer group relative ${
-                        currentSubTab === 'devices'
-                          ? 'bg-indigo-600 text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      <Volume2 className="w-5 h-5" />
-                    </button>
+                {/* Item 3: Soundboxes */}
+                <button
+                  type="button"
+                  onClick={() => handleAdminSubTabClick('devices')}
+                  title={isKhmer ? 'ឧបករណ៍ Soundbox' : 'Soundbox Devices'}
+                  className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
+                    isCollapsed 
+                      ? `h-12 justify-center ${currentSubTab === 'devices' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
+                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'devices' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                  }`}
+                >
+                  <Volume2 className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-amber-400'}`} />
+                  {!isCollapsed && (
+                    <span className="truncate">{isKhmer ? 'ឧបករណ៍ Soundbox' : 'Soundbox Devices'}</span>
+                  )}
+                </button>
 
-                    {/* User & Payment Logs */}
-                    <button
-                      type="button"
-                      onClick={() => handleAdminSubTabClick('user_logs')}
-                      title={isKhmer ? 'កំណត់ត្រាអតិថិជន (User Logs)' : 'User & Payment Logs'}
-                      className={`w-12 h-12 rounded-xl flex items-center justify-center transition cursor-pointer group relative ${
-                        currentSubTab === 'user_logs' || currentSubTab === 'logs'
-                          ? 'bg-emerald-600 text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      <Receipt className="w-5 h-5" />
-                    </button>
+                {/* Item 4: User & Payment Logs */}
+                <button
+                  type="button"
+                  onClick={() => handleAdminSubTabClick('user_logs')}
+                  title={isKhmer ? 'កំណត់ត្រាអតិថិជន (User Logs)' : 'User & Payment Logs'}
+                  className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
+                    isCollapsed 
+                      ? `h-12 justify-center ${currentSubTab === 'user_logs' || currentSubTab === 'logs' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
+                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'user_logs' || currentSubTab === 'logs' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                  }`}
+                >
+                  <Receipt className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-emerald-400'}`} />
+                  {!isCollapsed && (
+                    <span className="truncate">{isKhmer ? 'កំណត់ត្រាអតិថិជន (User Logs)' : 'User & Payment Logs'}</span>
+                  )}
+                </button>
 
-                    {/* Admin & Security Logs */}
-                    <button
-                      type="button"
-                      onClick={() => handleAdminSubTabClick('admin_logs')}
-                      title={isKhmer ? 'កំណត់ត្រាប្រព័ន្ធ (Admin Logs)' : 'Admin & Security Logs'}
-                      className={`w-12 h-12 rounded-xl flex items-center justify-center transition cursor-pointer group relative ${
-                        currentSubTab === 'admin_logs'
-                          ? 'bg-rose-600 text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      <ShieldAlert className="w-5 h-5" />
-                    </button>
-
-                  </div>
-                ) : (
-                  /* Expanded State: Full Collapsible Admin Accordion */
-                  <div className="rounded-xl overflow-hidden border border-slate-200/80 dark:border-slate-800 transition">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (activeTab !== 'admin') {
-                          handleNavClick('admin');
-                        }
-                        setIsAdminDropdownOpen(!isAdminDropdownOpen);
-                      }}
-                      className="w-full flex items-center justify-between px-3 py-2 sm:px-3.5 sm:py-2.5 text-xs sm:text-sm font-semibold bg-indigo-600 text-white shadow-xs transition cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2 sm:gap-2.5">
-                        <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        <span>{t('systemAdministration', 'System Administration')}</span>
-                      </div>
-                      {isAdminDropdownOpen ? (
-                        <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-200 opacity-80" />
-                      ) : (
-                        <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-200 opacity-80" />
-                      )}
-                    </button>
-
-                    {/* Dropdown Items List */}
-                    {isAdminDropdownOpen && (
-                      <div className="bg-slate-50/90 dark:bg-slate-800/50 p-1.5 space-y-0.5 border-t border-slate-100 dark:border-slate-800/80">
-                        
-                        {/* Sub-item: Users & Merchants */}
-                        <button
-                          type="button"
-                          onClick={() => handleAdminSubTabClick('users')}
-                          className={`w-full flex items-center gap-2 px-2.5 py-1.5 sm:py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
-                            currentSubTab === 'users'
-                              ? 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-bold shadow-2xs'
-                              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-white'
-                          }`}
-                        >
-                          <Users className="w-3.5 h-3.5 shrink-0 text-indigo-500" />
-                          <span>{isKhmer ? 'អ្នកប្រើប្រាស់ & អាជីវករ' : 'Users & Merchants'}</span>
-                        </button>
-
-                        {/* Sub-item: Stores & Locations */}
-                        <button
-                          type="button"
-                          onClick={() => handleAdminSubTabClick('stores')}
-                          className={`w-full flex items-center gap-2 px-2.5 py-1.5 sm:py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
-                            currentSubTab === 'stores'
-                              ? 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-bold shadow-2xs'
-                              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-white'
-                          }`}
-                        >
-                          <Store className="w-3.5 h-3.5 shrink-0 text-blue-500" />
-                          <span>{isKhmer ? 'ហាង និងទីតាំង' : 'Stores & Locations'}</span>
-                        </button>
-
-                        {/* Sub-item: Soundboxes */}
-                        <button
-                          type="button"
-                          onClick={() => handleAdminSubTabClick('devices')}
-                          className={`w-full flex items-center gap-2 px-2.5 py-1.5 sm:py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
-                            currentSubTab === 'devices'
-                              ? 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-bold shadow-2xs'
-                              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-white'
-                          }`}
-                        >
-                          <Volume2 className="w-3.5 h-3.5 shrink-0 text-amber-500" />
-                          <span>{isKhmer ? 'ឧបករណ៍ Soundbox' : 'Soundbox Devices'}</span>
-                        </button>
-
-                        {/* Sub-item: User & Payment Logs */}
-                        <button
-                          type="button"
-                          onClick={() => handleAdminSubTabClick('user_logs')}
-                          className={`w-full flex items-center gap-2 px-2.5 py-1.5 sm:py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
-                            currentSubTab === 'user_logs' || currentSubTab === 'logs'
-                              ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 font-bold shadow-2xs'
-                              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-white'
-                          }`}
-                        >
-                          <Receipt className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
-                          <span>{isKhmer ? 'កំណត់ត្រាអតិថិជន (User Logs)' : 'User & Payment Logs'}</span>
-                        </button>
-
-                        {/* Sub-item: Admin & Security Logs */}
-                        <button
-                          type="button"
-                          onClick={() => handleAdminSubTabClick('admin_logs')}
-                          className={`w-full flex items-center gap-2 px-2.5 py-1.5 sm:py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
-                            currentSubTab === 'admin_logs'
-                              ? 'bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 font-bold shadow-2xs'
-                              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-white'
-                          }`}
-                        >
-                          <ShieldAlert className="w-3.5 h-3.5 shrink-0 text-rose-500" />
-                          <span>{isKhmer ? 'កំណត់ត្រាប្រព័ន្ធ (Admin Logs)' : 'Admin & Security Logs'}</span>
-                        </button>
-
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* Item 5: Admin & Security Logs */}
+                <button
+                  type="button"
+                  onClick={() => handleAdminSubTabClick('admin_logs')}
+                  title={isKhmer ? 'កំណត់ត្រាប្រព័ន្ធ (Admin Logs)' : 'Admin & Security Logs'}
+                  className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
+                    isCollapsed 
+                      ? `h-12 justify-center ${currentSubTab === 'admin_logs' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
+                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'admin_logs' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                  }`}
+                >
+                  <ShieldAlert className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-rose-400'}`} />
+                  {!isCollapsed && (
+                    <span className="truncate">{isKhmer ? 'កំណត់ត្រាប្រព័ន្ធ (Admin Logs)' : 'Admin & Security Logs'}</span>
+                  )}
+                </button>
 
               </div>
             )}
@@ -342,28 +248,22 @@ export default function Sidebar({
             {/* Standard Merchant View Navigation */}
             {!isAdmin && (
               <>
-                {isCollapsed ? (
-                  <button
-                    type="button"
-                    onClick={() => handleNavClick('user')}
-                    title={t('storeBranches', 'Stores & Branches')}
-                    className="w-12 h-12 mx-auto rounded-xl flex items-center justify-center bg-emerald-600 text-white shadow-xs transition cursor-pointer"
-                  >
-                    <Store className="w-5 h-5" />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleNavClick('user')}
-                    className="w-full flex items-center justify-between px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold bg-emerald-600 text-white shadow-xs transition cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2 sm:gap-2.5">
-                      <Store className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      <span>{t('storeBranches', 'Stores & Branches')}</span>
-                    </div>
-                    <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 opacity-70" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => handleNavClick('user')}
+                  title={t('storeBranches', 'Stores & Branches')}
+                  className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm bg-emerald-600 text-white shadow-xs ${
+                    isCollapsed 
+                      ? 'h-12 justify-center' 
+                      : 'px-3.5 py-2.5 gap-2.5 justify-between'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Store className="w-4 h-4 shrink-0" />
+                    {!isCollapsed && <span className="truncate">{t('storeBranches', 'Stores & Branches')}</span>}
+                  </div>
+                  {!isCollapsed && <ChevronRight className="w-4 h-4 opacity-70 shrink-0" />}
+                </button>
               </>
             )}
 
