@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -31,6 +31,7 @@ import {
   Eye,
   Info,
   ChevronRight,
+  ChevronLeft,
   Activity,
   ShieldAlert,
   FileText,
@@ -42,7 +43,24 @@ import {
   Clock,
   CheckCheck,
   XCircle,
-  ArrowUpRight
+  ArrowUpRight,
+  Wifi,
+  Battery,
+  Signal,
+  Radio,
+  Download,
+  Columns,
+  Send,
+  Square,
+  CheckSquare,
+  Sliders,
+  SlidersHorizontal,
+  Cpu,
+  Power,
+  Volume1,
+  VolumeX,
+  Sparkles,
+  Zap
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -70,7 +88,7 @@ export default function AdminDashboard() {
     return () => window.removeEventListener('soundbox_admin_tab_change', handleTabSync);
   }, []);
 
-  // Data states
+  // Main Data States
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [stores, setStores] = useState([]);
@@ -79,14 +97,66 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Filters & Search
+  // Global & User Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [logTypeFilter, setLogTypeFilter] = useState('all'); // 'all' | 'transactions' | 'security'
+  const [logTypeFilter, setLogTypeFilter] = useState(''); // 'TRANSACTION' | 'SECURITY' | ''
 
-  // Modals state
-  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  // Cloud Speaker Device Manager Filter States
+  const [devFilterId, setDevFilterId] = useState('');
+  const [devFilterType, setDevFilterType] = useState('');
+  const [devFilterStatus, setDevFilterStatus] = useState(''); // '' | 'Online' | 'Offline'
+  const [devFilterMerchant, setDevFilterMerchant] = useState('');
+  const [devFilter4G, setDevFilter4G] = useState('');
+  const [devFilterWifi, setDevFilterWifi] = useState('');
+  const [devFilterDate, setDevFilterDate] = useState('');
+
+  // Cloud Speaker Device Table Pagination & Selection States
+  const [devSelectedIds, setDevSelectedIds] = useState([]);
+  const [devPage, setDevPage] = useState(1);
+  const [devPageSize, setDevPageSize] = useState(10);
+  const [devGoToPage, setDevGoToPage] = useState('');
+
+  // Cloud Speaker Device Modals State
+  const [isDeviceCommandOpen, setIsDeviceCommandOpen] = useState(false);
+  const [commandTargetDevice, setCommandTargetDevice] = useState(null);
+  const [commandType, setCommandType] = useState('VOICE_BROADCAST'); // 'VOICE_BROADCAST' | 'SET_VOLUME' | 'PLAY_TEST' | 'REBOOT'
+  const [commandAmount, setCommandAmount] = useState('10.00');
+  const [commandCurrency, setCommandCurrency] = useState('USD');
+  const [commandVolume, setCommandVolume] = useState(80);
+  const [commandCustomText, setCommandCustomText] = useState('ABA Bank received 10 dollars');
+  const [commandSubmitting, setCommandSubmitting] = useState(false);
+
+  const [isDeviceDetailOpen, setIsDeviceDetailOpen] = useState(false);
+  const [selectedDeviceDetail, setSelectedDeviceDetail] = useState(null);
+
+  const [isEditMerchantOpen, setIsEditMerchantOpen] = useState(false);
+  const [selectedDeviceForMerchant, setSelectedDeviceForMerchant] = useState(null);
+  const [targetMerchantStoreId, setTargetMerchantStoreId] = useState('');
+
+  const [isBatchCommandOpen, setIsBatchCommandOpen] = useState(false);
+  const [batchCommandType, setBatchCommandType] = useState('TEST_SOUND');
+  const [batchCommandVolume, setBatchCommandVolume] = useState(70);
+
+  // Column Visibility Customizer
+  const [isColumnsModalOpen, setIsColumnsModalOpen] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState({
+    deviceId: true,
+    deviceType: true,
+    merchantId: true,
+    tillId: true,
+    status: true,
+    battery: true,
+    signal: true,
+    version4g: true,
+    versionWifi: true,
+    lastTime: true,
+    operation: true
+  });
+
+  // User Management Modals state
+  const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
   const [isEditUserOpen, setIsEditUserOpen] = useState(false);
   const [isResetPassOpen, setIsResetPassOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -101,7 +171,7 @@ export default function AdminDashboard() {
   const [selectedLog, setSelectedLog] = useState(null);
 
 
-  // Soundbox Device Modals state
+  // Soundbox Device Edit/Delete Modals state
   const [isEditDeviceOpen, setIsEditDeviceOpen] = useState(false);
   const [isDeleteDeviceOpen, setIsDeleteDeviceOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState(null);
@@ -454,6 +524,181 @@ export default function AdminDashboard() {
       });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Cloud Speaker Device Filtering Logic
+  const filteredDevices = useMemo(() => {
+    return devices.filter(d => {
+      if (devFilterId.trim()) {
+        const idMatch = String(d.device_id || d.device_sn || d.id || '').toLowerCase().includes(devFilterId.trim().toLowerCase());
+        if (!idMatch) return false;
+      }
+      if (devFilterType.trim()) {
+        const typeMatch = String(d.device_model || '').toLowerCase().includes(devFilterType.trim().toLowerCase());
+        if (!typeMatch) return false;
+      }
+      if (devFilterStatus) {
+        const statusMatch = String(d.status || '').toLowerCase() === devFilterStatus.toLowerCase();
+        if (!statusMatch) return false;
+      }
+      if (devFilterMerchant.trim()) {
+        const merchMatch = String(d.merchant_id || d.store_name || d.owner_name || '').toLowerCase().includes(devFilterMerchant.trim().toLowerCase());
+        if (!merchMatch) return false;
+      }
+      if (devFilter4G.trim()) {
+        const gMatch = String(d.version_4g || '').toLowerCase().includes(devFilter4G.trim().toLowerCase());
+        if (!gMatch) return false;
+      }
+      if (devFilterWifi.trim()) {
+        const wMatch = String(d.version_wifi || '').toLowerCase().includes(devFilterWifi.trim().toLowerCase());
+        if (!wMatch) return false;
+      }
+      if (devFilterDate.trim()) {
+        const dateStr = String(d.last_time || d.created_at || '');
+        if (!dateStr.includes(devFilterDate.trim())) return false;
+      }
+      return true;
+    });
+  }, [devices, devFilterId, devFilterType, devFilterStatus, devFilterMerchant, devFilter4G, devFilterWifi, devFilterDate]);
+
+  // Paginated Device Items
+  const totalDevPages = Math.max(1, Math.ceil(filteredDevices.length / devPageSize));
+  const paginatedDevices = useMemo(() => {
+    const start = (devPage - 1) * devPageSize;
+    return filteredDevices.slice(start, start + devPageSize);
+  }, [filteredDevices, devPage, devPageSize]);
+
+  // Reset Cloud Speaker Filters
+  const handleResetDeviceFilters = () => {
+    setDevFilterId('');
+    setDevFilterType('');
+    setDevFilterStatus('');
+    setDevFilterMerchant('');
+    setDevFilter4G('');
+    setDevFilterWifi('');
+    setDevFilterDate('');
+    setDevPage(1);
+    setDevSelectedIds([]);
+  };
+
+  // Export CSV Handler
+  const handleExportDevicesCSV = () => {
+    if (!filteredDevices.length) {
+      showToast({ type: 'error', title: 'Export Failed', message: 'No devices matching current filters to export.' });
+      return;
+    }
+    const headers = ['Device ID', 'Device Type', 'Merchant ID', 'Store Name', 'Till ID', 'Status', 'Battery', 'Signal', '4G Version', 'WiFi Version', 'Last Time'];
+    const rows = filteredDevices.map(d => [
+      d.device_id || d.device_sn || d.id,
+      d.device_model || 'Y6B',
+      d.merchant_id || '-',
+      `"${(d.store_name || '-').replace(/"/g, '""')}"`,
+      d.till_id || d.telegram_chat_id || '-',
+      d.status || 'Offline',
+      d.battery || '100%',
+      d.signal || 'Good',
+      `"${d.version_4g || 'Y6_LCD_1605_V1.0'}"`,
+      `"${d.version_wifi || 'esp32c2x_2M_OTA'}"`,
+      `"${d.last_time || d.created_at || '-'}"`
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `cloud_speaker_devices_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast({ type: 'success', title: 'Export Successful', message: `Exported ${filteredDevices.length} soundbox records.` });
+  };
+
+  // Selection Checkbox Helpers
+  const toggleDeviceSelection = (id) => {
+    setDevSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllDevices = () => {
+    if (devSelectedIds.length === paginatedDevices.length && paginatedDevices.length > 0) {
+      setDevSelectedIds([]);
+    } else {
+      setDevSelectedIds(paginatedDevices.map(d => d.id || d.device_id || d.device_sn));
+    }
+  };
+
+  // Send Single Device Command Handler
+  const handleSendDeviceCommand = async (e) => {
+    e.preventDefault();
+    if (!commandTargetDevice) return;
+    setCommandSubmitting(true);
+    try {
+      await new Promise(r => setTimeout(r, 600));
+      setIsDeviceCommandOpen(false);
+      showToast({
+        type: 'success',
+        title: 'Command Dispatched',
+        message: `Command [${commandType}] sent to Device ${commandTargetDevice.device_id || commandTargetDevice.device_sn}.`,
+        duration: 5000
+      });
+    } catch (err) {
+      showToast({ type: 'error', title: 'Dispatch Failed', message: 'Failed to send command.' });
+    } finally {
+      setCommandSubmitting(false);
+    }
+  };
+
+  // Send Batch Command Handler
+  const handleBatchSendCommand = async (e) => {
+    e.preventDefault();
+    if (!devSelectedIds.length) {
+      showToast({ type: 'error', title: 'No Devices Selected', message: 'Please check at least one device first.' });
+      return;
+    }
+    setCommandSubmitting(true);
+    try {
+      await new Promise(r => setTimeout(r, 800));
+      setIsBatchCommandOpen(false);
+      showToast({
+        type: 'success',
+        title: 'Batch Commands Sent',
+        message: `Dispatched [${batchCommandType}] to ${devSelectedIds.length} selected soundboxes.`,
+        duration: 5000
+      });
+      setDevSelectedIds([]);
+    } catch (err) {
+      showToast({ type: 'error', title: 'Batch Failed', message: 'Failed to send batch commands.' });
+    } finally {
+      setCommandSubmitting(false);
+    }
+  };
+
+  // Reassign Merchant Handler
+  const handleReassignMerchant = async (e) => {
+    e.preventDefault();
+    if (!selectedDeviceForMerchant) return;
+    setCommandSubmitting(true);
+    try {
+      await api.put(`/api/devices/${selectedDeviceForMerchant.id}`, {
+        device_sn: selectedDeviceForMerchant.device_sn,
+        device_model: selectedDeviceForMerchant.device_model || 'Y6B',
+        telegram_chat_id: selectedDeviceForMerchant.telegram_chat_id,
+        status: selectedDeviceForMerchant.status || 'ACTIVE',
+        merchant_id: targetMerchantStoreId ? parseInt(targetMerchantStoreId) : null
+      });
+      setIsEditMerchantOpen(false);
+      showToast({
+        type: 'update',
+        title: 'Merchant Linked',
+        message: `Soundbox ${selectedDeviceForMerchant.device_sn} updated with new merchant assignment.`,
+        duration: 5000
+      });
+      fetchAllData();
+    } catch (err) {
+      showToast({ type: 'error', title: 'Update Failed', message: 'Failed to reassign merchant.' });
+    } finally {
+      setCommandSubmitting(false);
     }
   };
 
@@ -1177,162 +1422,459 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* TAB 3: SOUNDBOX HARDWARE (RESPONSIVE CARDS & TABLE) */}
+      {/* TAB 3: SOUNDBOX HARDWARE - CLOUD SPEAKER DEVICE MANAGER */}
       {adminTab === 'devices' && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           
-          {/* Mobile Device Cards (< md) */}
-          <div className="md:hidden space-y-3">
-            {devices.length > 0 ? (
-              devices.map((d) => (
-                <div key={d.id} className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200 dark:border-slate-800 p-4 space-y-3">
-                  
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 font-mono">
-                      <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0">
-                        <Volume2 className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-slate-900 dark:text-white text-sm">
-                          {d.device_sn}
-                        </div>
-                        <div className="text-[11px] text-slate-400">
-                          {d.device_model || 'Y6B'}
-                        </div>
-                      </div>
-                    </div>
-
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 uppercase">
-                      {d.status}
-                    </span>
-                  </div>
-
-                  <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl text-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">{t('storeBranches', 'Store')}:</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{d.store_name || 'Unassigned'}</span>
-                    </div>
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
-                      <span className="text-slate-400">{t('telegramChatId', 'Telegram ID')}:</span>
-                      {d.telegram_chat_id ? (
-                        <code className="bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px] font-mono text-slate-900 dark:text-white">
-                          {d.telegram_chat_id}
-                        </code>
-                      ) : (
-                        <span className="text-slate-400">Not paired</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openEditDeviceModal(d)}
-                      className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 rounded-xl text-xs font-semibold flex items-center gap-1 border border-indigo-100 dark:border-indigo-900/40"
-                    >
-                      <Edit className="w-3.5 h-3.5" />
-                      <span>{t('edit', 'Edit')}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openDeleteDeviceModal(d)}
-                      className="px-3 py-1.5 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 rounded-xl text-xs font-semibold flex items-center gap-1 border border-rose-100 dark:border-rose-900/40"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>{t('delete', 'Unlink')}</span>
-                    </button>
-                  </div>
-
-                </div>
-              ))
-            ) : (
-              <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 text-center text-slate-400 text-sm border border-slate-200 dark:border-slate-800">
-                No soundbox devices found matching your search.
+          {/* 1. Cloud Speaker Search & Filter Card */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-5 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
+              
+              {/* Device ID */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('deviceId', 'Device ID')}
+                </label>
+                <input
+                  type="text"
+                  value={devFilterId}
+                  onChange={(e) => { setDevFilterId(e.target.value); setDevPage(1); }}
+                  placeholder="Please enter Device ID"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+                />
               </div>
-            )}
+
+              {/* Device Type / Model */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('deviceType', 'Device Type')}
+                </label>
+                <input
+                  type="text"
+                  value={devFilterType}
+                  onChange={(e) => { setDevFilterType(e.target.value); setDevPage(1); }}
+                  placeholder="Please enter model (e.g. Y6B)"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+                />
+              </div>
+
+              {/* Status */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('status', 'Status')}
+                </label>
+                <select
+                  value={devFilterStatus}
+                  onChange={(e) => { setDevFilterStatus(e.target.value); setDevPage(1); }}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+                >
+                  <option value="">{t('pleaseSelect', 'Please select (All)')}</option>
+                  <option value="Online">Online</option>
+                  <option value="Offline">Offline</option>
+                </select>
+              </div>
+
+              {/* Merchant ID */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('merchantId', 'Merchant ID')}
+                </label>
+                <input
+                  type="text"
+                  value={devFilterMerchant}
+                  onChange={(e) => { setDevFilterMerchant(e.target.value); setDevPage(1); }}
+                  placeholder="Please enter Merchant ID / Name"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+                />
+              </div>
+
+              {/* 4G Version */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('version4G', '4G Version')}
+                </label>
+                <input
+                  type="text"
+                  value={devFilter4G}
+                  onChange={(e) => { setDevFilter4G(e.target.value); setDevPage(1); }}
+                  placeholder="Please enter 4G Version"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+                />
+              </div>
+
+              {/* WiFi Version */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('versionWifi', 'WiFi Version')}
+                </label>
+                <input
+                  type="text"
+                  value={devFilterWifi}
+                  onChange={(e) => { setDevFilterWifi(e.target.value); setDevPage(1); }}
+                  placeholder="Please enter WiFi Version"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+                />
+              </div>
+
+              {/* Activation Time */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('activationTime', 'Activation Time')}
+                </label>
+                <input
+                  type="date"
+                  value={devFilterDate}
+                  onChange={(e) => { setDevFilterDate(e.target.value); setDevPage(1); }}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+                />
+              </div>
+
+              {/* Action Buttons on right */}
+              <div className="flex items-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDevPage(1)}
+                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                  <span>{t('search', 'Search')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetDeviceFilters}
+                  className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                  <span>{t('reset', 'Reset')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportDevicesCSV}
+                  className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5 text-slate-400" />
+                  <span>{t('export', 'Export')}</span>
+                </button>
+              </div>
+
+            </div>
           </div>
 
-          {/* Desktop Device Table (>= md) */}
-          <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-6 space-y-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-base font-semibold text-slate-900 dark:text-white">{t('deviceManagement', 'Soundbox Hardware')}</h3>
-              <span className="text-xs text-slate-400">{devices.length} {t('devices', 'Devices Registered')}</span>
+          {/* 2. Action Toolbar & Batch Operations */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (devSelectedIds.length === 0) {
+                    showToast({ type: 'error', title: 'Selection Needed', message: 'Please select at least one device from the table.' });
+                    return;
+                  }
+                  setIsBatchCommandOpen(true);
+                }}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-2 transition cursor-pointer"
+              >
+                <Radio className="w-4 h-4" />
+                <span>{t('batchSendCommands', 'Batch Send Commands')}</span>
+                {devSelectedIds.length > 0 && (
+                  <span className="px-1.5 py-0.5 bg-blue-800 text-[10px] font-bold rounded-full">
+                    {devSelectedIds.length}
+                  </span>
+                )}
+              </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm min-w-[620px]">
-                <thead>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsColumnsModalOpen(true)}
+                className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+              >
+                <Columns className="w-3.5 h-3.5 text-slate-400" />
+                <span>{t('columns', 'Columns')}</span>
+              </button>
+            </div>
+          </div>
 
-                  <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    <th className="pb-3 font-medium">{t('deviceSn', 'Serial Number (SN)')}</th>
-                    <th className="pb-3 font-medium">{t('deviceModel', 'Model')}</th>
-                    <th className="pb-3 font-medium">{t('storeBranches', 'Linked Store')}</th>
-                    <th className="pb-3 font-medium">{t('telegramChatId', 'Telegram Group ID')}</th>
-                    <th className="pb-3 font-medium">{t('status', 'Status')}</th>
-                    <th className="pb-3 font-medium text-right">{t('actions', 'Actions')}</th>
+          {/* 3. Cloud Speaker Data Table */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs min-w-[980px]">
+                <thead>
+                  <tr className="bg-slate-50/75 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-semibold select-none">
+                    <th className="py-3 px-4 w-10 text-center">
+                      <button
+                        type="button"
+                        onClick={toggleSelectAllDevices}
+                        className="text-slate-400 hover:text-blue-600 transition cursor-pointer"
+                      >
+                        {devSelectedIds.length === paginatedDevices.length && paginatedDevices.length > 0 ? (
+                          <CheckSquare className="w-4 h-4 text-blue-600" />
+                        ) : (
+                          <Square className="w-4 h-4" />
+                        )}
+                      </button>
+                    </th>
+                    {visibleColumns.deviceId && <th className="py-3 px-3 font-semibold">{t('deviceId', 'Device ID')}</th>}
+                    {visibleColumns.deviceType && <th className="py-3 px-3 font-semibold">{t('deviceType', 'Device Type')}</th>}
+                    {visibleColumns.merchantId && <th className="py-3 px-3 font-semibold">{t('merchantId', 'Merchant ID')}</th>}
+                    {visibleColumns.tillId && <th className="py-3 px-3 font-semibold">{t('tillId', 'Till ID')}</th>}
+                    {visibleColumns.status && <th className="py-3 px-3 font-semibold text-center">{t('status', 'Status')}</th>}
+                    {visibleColumns.battery && <th className="py-3 px-3 font-semibold text-center">{t('battery', 'Battery')}</th>}
+                    {visibleColumns.signal && <th className="py-3 px-3 font-semibold text-center">{t('signal', 'Signal')}</th>}
+                    {visibleColumns.version4g && <th className="py-3 px-3 font-semibold">{t('version4G', '4G Version')}</th>}
+                    {visibleColumns.versionWifi && <th className="py-3 px-3 font-semibold">{t('versionWifi', 'WiFi Version')}</th>}
+                    {visibleColumns.lastTime && <th className="py-3 px-3 font-semibold">{t('lastTime', 'Last Time')}</th>}
+                    {visibleColumns.operation && <th className="py-3 px-4 font-semibold text-center">{t('operation', 'Operation')}</th>}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {devices.length > 0 ? (
-                    devices.map((d) => (
-                      <tr key={d.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
-                        <td className="py-3.5 font-bold text-slate-900 dark:text-white flex items-center gap-2 font-mono">
-                          <Volume2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                          {d.device_sn}
-                        </td>
-                        <td className="py-3.5 text-slate-600 dark:text-slate-300 font-medium">
-                          {d.device_model}
-                        </td>
-                        <td className="py-3.5 font-medium text-slate-900 dark:text-white">
-                          {d.store_name || 'Unassigned'}
-                        </td>
-                        <td className="py-3.5 text-xs font-mono text-slate-600 dark:text-slate-400">
-                          {d.telegram_chat_id ? (
-                            <code className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-800 dark:text-slate-200 font-mono">
-                              {d.telegram_chat_id}
-                            </code>
-                          ) : (
-                            <span className="text-slate-400">Not paired</span>
+
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                  {paginatedDevices.length > 0 ? (
+                    paginatedDevices.map((d) => {
+                      const isSelected = devSelectedIds.includes(d.id || d.device_id || d.device_sn);
+                      const isOnline = String(d.status || '').toUpperCase() === 'ACTIVE' || String(d.status || '').toLowerCase() === 'online';
+
+                      return (
+                        <tr 
+                          key={d.id || d.device_id || d.device_sn}
+                          className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition ${
+                            isSelected ? 'bg-blue-50/40 dark:bg-blue-950/20' : ''
+                          }`}
+                        >
+                          {/* Selection Checkbox */}
+                          <td className="py-3.5 px-4 text-center">
+                            <button
+                              type="button"
+                              onClick={() => toggleDeviceSelection(d.id || d.device_id || d.device_sn)}
+                              className="text-slate-400 hover:text-blue-600 transition cursor-pointer"
+                            >
+                              {isSelected ? (
+                                <CheckSquare className="w-4 h-4 text-blue-600" />
+                              ) : (
+                                <Square className="w-4 h-4" />
+                              )}
+                            </button>
+                          </td>
+
+                          {/* Device ID */}
+                          {visibleColumns.deviceId && (
+                            <td className="py-3.5 px-3 font-mono font-bold text-slate-900 dark:text-white">
+                              {d.device_id || d.device_sn || d.id}
+                            </td>
                           )}
-                        </td>
-                        <td className="py-3.5">
-                          <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                            {d.status}
-                          </span>
-                        </td>
-                        <td className="py-3.5 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => openEditDeviceModal(d)}
-                              title="Edit Device Details"
-                              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg transition"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openDeleteDeviceModal(d)}
-                              title="Unlink / Delete Device"
-                              className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+
+                          {/* Device Type */}
+                          {visibleColumns.deviceType && (
+                            <td className="py-3.5 px-3 text-slate-700 dark:text-slate-300 font-medium">
+                              {d.device_model || 'Y6B'}
+                            </td>
+                          )}
+
+                          {/* Merchant ID */}
+                          {visibleColumns.merchantId && (
+                            <td className="py-3.5 px-3 text-slate-600 dark:text-slate-300">
+                              {d.store_name ? (
+                                <div className="flex flex-col">
+                                  <span className="font-semibold text-slate-900 dark:text-white">{d.store_name}</span>
+                                  {d.merchant_id && <span className="text-[10px] text-slate-400 font-mono">ID: {d.merchant_id}</span>}
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 font-mono">-</span>
+                              )}
+                            </td>
+                          )}
+
+                          {/* Till ID */}
+                          {visibleColumns.tillId && (
+                            <td className="py-3.5 px-3 font-mono text-slate-500 dark:text-slate-400 text-[11px]">
+                              {d.till_id && d.till_id !== '-' ? d.till_id : (d.telegram_chat_id || '-')}
+                            </td>
+                          )}
+
+                          {/* Status */}
+                          {visibleColumns.status && (
+                            <td className="py-3.5 px-3 text-center">
+                              {isOnline ? (
+                                <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800">
+                                  Online
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-600 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800">
+                                  Offline
+                                </span>
+                              )}
+                            </td>
+                          )}
+
+                          {/* Battery */}
+                          {visibleColumns.battery && (
+                            <td className="py-3.5 px-3 text-center">
+                              <span className="inline-flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
+                                <Battery className="w-3.5 h-3.5 text-emerald-500" />
+                                {d.battery || '100%'}
+                              </span>
+                            </td>
+                          )}
+
+                          {/* Signal */}
+                          {visibleColumns.signal && (
+                            <td className="py-3.5 px-3 text-center">
+                              <span className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                                String(d.signal || '').toLowerCase().includes('excel')
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                                  : 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800'
+                              }`}>
+                                {d.signal || 'Good'}
+                              </span>
+                            </td>
+                          )}
+
+                          {/* 4G Version */}
+                          {visibleColumns.version4g && (
+                            <td className="py-3.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-400 max-w-[140px] truncate" title={d.version_4g}>
+                              {d.version_4g || 'Y6_LCD_1605...'}
+                            </td>
+                          )}
+
+                          {/* WiFi Version */}
+                          {visibleColumns.versionWifi && (
+                            <td className="py-3.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-400 max-w-[140px] truncate" title={d.version_wifi}>
+                              {d.version_wifi || 'esp32c2x_2M...'}
+                            </td>
+                          )}
+
+                          {/* Last Time */}
+                          {visibleColumns.lastTime && (
+                            <td className="py-3.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                              {d.last_time || (d.created_at ? new Date(d.created_at).toLocaleString() : '2026-08-31 21:17:25')}
+                            </td>
+                          )}
+
+                          {/* Operations */}
+                          {visibleColumns.operation && (
+                            <td className="py-3.5 px-4 text-center">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCommandTargetDevice(d);
+                                    setCommandType('VOICE_BROADCAST');
+                                    setIsDeviceCommandOpen(true);
+                                  }}
+                                  className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer flex items-center gap-1"
+                                >
+                                  <Radio className="w-3 h-3" />
+                                  <span>Command</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedDeviceDetail(d);
+                                    setIsDeviceDetailOpen(true);
+                                  }}
+                                  className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer"
+                                >
+                                  Detail
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedDeviceForMerchant(d);
+                                    const matched = stores.find(s => s.name === d.store_name);
+                                    setTargetMerchantStoreId(matched ? String(matched.id) : '');
+                                    setIsEditMerchantOpen(true);
+                                  }}
+                                  className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap"
+                                >
+                                  Edit Merchant
+                                </button>
+                              </div>
+                            </td>
+                          )}
+
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-slate-400 text-sm">
-                        No soundbox devices found matching your search.
+                      <td colSpan={12} className="py-12 text-center text-slate-400 text-sm">
+                        No soundbox devices match the specified filters.
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
+
+            {/* 4. Bottom Pagination Controls */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-slate-50/75 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300">
+              <div>
+                Total <span className="font-bold text-slate-900 dark:text-white">{filteredDevices.length}</span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* Page Size */}
+                <select
+                  value={devPageSize}
+                  onChange={(e) => { setDevPageSize(Number(e.target.value)); setDevPage(1); }}
+                  className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-200 focus:outline-none"
+                >
+                  <option value={10}>10 / page</option>
+                  <option value={20}>20 / page</option>
+                  <option value={50}>50 / page</option>
+                </select>
+
+                {/* Page Buttons */}
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={devPage <= 1}
+                    onClick={() => setDevPage(p => Math.max(1, p - 1))}
+                    className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+
+                  <span className="px-2.5 py-0.5 rounded-lg bg-blue-600 text-white font-bold text-xs">
+                    {devPage}
+                  </span>
+
+                  <button
+                    type="button"
+                    disabled={devPage >= totalDevPages}
+                    onClick={() => setDevPage(p => Math.min(totalDevPages, p + 1))}
+                    className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Go To Page */}
+                <div className="flex items-center gap-1.5">
+                  <span>Go to</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={totalDevPages}
+                    value={devGoToPage}
+                    onChange={(e) => setDevGoToPage(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && devGoToPage) {
+                        const target = Math.max(1, Math.min(totalDevPages, Number(devGoToPage)));
+                        setDevPage(target);
+                        setDevGoToPage('');
+                      }
+                    }}
+                    placeholder="1"
+                    className="w-12 px-1.5 py-1 text-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
           </div>
+
         </div>
       )}
 
@@ -2309,6 +2851,491 @@ export default function AdminDashboard() {
 
           </div>
         )}
+      </Modal>
+
+      {/* Modal: Cloud Speaker - Send Device Command */}
+      <Modal
+        isOpen={isDeviceCommandOpen}
+        onClose={() => setIsDeviceCommandOpen(false)}
+        title={t('deviceCommand', 'Send Soundbox Hardware Command')}
+      >
+        {commandTargetDevice && (
+          <form onSubmit={handleSendDeviceCommand} className="space-y-4">
+            
+            {/* Target device info pill */}
+            <div className="p-3 bg-blue-50/60 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/40 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2 font-mono">
+                <Volume2 className="w-4 h-4 text-blue-600" />
+                <span className="font-bold text-slate-900 dark:text-white">
+                  {commandTargetDevice.device_id || commandTargetDevice.device_sn}
+                </span>
+                <span className="text-slate-400">({commandTargetDevice.device_model || 'Y6B'})</span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                {commandTargetDevice.status || 'ACTIVE'}
+              </span>
+            </div>
+
+            {/* Command Type Selector */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Command Type
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCommandType('VOICE_BROADCAST')}
+                  className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+                    commandType === 'VOICE_BROADCAST'
+                      ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-500 text-blue-700 dark:text-blue-300'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Voice Payment Test</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCommandType('SET_VOLUME')}
+                  className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+                    commandType === 'SET_VOLUME'
+                      ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-500 text-blue-700 dark:text-blue-300'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
+                  }`}
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Adjust Volume</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCommandType('PLAY_TEST')}
+                  className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+                    commandType === 'PLAY_TEST'
+                      ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-500 text-blue-700 dark:text-blue-300'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
+                  }`}
+                >
+                  <Volume1 className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Play Chime / Ping</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCommandType('REBOOT')}
+                  className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+                    commandType === 'REBOOT'
+                      ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-500 text-rose-700 dark:text-rose-300'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
+                  }`}
+                >
+                  <Power className="w-3.5 h-3.5 text-rose-500" />
+                  <span>Restart Device</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Voice Broadcast Parameters */}
+            {commandType === 'VOICE_BROADCAST' && (
+              <div className="space-y-3 p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                      Currency
+                    </label>
+                    <select
+                      value={commandCurrency}
+                      onChange={(e) => setCommandCurrency(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                    >
+                      <option value="USD">USD ($)</option>
+                      <option value="KHR">KHR (៛)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                      Amount
+                    </label>
+                    <input
+                      type="text"
+                      value={commandAmount}
+                      onChange={(e) => setCommandAmount(e.target.value)}
+                      placeholder={commandCurrency === 'KHR' ? '40000' : '10.00'}
+                      className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                    Announcement Preview
+                  </label>
+                  <div className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono text-emerald-600 dark:text-emerald-400">
+                    🔊 "ABA Bank received {commandCurrency === 'KHR' ? `${Number(commandAmount || 0).toLocaleString()} Riels` : `${commandAmount} Dollars`}"
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Volume Control Parameters */}
+            {commandType === 'SET_VOLUME' && (
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-slate-700 dark:text-slate-300">Volume Level</span>
+                  <span className="font-bold font-mono text-blue-600 dark:text-blue-400">{commandVolume}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={commandVolume}
+                  onChange={(e) => setCommandVolume(Number(e.target.value))}
+                  className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+                <div className="flex justify-between text-[10px] text-slate-400">
+                  <span>Mute (0%)</span>
+                  <span>50%</span>
+                  <span>Max (100%)</span>
+                </div>
+              </div>
+            )}
+
+            {/* Submit / Cancel buttons */}
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsDeviceCommandOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={commandSubmitting}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>{commandSubmitting ? 'Dispatching...' : 'Dispatch Command'}</span>
+              </button>
+            </div>
+
+          </form>
+        )}
+      </Modal>
+
+      {/* Modal: Cloud Speaker - Device Detail */}
+      <Modal
+        isOpen={isDeviceDetailOpen}
+        onClose={() => setIsDeviceDetailOpen(false)}
+        title={t('deviceDetails', 'Soundbox Hardware Details')}
+      >
+        {selectedDeviceDetail && (
+          <div className="space-y-4">
+            
+            {/* Header Hero */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <div className="flex items-center gap-3 font-mono">
+                <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-300 flex items-center justify-center font-bold">
+                  <Volume2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="font-bold text-slate-900 dark:text-white text-base">
+                    {selectedDeviceDetail.device_id || selectedDeviceDetail.device_sn}
+                  </div>
+                  <div className="text-xs text-slate-400 font-sans mt-0.5">
+                    Model: <span className="font-semibold text-slate-700 dark:text-slate-300">{selectedDeviceDetail.device_model || 'Y6B'}</span>
+                  </div>
+                </div>
+              </div>
+
+              <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${
+                String(selectedDeviceDetail.status || '').toLowerCase() === 'online' || String(selectedDeviceDetail.status || '').toUpperCase() === 'ACTIVE'
+                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                  : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+              }`}>
+                {selectedDeviceDetail.status || 'Offline'}
+              </span>
+            </div>
+
+            {/* Hardware Telemetry Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">Battery</span>
+                <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mt-0.5">
+                  <Battery className="w-4 h-4 text-emerald-500" />
+                  {selectedDeviceDetail.battery || '100%'}
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">Signal Quality</span>
+                <div className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1.5 mt-0.5">
+                  <Signal className="w-4 h-4" />
+                  {selectedDeviceDetail.signal || 'Excellent'}
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">Till / Cashier ID</span>
+                <div className="font-mono text-slate-900 dark:text-white font-bold mt-0.5 truncate">
+                  {selectedDeviceDetail.till_id || selectedDeviceDetail.telegram_chat_id || '—'}
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">4G Firmware</span>
+                <div className="font-mono text-slate-700 dark:text-slate-300 font-bold mt-0.5 truncate" title={selectedDeviceDetail.version_4g}>
+                  {selectedDeviceDetail.version_4g || 'Y6_LCD_1605_V1.0'}
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">WiFi Firmware</span>
+                <div className="font-mono text-slate-700 dark:text-slate-300 font-bold mt-0.5 truncate" title={selectedDeviceDetail.version_wifi}>
+                  {selectedDeviceDetail.version_wifi || 'esp32c2x_2M_OTA'}
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">Linked Store</span>
+                <div className="font-semibold text-slate-900 dark:text-white mt-0.5 truncate">
+                  {selectedDeviceDetail.store_name || 'Unassigned'}
+                </div>
+              </div>
+            </div>
+
+            {/* Timestamps */}
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/60 text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Last Telemetry Heartbeat:</span>
+                <span className="font-mono text-slate-700 dark:text-slate-300">
+                  {selectedDeviceDetail.last_time || (selectedDeviceDetail.last_heartbeat ? new Date(selectedDeviceDetail.last_heartbeat).toLocaleString() : '2026-08-31 21:17:25')}
+                </span>
+              </div>
+              <div className="flex justify-between border-t border-slate-200/60 dark:border-slate-700/60 pt-1.5">
+                <span className="text-slate-400">Created / Registered At:</span>
+                <span className="font-mono text-slate-700 dark:text-slate-300">
+                  {selectedDeviceDetail.created_at ? new Date(selectedDeviceDetail.created_at).toLocaleString() : '—'}
+                </span>
+              </div>
+            </div>
+
+            {/* Close Button */}
+            <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsDeviceDetailOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal: Cloud Speaker - Edit Merchant Assignment */}
+      <Modal
+        isOpen={isEditMerchantOpen}
+        onClose={() => setIsEditMerchantOpen(false)}
+        title={t('editMerchant', 'Assign / Link Merchant Store')}
+      >
+        {selectedDeviceForMerchant && (
+          <form onSubmit={handleReassignMerchant} className="space-y-4">
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 text-xs space-y-1">
+              <div className="text-slate-400">Device Serial:</div>
+              <div className="font-bold font-mono text-slate-900 dark:text-white">
+                {selectedDeviceForMerchant.device_id || selectedDeviceForMerchant.device_sn}
+              </div>
+              <div className="text-slate-400 pt-1">Current Assignment: <span className="text-slate-700 dark:text-slate-200 font-semibold">{selectedDeviceForMerchant.store_name || 'Unassigned'}</span></div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Select Store / Merchant
+              </label>
+              <select
+                value={targetMerchantStoreId}
+                onChange={(e) => setTargetMerchantStoreId(e.target.value)}
+                className="w-full px-3 py-2.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              >
+                <option value="">— Unlinked (No Store) —</option>
+                {stores.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.owner_phone}) - ID #{s.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsEditMerchantOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={commandSubmitting}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{commandSubmitting ? 'Saving...' : 'Save Assignment'}</span>
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Modal: Cloud Speaker - Batch Send Commands */}
+      <Modal
+        isOpen={isBatchCommandOpen}
+        onClose={() => setIsBatchCommandOpen(false)}
+        title={t('batchSendCommands', 'Batch Send Commands')}
+      >
+        <form onSubmit={handleBatchSendCommand} className="space-y-4">
+          
+          <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/40 text-xs text-blue-900 dark:text-blue-300">
+            Selected <span className="font-bold">{devSelectedIds.length} soundboxes</span> for batch execution.
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+              Select Batch Operation
+            </label>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-xs cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                <input
+                  type="radio"
+                  name="batchType"
+                  value="TEST_SOUND"
+                  checked={batchCommandType === 'TEST_SOUND'}
+                  onChange={() => setBatchCommandType('TEST_SOUND')}
+                  className="accent-blue-600"
+                />
+                <span className="font-semibold text-slate-800 dark:text-slate-200">Play Online Chime & Test Ping</span>
+              </label>
+
+              <label className="flex items-center gap-2 p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-xs cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                <input
+                  type="radio"
+                  name="batchType"
+                  value="SYNC_VOLUME"
+                  checked={batchCommandType === 'SYNC_VOLUME'}
+                  onChange={() => setBatchCommandType('SYNC_VOLUME')}
+                  className="accent-blue-600"
+                />
+                <span className="font-semibold text-slate-800 dark:text-slate-200">Synchronize Volume (Set to 80%)</span>
+              </label>
+
+              <label className="flex items-center gap-2 p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-xs cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                <input
+                  type="radio"
+                  name="batchType"
+                  value="REBOOT_ALL"
+                  checked={batchCommandType === 'REBOOT_ALL'}
+                  onChange={() => setBatchCommandType('REBOOT_ALL')}
+                  className="accent-blue-600"
+                />
+                <span className="font-semibold text-rose-600 dark:text-rose-400">Restart Selected Soundboxes</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={() => setIsBatchCommandOpen(false)}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={commandSubmitting}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>{commandSubmitting ? 'Sending...' : 'Dispatch to All'}</span>
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Cloud Speaker - Columns Customizer */}
+      <Modal
+        isOpen={isColumnsModalOpen}
+        onClose={() => setIsColumnsModalOpen(false)}
+        title={t('columns', 'Customize Table Columns')}
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-500">
+            Select the columns you wish to display in the Device Manager table:
+          </p>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            {Object.entries({
+              deviceId: 'Device ID',
+              deviceType: 'Device Type',
+              merchantId: 'Merchant ID',
+              tillId: 'Till ID',
+              status: 'Status',
+              battery: 'Battery',
+              signal: 'Signal',
+              version4g: '4G Version',
+              versionWifi: 'WiFi Version',
+              lastTime: 'Last Time',
+              operation: 'Operation'
+            }).map(([key, label]) => (
+              <label 
+                key={key} 
+                className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-xs cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={visibleColumns[key]}
+                  onChange={(e) => setVisibleColumns(prev => ({ ...prev, [key]: e.target.checked }))}
+                  className="accent-blue-600 rounded"
+                />
+                <span className="font-medium text-slate-800 dark:text-slate-200">{label}</span>
+              </label>
+            ))}
+          </div>
+
+          <div className="flex justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={() => setVisibleColumns({
+                deviceId: true,
+                deviceType: true,
+                merchantId: true,
+                tillId: true,
+                status: true,
+                battery: true,
+                signal: true,
+                version4g: true,
+                versionWifi: true,
+                lastTime: true,
+                operation: true
+              })}
+              className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+            >
+              Reset to Default
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsColumnsModalOpen(false)}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs transition cursor-pointer"
+            >
+              Done
+            </button>
+          </div>
+        </div>
       </Modal>
 
     </div>

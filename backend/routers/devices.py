@@ -107,19 +107,23 @@ async def list_devices(
 
         query = f"""
             SELECT d.id, 
+                   COALESCE(d.device_id, d.device_sn, d.id::text) AS device_id,
                    COALESCE(d.device_sn, d.device_id, d.id::text) AS device_sn,
                    COALESCE(d.device_model, d.device_name, 'Y6B') AS device_model,
+                   d.merchant_id,
+                   COALESCE(d.chat_id, d.telegram_chat_id, '-') AS till_id,
                    COALESCE(d.telegram_chat_id, d.chat_id) AS telegram_chat_id,
-                   d.status,
+                   COALESCE(d.status, CASE WHEN d.is_active = FALSE THEN 'Offline' ELSE 'Online' END, 'Offline') AS status,
+                   COALESCE(d.battery, '100%') AS battery,
+                   COALESCE(d.signal, 'Good') AS signal,
+                   COALESCE(d.version_4g, 'Y6_LCD_1605_V1.0') AS version_4g,
+                   COALESCE(d.version_wifi, 'esp32c2x_2M_OTA') AS version_wifi,
+                   COALESCE(d.last_online, d.last_heartbeat, d.updated_at, d.created_at) AS last_time,
                    COALESCE(d.last_heartbeat, d.last_online) AS last_heartbeat,
-                   d.battery,
-                   d.signal,
-                   d.version_4g,
-                   d.version_wifi,
                    d.created_at,
-                   m.name AS store_name, m.owner_phone
+                   m.name AS store_name, m.owner_phone, m.owner_name
             FROM devices d
-            LEFT JOIN merchants m ON d.merchant_id = m.id
+            LEFT JOIN merchants m ON (d.merchant_id::text = m.id::text OR d.merchant_id::text = m.merchant_id::text)
             WHERE {where_sql}
             ORDER BY d.id DESC
         """
@@ -132,7 +136,8 @@ async def list_devices(
                 {
                     **dict(d),
                     "created_at": d["created_at"].isoformat() if d["created_at"] else None,
-                    "last_heartbeat": d["last_heartbeat"].isoformat() if d["last_heartbeat"] else None
+                    "last_heartbeat": d["last_heartbeat"].isoformat() if d["last_heartbeat"] else None,
+                    "last_time": d["last_time"].strftime("%Y-%m-%d %H:%M:%S") if d["last_time"] else None
                 }
                 for d in devices
             ]
