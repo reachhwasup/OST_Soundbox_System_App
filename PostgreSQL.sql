@@ -77,11 +77,20 @@ CREATE INDEX IF NOT EXISTS idx_merchants_owner_phone ON merchants(owner_phone);
 CREATE TABLE IF NOT EXISTS devices (
     id SERIAL PRIMARY KEY,
     merchant_id INT REFERENCES merchants(id) ON DELETE SET NULL,
-    device_sn VARCHAR(100) NOT NULL UNIQUE,          -- Serial Number របស់ Y6B
+    device_sn VARCHAR(100),                          -- Serial Number របស់ Y6B
     device_model VARCHAR(50) DEFAULT 'Y6B',
     telegram_chat_id VARCHAR(100),                    -- Telegram Group Verification Code / Chat ID
     status device_status DEFAULT 'ACTIVE',
     last_heartbeat TIMESTAMP WITH TIME ZONE,
+    battery VARCHAR(50),                              -- Battery percentage (e.g. '100%')
+    signal VARCHAR(50),                               -- Signal strength (e.g. 'Excellent (-47 dBm)')
+    version_4g VARCHAR(255),                          -- 4G Modem Firmware Version
+    version_wifi VARCHAR(255),                        -- WiFi ESP32 Firmware Version
+    last_online TIMESTAMP WITH TIME ZONE,             -- Last online timestamp
+    device_id VARCHAR(100),                           -- Hardware Device ID alias
+    device_name VARCHAR(255),                         -- Device Name alias
+    chat_id VARCHAR(100),                             -- Telegram Chat ID alias
+    is_active BOOLEAN DEFAULT TRUE,                   -- Active status boolean
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
