@@ -226,23 +226,6 @@ export default function Sidebar({ activeTab, setActiveTab, isMobileOpen, setIsMo
                   )}
                 </div>
 
-                {/* Merchant Store View Switcher */}
-                <button
-                  type="button"
-                  onClick={() => handleNavClick('user')}
-                  className={`w-full flex items-center justify-between px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer ${
-                    activeTab === 'user'
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 sm:gap-2.5">
-                    <Store className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    <span>{t('storeBranches', 'Merchant Store View')}</span>
-                  </div>
-                  {activeTab === 'user' && <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 opacity-70" />}
-                </button>
-
               </div>
             )}
 

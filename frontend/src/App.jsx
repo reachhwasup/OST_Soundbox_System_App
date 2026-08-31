@@ -44,7 +44,6 @@ function MainLayout() {
 
   // Authenticated Flow (Case-insensitive role validation)
   const isAdmin = String(user?.role || '').trim().toUpperCase() === 'ADMIN';
-  const showAdminView = isAdmin && activeTab === 'admin';
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
@@ -62,7 +61,7 @@ function MainLayout() {
         <Navbar onOpenSidebar={() => setIsMobileSidebarOpen(true)} />
 
         <main className="flex-1">
-          {showAdminView ? <AdminDashboard /> : <UserDashboard />}
+          {isAdmin ? <AdminDashboard /> : <UserDashboard />}
         </main>
         <footer className="border-t border-slate-200 dark:border-slate-800 py-6 text-center text-xs text-slate-400 dark:text-slate-500">
           OST Soundbox & Merchant Management Portal &copy; {new Date().getFullYear()}
