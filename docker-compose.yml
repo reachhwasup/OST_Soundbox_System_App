@@ -1,18 +1,33 @@
 services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: ost_app_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: fDdiFw_KB2930otN
+      POSTGRES_DB: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - ost_app_pgdata:/var/lib/postgresql/data
+    restart: always
+
   fastapi-gateway:
     build:
       context: .
     image: ios_app_backend
-    container_name: ios_app_backend
+    container_name: ost_app_backend
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8001:8000"
     environment:
-      - DATABASE_URL=postgresql://postgres:fDdiFw_KB2930otN@iot_postgres:5432/postgres
+      - DATABASE_URL=postgresql://postgres:fDdiFw_KB2930otN@postgres:5432/postgres
       - API_SECRET_KEY=your-api-key
       - ADMIN_PHONE=016441474
       - ADMIN_PASSWORD=reach1234
       - ADMIN_NAME=Admin Reach
+    depends_on:
+      - postgres
     restart: always
 
   frontend:
@@ -20,9 +35,12 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     image: ios_app_frontend
-    container_name: ios_app_frontend
+    container_name: ost_app_frontend
     ports:
       - "3000:80"
     depends_on:
       - fastapi-gateway
     restart: always
+
+volumes:
+  ost_app_pgdata:
