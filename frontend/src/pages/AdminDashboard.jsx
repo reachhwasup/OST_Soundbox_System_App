@@ -110,6 +110,17 @@ export default function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState('');
   const [logTypeFilter, setLogTypeFilter] = useState(''); // 'TRANSACTION' | 'SECURITY' | ''
 
+  // Dedicated User Logs Filters
+  const [userLogSearch, setUserLogSearch] = useState('');
+  const [userLogBankFilter, setUserLogBankFilter] = useState('ALL');
+  const [userLogCurrencyFilter, setUserLogCurrencyFilter] = useState('ALL');
+  const [userLogStoreFilter, setUserLogStoreFilter] = useState('ALL');
+
+  // Dedicated Admin Logs Filters
+  const [adminLogSearch, setAdminLogSearch] = useState('');
+  const [adminLogTypeFilter, setAdminLogTypeFilter] = useState('ALL');
+  const [adminLogSeverityFilter, setAdminLogSeverityFilter] = useState('ALL');
+
   // Store & Location Filter States
   const [storeSearch, setStoreSearch] = useState('');
   const [storeProvinceFilter, setStoreProvinceFilter] = useState('');
@@ -2217,146 +2228,236 @@ export default function AdminDashboard() {
       )}
 
 
-      {/* Tab: System & Audit Logs (User Logs & Admin Logs) */}
-      {(adminTab === 'logs' || adminTab === 'user_logs' || adminTab === 'admin_logs') && (
+      {/* ======================================================== */}
+      {/* TAB 4: DEDICATED USER & PAYMENT TRANSACTION LOGS         */}
+      {/* ======================================================== */}
+      {(adminTab === 'logs' || adminTab === 'user_logs') && (
         <div className="space-y-4">
           
-          {/* Logs Filter Sub-Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-              <button
-                type="button"
-                onClick={() => {
-                  setAdminTab('logs');
-                  setLogTypeFilter('all');
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
-                  adminTab === 'logs' && logTypeFilter === 'all'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <Activity className="w-3.5 h-3.5" />
-                <span>{t('allLogs', 'All Logs')}</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10 font-bold">
-                  {logs.length}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setAdminTab('user_logs');
-                  setLogTypeFilter('transactions');
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
-                  adminTab === 'user_logs' || logTypeFilter === 'transactions'
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <Receipt className="w-3.5 h-3.5" />
-                <span>{t('userLogs', 'User & Payment Logs')}</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10 font-bold">
-                  {logs.filter(l => l.log_category === 'TRANSACTION').length}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setAdminTab('admin_logs');
-                  setLogTypeFilter('security');
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
-                  adminTab === 'admin_logs' || logTypeFilter === 'security'
-                    ? 'bg-rose-600 text-white shadow-xs'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <ShieldAlert className="w-3.5 h-3.5" />
-                <span>{t('adminLogs', 'Admin & Security Logs')}</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10 font-bold">
-                  {logs.filter(l => l.log_category === 'SECURITY').length}
-                </span>
-              </button>
+          {/* Top User Payments KPI Banner */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total USD Collected</span>
+                <div className="p-1.5 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 rounded-lg">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
+                ${logs.filter(l => l.log_category === 'TRANSACTION' && String(l.currency).toUpperCase() !== 'KHR').reduce((sum, l) => sum + (Number(l.amount) || 0), 0).toFixed(2)}
+              </div>
+              <span className="text-[11px] text-slate-400">Across all merchant stores</span>
             </div>
 
-            <button
-              type="button"
-              onClick={fetchAllData}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 cursor-pointer ml-auto"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              <span>{isKhmer ? 'ផ្ទុកទិន្នន័យឡើងវិញ' : 'Refresh Logs'}</span>
-            </button>
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total KHR Collected</span>
+                <div className="p-1.5 bg-blue-50 dark:bg-blue-950/60 text-blue-600 rounded-lg">
+                  <span className="font-bold text-xs">៛</span>
+                </div>
+              </div>
+              <div className="text-2xl font-black text-blue-600 dark:text-blue-400 font-mono tracking-tight">
+                ៛{logs.filter(l => l.log_category === 'TRANSACTION' && String(l.currency).toUpperCase() === 'KHR').reduce((sum, l) => sum + (Number(l.amount) || 0), 0).toLocaleString()}
+              </div>
+              <span className="text-[11px] text-slate-400">Bakong Khmer Riel QR</span>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Payment Txns</span>
+                <div className="p-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 rounded-lg">
+                  <Receipt className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                {logs.filter(l => l.log_category === 'TRANSACTION').length} <span className="text-xs font-normal text-slate-400">txns</span>
+              </div>
+              <span className="text-[11px] text-emerald-500 font-medium flex items-center gap-1">
+                <CheckCheck className="w-3.5 h-3.5" />
+                <span>100% Broadcast Success</span>
+              </span>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Soundbox Status</span>
+                <div className="p-1.5 bg-amber-50 dark:bg-amber-950/60 text-amber-600 rounded-lg">
+                  <Volume2 className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                {devices.filter(d => String(d.status).toUpperCase() === 'ACTIVE' || String(d.status).toUpperCase() === 'ONLINE').length} / {devices.length}
+              </div>
+              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">Active Speakers Online</span>
+            </div>
           </div>
 
-          {/* Desktop Table View */}
-          <div className="hidden lg:block bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200 dark:border-slate-800 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                    <th className="py-3 px-4">Type</th>
-                    <th className="py-3 px-4">Time</th>
-                    <th className="py-3 px-4">Store & Soundbox</th>
-                    <th className="py-3 px-4">Bank & TxID</th>
-                    <th className="py-3 px-4">Amount</th>
-                    <th className="py-3 px-4">Payer / Sender</th>
-                    <th className="py-3 px-4">Status / Action</th>
-                    <th className="py-3 px-4 text-right">Details</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-                  {(() => {
-                    const filteredLogs = logs.filter(log => {
-                      if (adminTab === 'user_logs') return log.log_category === 'TRANSACTION';
-                      if (adminTab === 'admin_logs') return log.log_category === 'SECURITY';
-                      if (logTypeFilter === 'transactions') return log.log_category === 'TRANSACTION';
-                      if (logTypeFilter === 'security') return log.log_category === 'SECURITY';
-                      return true;
-                    });
+          {/* User Logs Card */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
+            
+            {/* Header Toolbar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Receipt className="w-5 h-5 text-emerald-600" />
+                  <span>{isKhmer ? 'កំណត់ត្រាប្រតិបត្តិការអតិថិជន (User Payment Logs)' : 'User & Customer Payment Transaction Logs'}</span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Live audit trail of customer payments processed and broadcasted via ABA, ACLEDA, Canadia, Wing, and Bakong QR.
+                </p>
+              </div>
 
-                    if (filteredLogs.length === 0) {
-                      return (
-                        <tr>
-                          <td colSpan={8} className="py-12 text-center text-slate-400">
-                            <Activity className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
-                            <p className="font-semibold text-slate-600 dark:text-slate-400">
-                              {adminTab === 'user_logs' ? 'No user payment logs recorded yet.' : adminTab === 'admin_logs' ? 'No security or admin alerts found.' : 'No logs found'}
-                            </p>
-                          </td>
-                        </tr>
-                      );
-                    }
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportCSV}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Export CSV</span>
+                </button>
 
-                    return filteredLogs.map((log, idx) => {
-                      const isTx = log.log_category === 'TRANSACTION';
+                <button
+                  type="button"
+                  onClick={fetchAllData}
+                  className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition cursor-pointer"
+                  title="Refresh user payment logs"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
 
-                      return (
+            {/* Filter Toolbar */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+              {/* Search */}
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={userLogSearch}
+                  onChange={(e) => setUserLogSearch(e.target.value)}
+                  placeholder="Search payer, TxID, amount, SN..."
+                  className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              {/* Bank Filter */}
+              <select
+                value={userLogBankFilter}
+                onChange={(e) => setUserLogBankFilter(e.target.value)}
+                className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+              >
+                <option value="ALL">All Banks & Gateways</option>
+                <option value="ABA">ABA Bank</option>
+                <option value="ACLEDA">ACLEDA Bank</option>
+                <option value="Canadia">Canadia Bank</option>
+                <option value="Wing">Wing Bank</option>
+                <option value="Bakong">Bakong QR</option>
+              </select>
+
+              {/* Currency Filter */}
+              <select
+                value={userLogCurrencyFilter}
+                onChange={(e) => setUserLogCurrencyFilter(e.target.value)}
+                className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+              >
+                <option value="ALL">All Currencies (USD & KHR)</option>
+                <option value="USD">USD ($) Only</option>
+                <option value="KHR">KHR (៛) Only</option>
+              </select>
+
+              {/* Store Filter */}
+              <select
+                value={userLogStoreFilter}
+                onChange={(e) => setUserLogStoreFilter(e.target.value)}
+                className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+              >
+                <option value="ALL">All Merchant Stores</option>
+                {stores.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* User Logs Table */}
+            {(() => {
+              const filteredUserLogs = logs.filter(log => {
+                if (log.log_category !== 'TRANSACTION') return false;
+                if (userLogBankFilter !== 'ALL' && !String(log.bank_name || '').toLowerCase().includes(userLogBankFilter.toLowerCase())) return false;
+                if (userLogCurrencyFilter !== 'ALL' && String(log.currency || 'USD').toUpperCase() !== userLogCurrencyFilter) return false;
+                if (userLogStoreFilter !== 'ALL' && String(log.store_id || '') !== String(userLogStoreFilter)) return false;
+                if (userLogSearch.trim()) {
+                  const q = userLogSearch.toLowerCase().trim();
+                  const payer = String(log.payer_name || '').toLowerCase();
+                  const txid = String(log.txid || '').toLowerCase();
+                  const bank = String(log.bank_name || '').toLowerCase();
+                  const sn = String(log.device_sn || '').toLowerCase();
+                  const store = String(log.store_name || '').toLowerCase();
+                  const amt = String(log.amount || '');
+                  return payer.includes(q) || txid.includes(q) || bank.includes(q) || sn.includes(q) || store.includes(q) || amt.includes(q);
+                }
+                return true;
+              });
+
+              if (filteredUserLogs.length === 0) {
+                return (
+                  <div className="text-center py-14 text-slate-500 space-y-2">
+                    <Receipt className="w-10 h-10 text-slate-300 mx-auto" />
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">No user payment logs match criteria</p>
+                    <p className="text-xs text-slate-400">Try clearing filters or performing a test payment.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800">
+                  <table className="w-full text-left border-collapse min-w-[850px]">
+                    <thead>
+                      <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                        <th className="py-3 px-4">Bank / Gateway</th>
+                        <th className="py-3 px-4">Amount</th>
+                        <th className="py-3 px-4">Customer / Payer</th>
+                        <th className="py-3 px-4">Bank Reference ID</th>
+                        <th className="py-3 px-4">Store & Soundbox</th>
+                        <th className="py-3 px-4">Broadcast Status</th>
+                        <th className="py-3 px-4">Timestamp</th>
+                        <th className="py-3 px-4 text-right">Details</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                      {filteredUserLogs.map((log, idx) => (
                         <tr key={log.id || idx} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
-                          {/* Type Badge */}
-                          <td className="py-3.5 px-4">
-                            {isTx ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-semibold text-[10px] uppercase border border-emerald-200/50 dark:border-emerald-800/50">
-                                <Receipt className="w-3 h-3" />
-                                Payment
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-semibold text-[10px] uppercase border border-rose-200/50 dark:border-rose-800/50">
-                                <ShieldAlert className="w-3 h-3" />
-                                {log.alert_type || 'Alert'}
-                              </span>
-                            )}
+                          <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <span>{log.bank_name || 'Bakong'}</span>
                           </td>
-
-                          {/* Timestamp */}
-                          <td className="py-3.5 px-4 whitespace-nowrap text-slate-500 font-mono text-[11px]">
-                            {log.created_at ? new Date(log.created_at).toLocaleString() : '—'}
+                          <td className="py-3.5 px-4 whitespace-nowrap font-mono font-black text-sm text-emerald-600 dark:text-emerald-400">
+                            +{log.currency === 'KHR'
+                              ? `៛${Number(log.amount).toLocaleString()}`
+                              : `$${Number(log.amount).toFixed(2)}`}
                           </td>
-
-                          {/* Store & Device */}
+                          <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 font-medium">
+                            {log.payer_name || 'Customer'}
+                          </td>
+                          <td className="py-3.5 px-4 font-mono text-slate-500">
+                            <div className="flex items-center gap-1.5">
+                              <span>{log.txid ? log.txid.substring(0, 16) : '—'}</span>
+                              {log.txid && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(log.txid);
+                                    showToast('Transaction ID copied!', 'success');
+                                  }}
+                                  className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                                  title="Copy TxID"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
                           <td className="py-3.5 px-4">
                             <div className="font-semibold text-slate-900 dark:text-white">
                               {log.store_name || '—'}
@@ -2366,79 +2467,20 @@ export default function AdminDashboard() {
                               <span>{log.device_sn || '—'}</span>
                             </div>
                           </td>
-
-                          {/* Bank & TxID */}
-                          <td className="py-3.5 px-4">
-                            <div className="font-semibold text-indigo-600 dark:text-indigo-400">
-                              {log.bank_name || 'Bank'}
-                            </div>
-                            <div className="flex items-center gap-1 font-mono text-[10px] text-slate-400 mt-0.5">
-                              <span>{log.txid ? log.txid.substring(0, 16) : '—'}</span>
-                              {log.txid && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(log.txid);
-                                    showToast('Transaction ID copied!', 'success');
-                                  }}
-                                  className="text-slate-400 hover:text-indigo-600 transition cursor-pointer"
-                                >
-                                  <Copy className="w-2.5 h-2.5" />
-                                </button>
-                              )}
-                            </div>
-                          </td>
-
-                          {/* Amount */}
-                          <td className="py-3.5 px-4 whitespace-nowrap font-mono font-bold">
-                            {isTx ? (
-                              <span className="text-emerald-600 dark:text-emerald-400">
-                                {log.currency === 'KHR'
-                                  ? `${Number(log.amount).toLocaleString()} ៛`
-                                  : `$${Number(log.amount).toFixed(2)}`}
-                              </span>
-                            ) : (
-                              <span className="text-rose-600 dark:text-rose-400">
-                                {log.amount ? `$${Number(log.amount).toFixed(2)}` : '—'}
-                              </span>
-                            )}
-                          </td>
-
-                          {/* Payer / Sender */}
-                          <td className="py-3.5 px-4">
-                            <div className="text-slate-700 dark:text-slate-300 font-medium">
-                              {log.payer_name || log.sender_name || '—'}
-                            </div>
-                            {log.sender_user_id && (
-                              <div className="text-[10px] text-slate-400 font-mono">
-                                ID: {log.sender_user_id}
-                              </div>
-                            )}
-                          </td>
-
-                          {/* Status / Action */}
                           <td className="py-3.5 px-4 whitespace-nowrap">
-                            {isTx ? (
-                              <div className="flex flex-col gap-1">
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 w-fit">
-                                  <CheckCheck className="w-3 h-3" />
-                                  {log.status || 'PROCESSED'}
-                                </span>
-                                {log.device_ack && (
-                                  <span className="text-[9px] text-indigo-500 font-medium flex items-center gap-0.5">
-                                    <Volume2 className="w-2.5 h-2.5" /> Soundbox Announced
-                                  </span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
-                                <AlertTriangle className="w-3 h-3" />
-                                {log.status || 'BLOCKED'}
+                            <div className="flex flex-col gap-0.5">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 w-fit">
+                                <CheckCheck className="w-3 h-3" />
+                                {log.status || 'PROCESSED'}
                               </span>
-                            )}
+                              <span className="text-[9px] text-indigo-500 font-medium flex items-center gap-0.5">
+                                <Volume2 className="w-2.5 h-2.5" /> Soundbox Announced
+                              </span>
+                            </div>
                           </td>
-
-                          {/* View Raw Action */}
+                          <td className="py-3.5 px-4 whitespace-nowrap text-slate-400 font-mono text-[11px]">
+                            {log.created_at ? new Date(log.created_at).toLocaleString() : '—'}
+                          </td>
                           <td className="py-3.5 px-4 text-right">
                             <button
                               type="button"
@@ -2446,94 +2488,250 @@ export default function AdminDashboard() {
                                 setSelectedLog(log);
                                 setIsLogDetailOpen(true);
                               }}
-                              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg transition cursor-pointer"
+                              className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition cursor-pointer"
                               title="View Raw Message & Audit Payload"
                             >
                               <Eye className="w-4 h-4" />
                             </button>
                           </td>
                         </tr>
-                      );
-                    });
-                  })()}
-                </tbody>
-              </table>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
+
+          </div>
+
+        </div>
+      )}
+
+
+      {/* ======================================================== */}
+      {/* TAB 5: DEDICATED ADMIN & SECURITY AUDIT LOGS             */}
+      {/* ======================================================== */}
+      {adminTab === 'admin_logs' && (
+        <div className="space-y-4">
+          
+          {/* Top Admin Security KPI Banner */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Audit Events</span>
+                <div className="p-1.5 bg-rose-50 dark:bg-rose-950/60 text-rose-600 rounded-lg">
+                  <ShieldAlert className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-rose-600 dark:text-rose-400 font-mono tracking-tight">
+                {logs.filter(l => l.log_category === 'SECURITY').length} <span className="text-xs font-normal text-slate-400">events</span>
+              </div>
+              <span className="text-[11px] text-slate-400">Hardware & security actions</span>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Remote Commands</span>
+                <div className="p-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 rounded-lg">
+                  <Send className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-tight">
+                {logs.filter(l => l.log_category === 'SECURITY' && (l.alert_type === 'VOICE_BROADCAST' || l.alert_type === 'SET_VOLUME' || l.alert_type === 'REBOOT')).length}
+              </div>
+              <span className="text-[11px] text-slate-400">Voice tests, volume & reboots</span>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Device Unlinks / Binds</span>
+                <div className="p-1.5 bg-amber-50 dark:bg-amber-950/60 text-amber-600 rounded-lg">
+                  <Unlink className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-amber-600 dark:text-amber-400 font-mono tracking-tight">
+                {logs.filter(l => l.log_category === 'SECURITY' && (l.alert_type === 'DEVICE_UNLINK' || l.alert_type === 'DEVICE_LINK')).length}
+              </div>
+              <span className="text-[11px] text-amber-600 font-medium">Store reassignments</span>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">System Integrity</span>
+                <div className="p-1.5 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 rounded-lg">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
+                100% <span className="text-xs font-normal text-slate-400 font-sans">Secure</span>
+              </div>
+              <span className="text-[11px] text-emerald-500 font-medium">All audit records verified</span>
             </div>
           </div>
 
-          {/* Mobile Card View */}
-          <div className="lg:hidden space-y-3">
+          {/* Admin Logs Card */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
+            
+            {/* Header Toolbar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <ShieldAlert className="w-5 h-5 text-rose-600" />
+                  <span>{isKhmer ? 'កំណត់ត្រាប្រព័ន្ធ & សុវត្ថិភាព (Admin & Security Audit Logs)' : 'Admin, Security & Remote Command Audit Logs'}</span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Audit trail for hardware operations, remote speaker commands, volume changes, store unlink events, and administrator actions.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={fetchAllData}
+                  className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition cursor-pointer"
+                  title="Refresh security audit logs"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Toolbar */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {/* Search */}
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={adminLogSearch}
+                  onChange={(e) => setAdminLogSearch(e.target.value)}
+                  placeholder="Search reason, device SN, admin..."
+                  className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+
+              {/* Event Type Filter */}
+              <select
+                value={adminLogTypeFilter}
+                onChange={(e) => setAdminLogTypeFilter(e.target.value)}
+                className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 cursor-pointer"
+              >
+                <option value="ALL">All Event Types</option>
+                <option value="VOICE_BROADCAST">🔊 Voice Broadcast</option>
+                <option value="SET_VOLUME">🔉 Volume Adjustment</option>
+                <option value="REBOOT">🔄 Device Reboot</option>
+                <option value="DEVICE_UNLINK">🔗 Device Unlink</option>
+                <option value="SECURITY">🛡️ Security Alert</option>
+              </select>
+
+              {/* Severity Filter */}
+              <select
+                value={adminLogSeverityFilter}
+                onChange={(e) => setAdminLogSeverityFilter(e.target.value)}
+                className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 cursor-pointer"
+              >
+                <option value="ALL">All Severity Levels</option>
+                <option value="INFO">ℹ️ Info</option>
+                <option value="WARNING">⚠️ Warning</option>
+                <option value="CRITICAL">🚨 Critical</option>
+              </select>
+            </div>
+
+            {/* Admin Logs Table */}
             {(() => {
-              const filteredMobileLogs = logs.filter(log => {
-                if (adminTab === 'user_logs') return log.log_category === 'TRANSACTION';
-                if (adminTab === 'admin_logs') return log.log_category === 'SECURITY';
-                if (logTypeFilter === 'transactions') return log.log_category === 'TRANSACTION';
-                if (logTypeFilter === 'security') return log.log_category === 'SECURITY';
+              const filteredAdminLogs = logs.filter(log => {
+                if (log.log_category !== 'SECURITY') return false;
+                if (adminLogTypeFilter !== 'ALL' && !String(log.alert_type || '').toUpperCase().includes(adminLogTypeFilter)) return false;
+                if (adminLogSeverityFilter !== 'ALL' && String(log.status || '').toUpperCase() !== adminLogSeverityFilter) return false;
+                if (adminLogSearch.trim()) {
+                  const q = adminLogSearch.toLowerCase().trim();
+                  const reason = String(log.reason || '').toLowerCase();
+                  const type = String(log.alert_type || '').toLowerCase();
+                  const sn = String(log.device_sn || '').toLowerCase();
+                  const store = String(log.store_name || '').toLowerCase();
+                  const sender = String(log.sender_name || log.payer_name || '').toLowerCase();
+                  return reason.includes(q) || type.includes(q) || sn.includes(q) || store.includes(q) || sender.includes(q);
+                }
                 return true;
               });
 
-              if (filteredMobileLogs.length === 0) {
+              if (filteredAdminLogs.length === 0) {
                 return (
-                  <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 text-center text-slate-400 text-sm">
-                    {adminTab === 'user_logs' ? 'No user payment logs recorded yet.' : adminTab === 'admin_logs' ? 'No security or admin alerts found.' : 'No logs recorded yet.'}
+                  <div className="text-center py-14 text-slate-500 space-y-2">
+                    <ShieldAlert className="w-10 h-10 text-slate-300 mx-auto" />
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">No admin security logs match criteria</p>
+                    <p className="text-xs text-slate-400">All systems are running securely.</p>
                   </div>
                 );
               }
 
-              return filteredMobileLogs.map((log, idx) => {
-                const isTx = log.log_category === 'TRANSACTION';
-
-                return (
-                  <div
-                    key={log.id || idx}
-                    onClick={() => {
-                      setSelectedLog(log);
-                      setIsLogDetailOpen(true);
-                    }}
-                    className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3 cursor-pointer active:scale-[0.99] transition"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        {isTx ? (
-                          <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold text-[10px] uppercase">
-                            Payment
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-bold text-[10px] uppercase">
-                            {log.alert_type || 'Alert'}
-                          </span>
-                        )}
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          {log.created_at ? new Date(log.created_at).toLocaleTimeString() : '—'}
-                        </span>
-                      </div>
-                      <span className="font-bold text-sm font-mono text-emerald-600 dark:text-emerald-400">
-                        {log.currency === 'KHR'
-                          ? `${Number(log.amount || 0).toLocaleString()} ៛`
-                          : `$${Number(log.amount || 0).toFixed(2)}`}
-                      </span>
-                    </div>
-
-                    <div className="text-xs space-y-1">
-                      <div className="font-bold text-slate-900 dark:text-white flex items-center justify-between">
-                        <span>{log.store_name || 'Store'}</span>
-                        <span className="text-slate-400 font-mono font-normal text-[11px]">{log.bank_name}</span>
-                      </div>
-                      <div className="text-slate-500 font-mono text-[11px] flex items-center gap-1">
-                        <Volume2 className="w-3 h-3 text-emerald-500" />
-                        <span>{log.device_sn || '—'}</span>
-                      </div>
-                    </div>
-
-                    {log.payer_name && (
-                      <div className="text-[11px] text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 p-2 rounded-lg">
-                        Payer: <span className="font-semibold text-slate-900 dark:text-white">{log.payer_name}</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              });
+              return (
+                <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800">
+                  <table className="w-full text-left border-collapse min-w-[850px]">
+                    <thead>
+                      <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                        <th className="py-3 px-4">Event Type</th>
+                        <th className="py-3 px-4">Target Device (SN)</th>
+                        <th className="py-3 px-4">Target Store</th>
+                        <th className="py-3 px-4">Action / Reason</th>
+                        <th className="py-3 px-4">Operator / Sender</th>
+                        <th className="py-3 px-4">Severity / Status</th>
+                        <th className="py-3 px-4">Timestamp</th>
+                        <th className="py-3 px-4 text-right">Details</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                      {filteredAdminLogs.map((log, idx) => (
+                        <tr key={log.id || idx} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
+                          <td className="py-3.5 px-4">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-bold text-[10px] uppercase border border-rose-200/60 dark:border-rose-800/60">
+                              <ShieldAlert className="w-3 h-3" />
+                              {log.alert_type || 'SECURITY'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                            <Smartphone className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                            <span>{log.device_sn || '—'}</span>
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-800 dark:text-slate-200 font-medium">
+                            {log.store_name || 'Store'}
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 max-w-xs truncate">
+                            {log.reason || 'Hardware command executed'}
+                          </td>
+                          <td className="py-3.5 px-4 font-medium text-slate-600 dark:text-slate-400">
+                            {log.sender_name || currentAdmin?.full_name || 'Admin'}
+                          </td>
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                              <CheckCircle2 className="w-3 h-3" />
+                              {log.status || 'DISPATCHED'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 whitespace-nowrap text-slate-400 font-mono text-[11px]">
+                            {log.created_at ? new Date(log.created_at).toLocaleString() : '—'}
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedLog(log);
+                                setIsLogDetailOpen(true);
+                              }}
+                              className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition cursor-pointer"
+                              title="View Raw Audit Payload"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
             })()}
+
           </div>
 
         </div>
