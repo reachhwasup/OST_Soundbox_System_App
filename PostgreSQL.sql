@@ -59,6 +59,8 @@ CREATE TABLE IF NOT EXISTS devices (
     signal VARCHAR(50),
     version_4g VARCHAR(255),
     version_wifi VARCHAR(255),
+    batch_no VARCHAR(100),
+    notes TEXT,
     last_online TIMESTAMP WITH TIME ZONE,
     last_heartbeat TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

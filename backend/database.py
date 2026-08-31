@@ -48,10 +48,18 @@ async def init_db():
             END $$;
 
             DO $$ BEGIN
-                CREATE TYPE device_status AS ENUM ('ACTIVE', 'INACTIVE', 'MAINTENANCE');
+                CREATE TYPE device_status AS ENUM ('ACTIVE', 'INACTIVE', 'MAINTENANCE', 'IN_STOCK', 'RETIRED');
             EXCEPTION
                 WHEN duplicate_object THEN null;
             END $$;
+
+            DO $$ BEGIN
+                ALTER TYPE device_status ADD VALUE IF NOT EXISTS 'IN_STOCK';
+            EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+            DO $$ BEGIN
+                ALTER TYPE device_status ADD VALUE IF NOT EXISTS 'RETIRED';
+            EXCEPTION WHEN duplicate_object THEN null; END $$;
 
             DO $$ BEGIN
                 CREATE TYPE tx_status AS ENUM ('PENDING', 'PROCESSED', 'FAILED', 'DUPLICATE');
@@ -154,6 +162,8 @@ async def init_db():
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS signal VARCHAR(50);
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_4g VARCHAR(255);
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_wifi VARCHAR(255);
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS batch_no VARCHAR(100);
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS last_online TIMESTAMP WITH TIME ZONE;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_id VARCHAR(100);
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_name VARCHAR(255);

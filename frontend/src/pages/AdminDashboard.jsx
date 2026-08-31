@@ -60,7 +60,14 @@ import {
   Volume1,
   VolumeX,
   Sparkles,
-  Zap
+  Zap,
+  Package,
+  PackagePlus,
+  Wrench,
+  Undo2,
+  ArrowLeftRight,
+  Warehouse,
+  Boxes
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -132,6 +139,20 @@ export default function AdminDashboard() {
   const [commandVolume, setCommandVolume] = useState(80);
   const [commandCustomText, setCommandCustomText] = useState('ABA Bank received 10 dollars');
   const [commandSubmitting, setCommandSubmitting] = useState(false);
+
+  // Stock Management & Intake State
+  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+  const [stockModalTab, setStockModalTab] = useState('BULK'); // 'BULK' | 'SINGLE'
+  const [bulkSnInput, setBulkSnInput] = useState('');
+  const [bulkModel, setBulkModel] = useState('Y6B');
+  const [bulkBatchNo, setBulkBatchNo] = useState(`BATCH-${new Date().toISOString().slice(0,7)}`);
+  const [bulkNotes, setBulkNotes] = useState('');
+  const [singleSnInput, setSingleSnInput] = useState('');
+  const [singleModel, setSingleModel] = useState('Y6B');
+  const [singleStoreId, setSingleStoreId] = useState('');
+  const [singleBatchNo, setSingleBatchNo] = useState(`BATCH-${new Date().toISOString().slice(0,7)}`);
+  const [singleNotes, setSingleNotes] = useState('');
+  const [stockSubmitting, setStockSubmitting] = useState(false);
 
   const [isDeviceDetailOpen, setIsDeviceDetailOpen] = useState(false);
   const [selectedDeviceDetail, setSelectedDeviceDetail] = useState(null);
@@ -643,8 +664,19 @@ export default function AdminDashboard() {
         if (!typeMatch) return false;
       }
       if (devFilterStatus) {
-        const statusMatch = String(d.status || '').toLowerCase() === devFilterStatus.toLowerCase();
-        if (!statusMatch) return false;
+        const targetSt = devFilterStatus.toLowerCase();
+        const dSt = String(d.status || '').toLowerCase();
+        if (targetSt === 'in_stock') {
+          if (dSt !== 'in_stock' && d.merchant_id) return false;
+        } else if (targetSt === 'maintenance') {
+          if (dSt !== 'maintenance') return false;
+        } else if (targetSt === 'online') {
+          if (dSt !== 'active' && dSt !== 'online') return false;
+        } else if (targetSt === 'offline') {
+          if (dSt !== 'inactive' && dSt !== 'offline') return false;
+        } else {
+          if (dSt !== targetSt) return false;
+        }
       }
       if (devFilterMerchant.trim()) {
         const merchMatch = String(d.merchant_id || d.store_name || d.owner_name || '').toLowerCase().includes(devFilterMerchant.trim().toLowerCase());
@@ -672,6 +704,121 @@ export default function AdminDashboard() {
     const start = (devPage - 1) * devPageSize;
     return filteredDevices.slice(start, start + devPageSize);
   }, [filteredDevices, devPage, devPageSize]);
+
+  // Handle Bulk Import Stock
+  const handleBulkImportStock = async (e) => {
+    e.preventDefault();
+    const rawLines = bulkSnInput
+      .split(/[\n,;]+/)
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    if (rawLines.length === 0) {
+      showToast({ type: 'error', title: 'Serial Numbers Required', message: 'Please enter or scan at least one serial number.' });
+      return;
+    }
+
+    setStockSubmitting(true);
+    try {
+      const res = await api.post('/api/devices/bulk-import', {
+        serial_numbers: rawLines,
+        device_model: bulkModel,
+        batch_no: bulkBatchNo,
+        notes: bulkNotes
+      });
+      showToast({
+        type: 'success',
+        title: 'Stock Imported',
+        message: res.data.message || `Imported ${res.data.imported_count} devices into warehouse stock.`,
+        duration: 5000
+      });
+      setIsStockModalOpen(false);
+      setBulkSnInput('');
+      setBulkNotes('');
+      fetchAllData();
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Failed to import stock.';
+      showToast({ type: 'error', title: 'Import Failed', message: msg, duration: 5000 });
+    } finally {
+      setStockSubmitting(false);
+    }
+  };
+
+  // Handle Single Device Intake
+  const handleSingleIntakeStock = async (e) => {
+    e.preventDefault();
+    if (!singleSnInput.trim()) {
+      showToast({ type: 'error', title: 'SN Required', message: 'Please enter the device serial number.' });
+      return;
+    }
+
+    setStockSubmitting(true);
+    try {
+      const res = await api.post('/api/devices/intake', {
+        device_sn: singleSnInput.trim(),
+        device_model: singleModel,
+        batch_no: singleBatchNo,
+        notes: singleNotes,
+        merchant_id: singleStoreId ? Number(singleStoreId) : null
+      });
+      showToast({
+        type: 'success',
+        title: 'Device Intake Completed',
+        message: res.data.message || `Soundbox ${singleSnInput} added to stock.`,
+        duration: 5000
+      });
+      setIsStockModalOpen(false);
+      setSingleSnInput('');
+      setSingleStoreId('');
+      setSingleNotes('');
+      fetchAllData();
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Failed to intake device.';
+      showToast({ type: 'error', title: 'Intake Failed', message: msg, duration: 5000 });
+    } finally {
+      setStockSubmitting(false);
+    }
+  };
+
+  // Handle Return Device to Warehouse Stock
+  const handleReturnDeviceToStock = async (device) => {
+    if (!window.confirm(`Are you sure you want to unlink device '${device.device_sn}' from its store and return it to warehouse stock?`)) {
+      return;
+    }
+    try {
+      const res = await api.post(`/api/devices/${device.id}/return-to-stock`);
+      showToast({
+        type: 'success',
+        title: 'Returned to Stock',
+        message: res.data.message || `Device '${device.device_sn}' is now unassigned in warehouse stock.`,
+        duration: 5000
+      });
+      fetchAllData();
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Failed to return device to stock.';
+      showToast({ type: 'error', title: 'Action Failed', message: msg, duration: 5000 });
+    }
+  };
+
+  // Handle Mark Device for Maintenance / Repair
+  const handleSendDeviceToMaintenance = async (device) => {
+    if (!window.confirm(`Mark device '${device.device_sn}' as under maintenance / repair?`)) {
+      return;
+    }
+    try {
+      const res = await api.post(`/api/devices/${device.id}/maintenance`);
+      showToast({
+        type: 'success',
+        title: 'Sent to Maintenance',
+        message: res.data.message || `Device '${device.device_sn}' is now in maintenance.`,
+        duration: 5000
+      });
+      fetchAllData();
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Failed to mark device maintenance.';
+      showToast({ type: 'error', title: 'Action Failed', message: msg, duration: 5000 });
+    }
+  };
 
   // Reset Cloud Speaker Filters
   const handleResetDeviceFilters = () => {
@@ -1505,6 +1652,53 @@ export default function AdminDashboard() {
       {/* TAB 3: SOUNDBOX HARDWARE - CLOUD SPEAKER DEVICE MANAGER */}
       {adminTab === 'devices' && (
         <div className="space-y-4">
+
+          {/* 0. Device Stock & Inventory KPI Summary Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+              <div className="text-[10px] sm:text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Warehouse className="w-3.5 h-3.5" />
+                <span>Warehouse Stock</span>
+              </div>
+              <div className="text-xl sm:text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">
+                {devices.filter(d => String(d.status).toUpperCase() === 'IN_STOCK' || !d.merchant_id).length}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Unassigned & Ready</div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+              <div className="text-[10px] sm:text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                <CheckCircle className="w-3.5 h-3.5" />
+                <span>Deployed (Active)</span>
+              </div>
+              <div className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                {devices.filter(d => d.merchant_id && String(d.status).toUpperCase() !== 'MAINTENANCE').length}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-0.5">In Merchant Stores</div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+              <div className="text-[10px] sm:text-xs font-semibold text-rose-600 dark:text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Wrench className="w-3.5 h-3.5" />
+                <span>Maintenance / RMA</span>
+              </div>
+              <div className="text-xl sm:text-2xl font-bold text-rose-600 dark:text-rose-400 mt-1">
+                {devices.filter(d => String(d.status).toUpperCase() === 'MAINTENANCE').length}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Hardware Repair</div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+              <div className="text-[10px] sm:text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>Total Fleet</span>
+              </div>
+              <div className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">
+                {devices.length}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-0.5">All Soundbox Units</div>
+            </div>
+          </div>
           
           {/* 1. Cloud Speaker Search & Filter Card */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-5 space-y-4">
@@ -1548,9 +1742,11 @@ export default function AdminDashboard() {
                   onChange={(e) => { setDevFilterStatus(e.target.value); setDevPage(1); }}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
                 >
-                  <option value="">{t('pleaseSelect', 'Please select (All)')}</option>
-                  <option value="Online">Online</option>
-                  <option value="Offline">Offline</option>
+                  <option value="">{t('allStatuses', 'All Statuses')}</option>
+                  <option value="IN_STOCK">📦 In Stock (Warehouse)</option>
+                  <option value="Online">🟢 Deployed (Online)</option>
+                  <option value="Offline">⚪ Deployed (Offline)</option>
+                  <option value="MAINTENANCE">🛠️ Maintenance (Repair)</option>
                 </select>
               </div>
 
@@ -1642,7 +1838,16 @@ export default function AdminDashboard() {
 
           {/* 2. Action Toolbar & Batch Operations */}
           <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsStockModalOpen(true)}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <PackagePlus className="w-4 h-4" />
+                <span>Add / Import Stock</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
@@ -1756,10 +1961,13 @@ export default function AdminDashboard() {
                               {d.store_name ? (
                                 <div className="flex flex-col">
                                   <span className="font-semibold text-slate-900 dark:text-white">{d.store_name}</span>
-                                  {d.merchant_id && <span className="text-[10px] text-slate-400 font-mono">ID: {d.merchant_id}</span>}
+                                  {d.merchant_id && <span className="text-[10px] text-slate-400 font-mono">Store ID: #{d.merchant_id}</span>}
                                 </div>
                               ) : (
-                                <span className="text-slate-400 font-mono">-</span>
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-200/60 dark:border-amber-800/40">
+                                  <Package className="w-3 h-3" />
+                                  Warehouse Stock
+                                </span>
                               )}
                             </td>
                           )}
@@ -1767,12 +1975,20 @@ export default function AdminDashboard() {
                           {/* Status */}
                           {visibleColumns.status && (
                             <td className="py-3.5 px-3 text-center">
-                              {isOnline ? (
+                              {String(d.status || '').toUpperCase() === 'IN_STOCK' || !d.merchant_id ? (
+                                <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
+                                  In Stock
+                                </span>
+                              ) : String(d.status || '').toUpperCase() === 'MAINTENANCE' ? (
+                                <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800">
+                                  Maintenance
+                                </span>
+                              ) : isOnline ? (
                                 <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800">
                                   Online
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-600 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800">
+                                <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
                                   Offline
                                 </span>
                               )}
@@ -1827,18 +2043,21 @@ export default function AdminDashboard() {
                           {visibleColumns.operation && (
                             <td className="py-3.5 px-4 text-center">
                               <div className="flex items-center justify-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setCommandTargetDevice(d);
-                                    setCommandType('VOICE_BROADCAST');
-                                    setIsDeviceCommandOpen(true);
-                                  }}
-                                  className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer flex items-center gap-1"
-                                >
-                                  <Radio className="w-3 h-3" />
-                                  <span>Command</span>
-                                </button>
+                                {d.merchant_id && String(d.status).toUpperCase() !== 'MAINTENANCE' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCommandTargetDevice(d);
+                                      setCommandType('VOICE_BROADCAST');
+                                      setIsDeviceCommandOpen(true);
+                                    }}
+                                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer flex items-center gap-1"
+                                  >
+                                    <Radio className="w-3 h-3" />
+                                    <span>Command</span>
+                                  </button>
+                                )}
+
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -1849,6 +2068,7 @@ export default function AdminDashboard() {
                                 >
                                   Detail
                                 </button>
+
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -1859,8 +2079,39 @@ export default function AdminDashboard() {
                                   }}
                                   className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap"
                                 >
-                                  Edit Merchant
+                                  {d.merchant_id ? 'Edit Store' : 'Assign Store'}
                                 </button>
+
+                                {d.merchant_id && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleReturnDeviceToStock(d)}
+                                    title="Unlink and return to warehouse stock"
+                                    className="p-1.5 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-lg transition cursor-pointer"
+                                  >
+                                    <Undo2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+
+                                {String(d.status).toUpperCase() !== 'MAINTENANCE' ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSendDeviceToMaintenance(d)}
+                                    title="Send to Maintenance / Repair"
+                                    className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-slate-200 dark:border-slate-700 rounded-lg transition cursor-pointer"
+                                  >
+                                    <Wrench className="w-3.5 h-3.5" />
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleReturnDeviceToStock(d)}
+                                    title="Mark Repaired (Return to Warehouse Stock)"
+                                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
+                                  >
+                                    Repaired
+                                  </button>
+                                )}
                               </div>
                             </td>
                           )}
@@ -3398,6 +3649,254 @@ export default function AdminDashboard() {
               Done
             </button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Modal: Warehouse Stock Intake & Device Import */}
+      <Modal
+        isOpen={isStockModalOpen}
+        onClose={() => !stockSubmitting && setIsStockModalOpen(false)}
+        title="Warehouse Stock Intake & Device Import"
+      >
+        <div className="space-y-4">
+          
+          {/* Intake Mode Switcher */}
+          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setStockModalTab('BULK')}
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                stockModalTab === 'BULK'
+                  ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400'
+              }`}
+            >
+              <Boxes className="w-3.5 h-3.5" />
+              <span>Bulk Barcode / Multi-SN Import</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setStockModalTab('SINGLE')}
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                stockModalTab === 'SINGLE'
+                  ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400'
+              }`}
+            >
+              <PackagePlus className="w-3.5 h-3.5" />
+              <span>Single Device Intake</span>
+            </button>
+          </div>
+
+          {/* TAB 1: BULK IMPORT */}
+          {stockModalTab === 'BULK' && (
+            <form onSubmit={handleBulkImportStock} className="space-y-3.5">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Serial Numbers List (Scan or Paste)
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {bulkSnInput.split(/[\n,;]+/).filter(s => s.trim()).length} SNs detected
+                  </span>
+                </div>
+                <textarea
+                  rows={5}
+                  value={bulkSnInput}
+                  onChange={(e) => setBulkSnInput(e.target.value)}
+                  placeholder="6152608110020&#10;6152608110021&#10;6152608110022&#10;or paste comma-separated serial numbers..."
+                  required
+                  className="w-full px-3 py-2.5 text-xs font-mono bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  You can scan serial numbers with a 1D/2D barcode gun directly into this field.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Device Model
+                  </label>
+                  <select
+                    value={bulkModel}
+                    onChange={(e) => setBulkModel(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="Y6B">Y6B (LCD Display 4G+WiFi)</option>
+                    <option value="Y6_LCD">Y6 LCD Standard</option>
+                    <option value="S1">S1 Compact Soundbox</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Batch / PO Reference
+                  </label>
+                  <input
+                    type="text"
+                    value={bulkBatchNo}
+                    onChange={(e) => setBulkBatchNo(e.target.value)}
+                    placeholder="e.g. BATCH-2026-09"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Warehouse Notes (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={bulkNotes}
+                  onChange={(e) => setBulkNotes(e.target.value)}
+                  placeholder="e.g. Factory shipment #4, tested working"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsStockModalOpen(false)}
+                  disabled={stockSubmitting}
+                  className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={stockSubmitting}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  {stockSubmitting ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Importing Stock...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Boxes className="w-3.5 h-3.5" />
+                      <span>Import to Warehouse Stock</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* TAB 2: SINGLE DEVICE INTAKE */}
+          {stockModalTab === 'SINGLE' && (
+            <form onSubmit={handleSingleIntakeStock} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Soundbox Serial Number (SN) *
+                </label>
+                <input
+                  type="text"
+                  value={singleSnInput}
+                  onChange={(e) => setSingleSnInput(e.target.value)}
+                  placeholder="e.g. 6152608110050"
+                  required
+                  className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Device Model
+                  </label>
+                  <select
+                    value={singleModel}
+                    onChange={(e) => setSingleModel(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="Y6B">Y6B (LCD Display 4G+WiFi)</option>
+                    <option value="Y6_LCD">Y6 LCD Standard</option>
+                    <option value="S1">S1 Compact Soundbox</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Batch / PO Reference
+                  </label>
+                  <input
+                    type="text"
+                    value={singleBatchNo}
+                    onChange={(e) => setSingleBatchNo(e.target.value)}
+                    placeholder="e.g. BATCH-2026-09"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Assign Store (Optional)
+                </label>
+                <select
+                  value={singleStoreId}
+                  onChange={(e) => setSingleStoreId(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
+                >
+                  <option value="">📦 Keep in Warehouse Stock (Unassigned)</option>
+                  {stores.map(s => (
+                    <option key={s.id} value={s.id}>
+                      🏬 {s.name} ({s.owner_phone})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Leave unassigned if the device is staying in warehouse stock.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Notes (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={singleNotes}
+                  onChange={(e) => setSingleNotes(e.target.value)}
+                  placeholder="e.g. Sample unit, replacement device"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsStockModalOpen(false)}
+                  disabled={stockSubmitting}
+                  className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={stockSubmitting}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  {stockSubmitting ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <PackagePlus className="w-3.5 h-3.5" />
+                      <span>Save to Stock</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+
         </div>
       </Modal>
 

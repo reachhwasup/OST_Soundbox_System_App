@@ -111,8 +111,10 @@ async def list_devices(
                    COALESCE(d.device_sn, d.device_id, d.id::text) AS device_sn,
                    COALESCE(d.device_model, d.device_name, 'Y6B') AS device_model,
                    d.merchant_id,
+                   COALESCE(d.batch_no, 'BATCH-STD') AS batch_no,
+                   d.notes,
                    COALESCE(d.telegram_chat_id, d.chat_id) AS telegram_chat_id,
-                   COALESCE(d.status, CASE WHEN d.is_active = FALSE THEN 'Offline' ELSE 'Online' END, 'Offline') AS status,
+                   COALESCE(d.status::text, CASE WHEN d.merchant_id IS NULL THEN 'IN_STOCK' WHEN d.is_active = FALSE THEN 'Offline' ELSE 'Online' END, 'IN_STOCK') AS status,
                    COALESCE(d.battery, '100%') AS battery,
                    COALESCE(d.signal, 'Good') AS signal,
                    COALESCE(d.version_4g, 'Y6_LCD_1605_V1.0') AS version_4g,
@@ -143,12 +145,168 @@ async def list_devices(
         }
 
 
+class DeviceBulkImportSchema(BaseModel):
+    serial_numbers: List[str] = Field(..., description="List of serial numbers to import into stock")
+    device_model: str = "Y6B"
+    batch_no: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@router.post("/bulk-import", status_code=status.HTTP_201_CREATED)
+async def bulk_import_devices(
+    payload: DeviceBulkImportSchema,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Bulk imports Soundbox serial numbers into warehouse stock (unassigned).
+    Requires Admin privileges.
+    """
+    if current_user.get("role") != "ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only administrators can import device stock.")
+
+    raw_sns = [sn.strip() for sn in payload.serial_numbers if sn and sn.strip()]
+    if not raw_sns:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No valid serial numbers provided.")
+
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        imported_count = 0
+        skipped_count = 0
+
+        for sn in set(raw_sns):
+            existing = await conn.fetchrow("SELECT id FROM devices WHERE device_sn = $1", sn)
+            if existing:
+                skipped_count += 1
+                continue
+
+            await conn.execute("""
+                INSERT INTO devices (device_id, device_sn, device_model, batch_no, notes, status, is_active, battery, signal)
+                VALUES ($1, $1, $2, $3, $4, 'IN_STOCK', FALSE, '100%', 'Good')
+            """, sn, payload.device_model or "Y6B", payload.batch_no or "BATCH-BULK", payload.notes)
+            imported_count += 1
+
+        return {
+            "status": "success",
+            "message": f"Successfully imported {imported_count} soundbox devices into stock ({skipped_count} duplicates skipped).",
+            "imported_count": imported_count,
+            "skipped_count": skipped_count
+        }
+
+
+class DeviceIntakeSchema(BaseModel):
+    device_sn: str
+    device_model: str = "Y6B"
+    batch_no: Optional[str] = None
+    notes: Optional[str] = None
+    merchant_id: Optional[int] = None
+
+
+@router.post("/intake", status_code=status.HTTP_201_CREATED)
+async def intake_single_device(
+    payload: DeviceIntakeSchema,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Registers a single Soundbox device into warehouse stock or assigns it to a store.
+    Requires Admin privileges.
+    """
+    if current_user.get("role") != "ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only administrators can intake device stock.")
+
+    sn = payload.device_sn.strip()
+    if not sn:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Serial number is required.")
+
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        existing = await conn.fetchrow("SELECT id FROM devices WHERE device_sn = $1", sn)
+        if existing:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Device SN '{sn}' is already registered in the system.")
+
+        initial_status = 'ACTIVE' if payload.merchant_id else 'IN_STOCK'
+        is_active = True if payload.merchant_id else False
+
+        new_id = await conn.fetchval("""
+            INSERT INTO devices (device_id, device_sn, device_model, merchant_id, batch_no, notes, status, is_active, battery, signal)
+            VALUES ($1, $1, $2, $3, $4, $5, $6::device_status, $7, '100%', 'Good')
+            RETURNING id
+        """, sn, payload.device_model or "Y6B", payload.merchant_id, payload.batch_no or "BATCH-SINGLE", payload.notes, initial_status, is_active)
+
+        return {
+            "status": "success",
+            "message": f"Soundbox '{sn}' registered successfully into stock.",
+            "device_id": new_id
+        }
+
+
+@router.post("/{device_id}/return-to-stock")
+async def return_device_to_stock(
+    device_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Unlinks a soundbox from its current store and returns it to available warehouse inventory.
+    Requires Admin privileges.
+    """
+    if current_user.get("role") != "ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only administrators can return devices to stock.")
+
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        device = await conn.fetchrow("SELECT id, device_sn FROM devices WHERE id = $1", device_id)
+        if not device:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
+
+        await conn.execute("""
+            UPDATE devices 
+            SET merchant_id = NULL, status = 'IN_STOCK', is_active = FALSE, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $1
+        """, device_id)
+
+        return {
+            "status": "success",
+            "message": f"Device '{device['device_sn']}' returned to warehouse stock."
+        }
+
+
+@router.post("/{device_id}/maintenance")
+async def mark_device_maintenance(
+    device_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Marks a device as under repair/maintenance.
+    Requires Admin privileges.
+    """
+    if current_user.get("role") != "ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only administrators can manage maintenance.")
+
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        device = await conn.fetchrow("SELECT id, device_sn FROM devices WHERE id = $1", device_id)
+        if not device:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
+
+        await conn.execute("""
+            UPDATE devices 
+            SET status = 'MAINTENANCE', is_active = FALSE, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $1
+        """, device_id)
+
+        return {
+            "status": "success",
+            "message": f"Device '{device['device_sn']}' marked under maintenance/repair."
+        }
+
+
 class DeviceUpdateSchema(BaseModel):
     device_sn: Optional[str] = None
     telegram_chat_id: Optional[str] = None
     device_model: Optional[str] = None
     status: Optional[str] = None
     merchant_id: Optional[int] = None
+    batch_no: Optional[str] = None
+    notes: Optional[str] = None
 
 
 @router.put("/{device_id}")
