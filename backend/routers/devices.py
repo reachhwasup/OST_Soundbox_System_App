@@ -106,7 +106,17 @@ async def list_devices(
         where_sql = " AND ".join(where_clauses)
 
         query = f"""
-            SELECT d.id, d.device_sn, d.device_model, d.telegram_chat_id, d.status, d.last_heartbeat, d.created_at,
+            SELECT d.id, 
+                   COALESCE(d.device_sn, d.device_id, d.id::text) AS device_sn,
+                   COALESCE(d.device_model, d.device_name, 'Y6B') AS device_model,
+                   COALESCE(d.telegram_chat_id, d.chat_id) AS telegram_chat_id,
+                   d.status,
+                   COALESCE(d.last_heartbeat, d.last_online) AS last_heartbeat,
+                   d.battery,
+                   d.signal,
+                   d.version_4g,
+                   d.version_wifi,
+                   d.created_at,
                    m.name AS store_name, m.owner_phone
             FROM devices d
             LEFT JOIN merchants m ON d.merchant_id = m.id

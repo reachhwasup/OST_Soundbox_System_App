@@ -125,14 +125,49 @@ async def init_db():
             CREATE TABLE IF NOT EXISTS devices (
                 id SERIAL PRIMARY KEY,
                 merchant_id INT REFERENCES merchants(id) ON DELETE SET NULL,
-                device_sn VARCHAR(100) NOT NULL UNIQUE,
+                device_sn VARCHAR(100),
                 device_model VARCHAR(50) DEFAULT 'Y6B',
                 telegram_chat_id VARCHAR(100),
                 status device_status DEFAULT 'ACTIVE',
                 last_heartbeat TIMESTAMP WITH TIME ZONE,
+                battery VARCHAR(50),
+                signal VARCHAR(50),
+                version_4g VARCHAR(255),
+                version_wifi VARCHAR(255),
+                last_online TIMESTAMP WITH TIME ZONE,
+                device_id VARCHAR(100),
+                device_name VARCHAR(255),
+                chat_id VARCHAR(100),
+                is_active BOOLEAN DEFAULT TRUE,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
+
+            -- Ensure all hardware telemetry & legacy PRD columns exist safely
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS merchant_id INT REFERENCES merchants(id) ON DELETE SET NULL;
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_sn VARCHAR(100);
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_model VARCHAR(50) DEFAULT 'Y6B';
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(100);
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS status device_status DEFAULT 'ACTIVE';
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS last_heartbeat TIMESTAMP WITH TIME ZONE;
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS battery VARCHAR(50);
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS signal VARCHAR(50);
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_4g VARCHAR(255);
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_wifi VARCHAR(255);
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS last_online TIMESTAMP WITH TIME ZONE;
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_id VARCHAR(100);
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_name VARCHAR(255);
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS chat_id VARCHAR(100);
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+
+            -- Auto-sync columns if existing records have legacy names
+            UPDATE devices SET
+                device_sn = COALESCE(device_sn, device_id, id::text),
+                device_model = COALESCE(device_model, device_name, 'Y6B'),
+                telegram_chat_id = COALESCE(telegram_chat_id, chat_id),
+                last_heartbeat = COALESCE(last_heartbeat, last_online)
+            WHERE device_sn IS NULL OR telegram_chat_id IS NULL;
+
             ALTER TABLE devices DROP CONSTRAINT IF EXISTS devices_telegram_chat_id_key;
             CREATE INDEX IF NOT EXISTS idx_devices_telegram_chat_id ON devices(telegram_chat_id);
             CREATE INDEX IF NOT EXISTS idx_devices_sn ON devices(device_sn);
