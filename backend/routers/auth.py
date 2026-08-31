@@ -179,43 +179,28 @@ async def update_profile(
 ):
     pool = await get_db_pool()
     clean_name = payload.full_name.strip()
-    target_phone = normalize_phone_number(payload.phone_number) if payload.phone_number else current_user["phone_number"]
+    
+    # Enforce rule: Phone number cannot be changed as it is the login identifier
+    if payload.phone_number:
+        clean_req_phone = normalize_phone_number(payload.phone_number)
+        if clean_req_phone != current_user["phone_number"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Phone number cannot be changed as it is used as your unique login identity."
+            )
 
-    if not target_phone or len(target_phone) < 6:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A valid phone number is required."
-        )
+    target_phone = current_user["phone_number"]
 
     async with pool.acquire() as conn:
-        # Check if phone number is changed and already taken by someone else
-        if target_phone != current_user["phone_number"]:
-            existing = await conn.fetchrow(
-                "SELECT id FROM users WHERE phone_number = $1 AND id != $2",
-                target_phone, current_user["id"]
-            )
-            if existing:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="This phone number is already registered to another account."
-                )
-
         updated_row = await conn.fetchrow(
             """
             UPDATE users 
-            SET full_name = $1, phone_number = $2, updated_at = CURRENT_TIMESTAMP
-            WHERE id = $3
+            SET full_name = $1, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $2
             RETURNING id, phone_number, full_name, role, status, created_at, updated_at
             """,
-            clean_name, target_phone, current_user["id"]
+            clean_name, current_user["id"]
         )
-
-        # Also cascade update owner_phone in merchants if user has stores
-        if target_phone != current_user["phone_number"]:
-            await conn.execute(
-                "UPDATE merchants SET owner_phone = $1 WHERE user_id = $2",
-                target_phone, current_user["id"]
-            )
 
         # Check store info
         store = await conn.fetchrow(

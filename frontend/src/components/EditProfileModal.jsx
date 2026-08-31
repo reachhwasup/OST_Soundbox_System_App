@@ -163,11 +163,16 @@ export default function EditProfileModal({ isOpen, onClose, onOpenChangePassword
           </div>
         </div>
 
-        {/* Field 2: Phone Number */}
+        {/* Field 2: Phone Number (Locked Login Identifier) */}
         <div>
-          <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
-            {t('phoneNumber', 'Phone Number')} <span className="text-rose-500">*</span>
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300">
+              {t('phoneNumber', 'Phone Number (Login ID)')}
+            </label>
+            <span className="text-[10px] text-slate-400 font-mono flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+              🔒 {isKhmer ? 'អត្តសញ្ញាណចូលគណនី (មិនអាចកែបាន)' : 'Login ID (Locked)'}
+            </span>
+          </div>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
               <Phone className="w-4 h-4" />
@@ -175,16 +180,14 @@ export default function EditProfileModal({ isOpen, onClose, onOpenChangePassword
             <input
               type="tel"
               value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              placeholder={t('phonePlaceholder', 'e.g. 012345678')}
-              className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
-              required
+              disabled={true}
+              className="w-full pl-9 pr-3 py-2.5 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-600 dark:text-slate-400 font-mono cursor-not-allowed select-none opacity-80"
             />
           </div>
           <p className="text-[10px] text-slate-400 mt-1">
             {isKhmer 
-              ? 'លេខទូរស័ព្ទនេះប្រើប្រាស់សម្រាប់ចូលគណនី និងភ្ជាប់ជាមួយហាងរបស់អ្នក។' 
-              : 'This phone number is used for logging into your account and linking stores.'}
+              ? '🔒 លេខទូរស័ព្ទនេះប្រើប្រាស់ជាអត្តសញ្ញាណតែមួយគត់សម្រាប់ចូលគណនី និងមិនអាចកែប្រែបានទេ។' 
+              : '🔒 Your phone number is your unique login credential and cannot be changed.'}
           </p>
         </div>
 
