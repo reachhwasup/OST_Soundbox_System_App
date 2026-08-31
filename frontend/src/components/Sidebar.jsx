@@ -43,15 +43,26 @@ export default function Sidebar({
     return () => window.removeEventListener('resize', handleResize);
   }, [setIsOpen]);
 
-  // Listen to admin tab changes from dashboard
+  // Listen to admin and merchant tab changes
+  const [currentMerchantTab, setCurrentMerchantTab] = useState(() => localStorage.getItem('soundbox_merchant_tab') || 'stores');
+
   useEffect(() => {
     const handleTabSync = (e) => {
       if (e.detail) {
         setCurrentSubTab(e.detail);
       }
     };
+    const handleMerchantTabSync = (e) => {
+      if (e.detail) {
+        setCurrentMerchantTab(e.detail);
+      }
+    };
     window.addEventListener('soundbox_admin_tab_change', handleTabSync);
-    return () => window.removeEventListener('soundbox_admin_tab_change', handleTabSync);
+    window.addEventListener('soundbox_merchant_tab_change', handleMerchantTabSync);
+    return () => {
+      window.removeEventListener('soundbox_admin_tab_change', handleTabSync);
+      window.removeEventListener('soundbox_merchant_tab_change', handleMerchantTabSync);
+    };
   }, []);
 
   if (!user) return null;
@@ -71,6 +82,16 @@ export default function Sidebar({
     window.dispatchEvent(new CustomEvent('soundbox_admin_tab_change', { detail: subTab }));
     if (setActiveTab) {
       setActiveTab('admin');
+    }
+    setIsOpen(false);
+  };
+
+  const handleMerchantSubTabClick = (tab) => {
+    setCurrentMerchantTab(tab);
+    localStorage.setItem('soundbox_merchant_tab', tab);
+    window.dispatchEvent(new CustomEvent('soundbox_merchant_tab_change', { detail: tab }));
+    if (setActiveTab) {
+      setActiveTab('user');
     }
     setIsOpen(false);
   };
@@ -247,24 +268,58 @@ export default function Sidebar({
 
             {/* Standard Merchant View Navigation */}
             {!isAdmin && (
-              <>
+              <div className="space-y-1">
+                {/* Item 1: Stores & Branches */}
                 <button
                   type="button"
-                  onClick={() => handleNavClick('user')}
+                  onClick={() => handleMerchantSubTabClick('stores')}
                   title={t('storeBranches', 'Stores & Branches')}
-                  className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm bg-emerald-600 text-white shadow-xs ${
+                  className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
                     isCollapsed 
-                      ? 'h-12 justify-center' 
-                      : 'px-3.5 py-2.5 gap-2.5 justify-between'
+                      ? `h-12 justify-center ${currentMerchantTab === 'stores' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
+                      : `px-3 py-2.5 gap-2.5 ${currentMerchantTab === 'stores' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
                   }`}
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <Store className="w-4 h-4 shrink-0" />
-                    {!isCollapsed && <span className="truncate">{t('storeBranches', 'Stores & Branches')}</span>}
-                  </div>
-                  {!isCollapsed && <ChevronRight className="w-4 h-4 opacity-70 shrink-0" />}
+                  <Store className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-emerald-400'}`} />
+                  {!isCollapsed && (
+                    <span className="truncate">{t('storeBranches', 'Stores & Branches')}</span>
+                  )}
                 </button>
-              </>
+
+                {/* Item 2: Device Info & Soundbox */}
+                <button
+                  type="button"
+                  onClick={() => handleMerchantSubTabClick('devices')}
+                  title={isKhmer ? 'ព័ត៌មានឧបករណ៍ (Device Info)' : 'Device Info & Soundbox'}
+                  className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
+                    isCollapsed 
+                      ? `h-12 justify-center ${currentMerchantTab === 'devices' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
+                      : `px-3 py-2.5 gap-2.5 ${currentMerchantTab === 'devices' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                  }`}
+                >
+                  <Volume2 className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-indigo-400'}`} />
+                  {!isCollapsed && (
+                    <span className="truncate">{isKhmer ? 'ព័ត៌មានឧបករណ៍ (Device Info)' : 'Device Info & Soundbox'}</span>
+                  )}
+                </button>
+
+                {/* Item 3: Transaction History */}
+                <button
+                  type="button"
+                  onClick={() => handleMerchantSubTabClick('transactions')}
+                  title={isKhmer ? 'ប្រវត្តិប្រតិបត្តិការ (Transaction History)' : 'Transaction History'}
+                  className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
+                    isCollapsed 
+                      ? `h-12 justify-center ${currentMerchantTab === 'transactions' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
+                      : `px-3 py-2.5 gap-2.5 ${currentMerchantTab === 'transactions' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                  }`}
+                >
+                  <Receipt className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-blue-400'}`} />
+                  {!isCollapsed && (
+                    <span className="truncate">{isKhmer ? 'ប្រវត្តិប្រតិបត្តិការ (Transaction History)' : 'Transaction History'}</span>
+                  )}
+                </button>
+              </div>
             )}
 
           </nav>

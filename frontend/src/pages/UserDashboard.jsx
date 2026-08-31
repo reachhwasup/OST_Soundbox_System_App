@@ -45,13 +45,36 @@ import {
   Signal,
   BatteryCharging,
   Sliders,
-  BellRing
+  BellRing,
+  RotateCcw,
+  Calendar,
+  ChevronRight,
+  Info
 } from 'lucide-react';
 
 export default function UserDashboard() {
   const { user, refreshUser } = useAuth();
   const { t, isKhmer } = useLanguage();
   const { showToast } = useToast();
+
+  // Active Merchant Navigation Tab ('stores' | 'devices' | 'transactions')
+  const [merchantTab, setMerchantTab] = useState(() => localStorage.getItem('soundbox_merchant_tab') || 'stores');
+
+  useEffect(() => {
+    const handleTabSync = (e) => {
+      if (e.detail) {
+        setMerchantTab(e.detail);
+      }
+    };
+    window.addEventListener('soundbox_merchant_tab_change', handleTabSync);
+    return () => window.removeEventListener('soundbox_merchant_tab_change', handleTabSync);
+  }, []);
+
+  const changeTab = (tab) => {
+    setMerchantTab(tab);
+    localStorage.setItem('soundbox_merchant_tab', tab);
+    window.dispatchEvent(new CustomEvent('soundbox_merchant_tab_change', { detail: tab }));
+  };
 
   // Multi-Store State
   const [stores, setStores] = useState([]);
@@ -72,6 +95,7 @@ export default function UserDashboard() {
 
   // Soundbox Test Voice & Volume Command State
   const [testingDeviceId, setTestingDeviceId] = useState(null);
+  const [rebootingDeviceId, setRebootingDeviceId] = useState(null);
   const [isVolumeModalOpen, setIsVolumeModalOpen] = useState(false);
   const [targetVolumeDevice, setTargetVolumeDevice] = useState(null);
   const [deviceVolume, setDeviceVolume] = useState(80);
@@ -84,6 +108,8 @@ export default function UserDashboard() {
   const [txSearchTerm, setTxSearchTerm] = useState('');
   const [txCurrencyFilter, setTxCurrencyFilter] = useState('ALL');
   const [txBankFilter, setTxBankFilter] = useState('ALL');
+  const [txStoreFilter, setTxStoreFilter] = useState('ALL');
+  const [txDateRangeFilter, setTxDateRangeFilter] = useState('ALL');
 
   // Initial / New Store Form State
   const [storeName, setStoreName] = useState('');
@@ -105,6 +131,7 @@ export default function UserDashboard() {
   // Device Link Form State (New)
   const [deviceSn, setDeviceSn] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
+  const [targetStoreIdForNewDevice, setTargetStoreIdForNewDevice] = useState('');
   const [savingDevice, setSavingDevice] = useState(false);
   
   // Field-specific Camera QR Scanner state for Link Modal
@@ -149,6 +176,30 @@ export default function UserDashboard() {
   }, []);
 
   const activeStore = stores.length > 0 ? stores[selectedStoreIndex] || stores[0] : null;
+
+  // Flatten all devices across all user stores
+  const allUserDevices = useMemo(() => {
+    const list = [];
+    stores.forEach(s => {
+      (s.devices || []).forEach(d => {
+        list.push({ ...d, storeName: s.name, storeId: s.id, storeLocation: s.location || s.place });
+      });
+    });
+    return list;
+  }, [stores]);
+
+  // Flatten all transactions across all user stores
+  const allUserTransactions = useMemo(() => {
+    const list = [];
+    stores.forEach(s => {
+      (s.recent_transactions || []).forEach(tx => {
+        list.push({ ...tx, storeName: s.name, storeId: s.id });
+      });
+    });
+    // Sort descending by created_at
+    list.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    return list;
+  }, [stores]);
 
   // Helper to compile formatted location string
   const compileLocation = (pId, dId, cId, vId, street) => {
@@ -321,7 +372,8 @@ export default function UserDashboard() {
   // Handle Register Device
   const handleRegisterDevice = async (e) => {
     e.preventDefault();
-    if (!activeStore) return;
+    const targetStore = targetStoreIdForNewDevice ? stores.find(s => String(s.id) === String(targetStoreIdForNewDevice)) : activeStore;
+    if (!targetStore) return;
     if (!deviceSn.trim()) {
       setError('Please enter device Serial Number (SN).');
       return;
@@ -332,12 +384,12 @@ export default function UserDashboard() {
 
     try {
       await api.post('/api/devices/register', {
-        merchant_id: activeStore.id,
+        merchant_id: targetStore.id,
         device_sn: deviceSn.trim(),
         telegram_chat_id: telegramChatId.trim() || null,
         device_model: 'Y6B'
       });
-      const dvcMsg = `Soundbox '${deviceSn.trim()}' linked to '${activeStore.name}'!`;
+      const dvcMsg = `Soundbox '${deviceSn.trim()}' linked to '${targetStore.name}'!`;
       showToast({
         type: 'success',
         title: 'Soundbox Linked',
@@ -346,6 +398,7 @@ export default function UserDashboard() {
       });
       setDeviceSn('');
       setTelegramChatId('');
+      setTargetStoreIdForNewDevice('');
       setActiveCameraField(null);
       setScanFeedback({ field: '', message: '', isError: false });
       setIsDeviceModalOpen(false);
@@ -370,7 +423,7 @@ export default function UserDashboard() {
     setEditDeviceSn(device.device_sn || '');
     setEditTelegramChatId(device.telegram_chat_id || '');
     setEditDeviceModel(device.device_model || 'Y6B');
-    setEditDeviceMerchantId(String(activeStore?.id || ''));
+    setEditDeviceMerchantId(String(device.storeId || activeStore?.id || ''));
     setEditActiveCameraField(null);
     setEditScanFeedback({ field: '', message: '', isError: false });
     setIsEditDeviceOpen(true);
@@ -481,6 +534,29 @@ export default function UserDashboard() {
     }
   };
 
+  // Trigger Soundbox Reboot Command
+  const handleTriggerReboot = async (device) => {
+    if (!device) return;
+    setRebootingDeviceId(device.id);
+    try {
+      const res = await api.post(`/api/devices/${device.id}/command`, {
+        command_type: 'REBOOT'
+      });
+      showToast({
+        type: 'success',
+        title: 'Reboot Dispatched',
+        message: `Restart command sent to Soundbox ${device.device_sn}.`,
+        duration: 5000
+      });
+      fetchStoresData(true);
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Failed to reboot soundbox.';
+      showToast({ type: 'error', title: 'Reboot Failed', message: msg });
+    } finally {
+      setRebootingDeviceId(null);
+    }
+  };
+
   // Open Volume Modal
   const handleOpenVolumeModal = (device) => {
     setTargetVolumeDevice(device);
@@ -513,18 +589,20 @@ export default function UserDashboard() {
 
   // Export Transactions as CSV
   const handleExportCSV = () => {
-    if (!activeStore || !activeStore.recent_transactions || activeStore.recent_transactions.length === 0) {
-      showToast({ type: 'info', title: 'No Data', message: 'No transactions to export for this store.' });
+    const listToExport = merchantTab === 'transactions' ? filteredTransactions : (activeStore?.recent_transactions || []);
+    if (!listToExport || listToExport.length === 0) {
+      showToast({ type: 'info', title: 'No Data', message: 'No transactions to export.' });
       return;
     }
-    const headers = ['Transaction ID', 'Bank Name', 'Amount', 'Currency', 'Customer / Payer', 'Soundbox SN', 'Status', 'Date Time'];
-    const rows = activeStore.recent_transactions.map(tx => [
+    const headers = ['Transaction ID', 'Bank Name', 'Amount', 'Currency', 'Customer / Payer', 'Soundbox SN', 'Store / Branch', 'Status', 'Date Time'];
+    const rows = listToExport.map(tx => [
       tx.bank_tx_id || tx.id,
       tx.bank_name || 'Bank',
       tx.amount,
       tx.currency || 'USD',
       `"${(tx.payer_name || 'Customer').replace(/"/g, '""')}"`,
       tx.device_sn || '',
+      `"${(tx.storeName || activeStore?.name || '').replace(/"/g, '""')}"`,
       tx.status || 'PROCESSED',
       tx.created_at ? new Date(tx.created_at).toLocaleString() : ''
     ]);
@@ -533,7 +611,7 @@ export default function UserDashboard() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `${activeStore.name.replace(/\s+/g, '_')}_transactions_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `OST_transactions_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -612,7 +690,7 @@ export default function UserDashboard() {
     e.target.value = '';
   };
 
-  // Calculate Real-Time Store Financial Metrics
+  // Calculate Real-Time Store Financial Metrics for Overview
   const storeMetrics = useMemo(() => {
     if (!activeStore || !activeStore.recent_transactions) {
       return { totalUSD: 0, totalKHR: 0, txCount: 0, activeDevices: 0 };
@@ -634,10 +712,14 @@ export default function UserDashboard() {
     };
   }, [activeStore]);
 
-  // Filtered Transactions
+  // Filtered Transactions for History Tab & Store Feed
   const filteredTransactions = useMemo(() => {
-    if (!activeStore || !activeStore.recent_transactions) return [];
-    return activeStore.recent_transactions.filter(tx => {
+    const sourceList = merchantTab === 'transactions' ? allUserTransactions : (activeStore?.recent_transactions || []);
+    return sourceList.filter(tx => {
+      // Store filter (for transactions tab)
+      if (merchantTab === 'transactions' && txStoreFilter !== 'ALL' && String(tx.storeId) !== String(txStoreFilter)) {
+        return false;
+      }
       // Currency match
       if (txCurrencyFilter !== 'ALL' && String(tx.currency).toUpperCase() !== txCurrencyFilter) {
         return false;
@@ -654,11 +736,31 @@ export default function UserDashboard() {
         const bank = String(tx.bank_name || '').toLowerCase();
         const sn = String(tx.device_sn || '').toLowerCase();
         const amt = String(tx.amount || '');
-        return payer.includes(q) || txId.includes(q) || bank.includes(q) || sn.includes(q) || amt.includes(q);
+        const store = String(tx.storeName || '').toLowerCase();
+        return payer.includes(q) || txId.includes(q) || bank.includes(q) || sn.includes(q) || amt.includes(q) || store.includes(q);
       }
       return true;
     });
-  }, [activeStore, txCurrencyFilter, txBankFilter, txSearchTerm]);
+  }, [merchantTab, allUserTransactions, activeStore, txStoreFilter, txCurrencyFilter, txBankFilter, txSearchTerm]);
+
+  // Overall Financial Aggregation for Transaction History Tab
+  const totalHistoryMetrics = useMemo(() => {
+    let usd = 0;
+    let khr = 0;
+    filteredTransactions.forEach(tx => {
+      if (String(tx.currency).toUpperCase() === 'KHR') {
+        khr += Number(tx.amount || 0);
+      } else {
+        usd += Number(tx.amount || 0);
+      }
+    });
+    return {
+      usd,
+      khr,
+      count: filteredTransactions.length,
+      avgUSD: filteredTransactions.length ? usd / filteredTransactions.length : 0
+    };
+  }, [filteredTransactions]);
 
   if (loading) {
     return (
@@ -758,149 +860,410 @@ export default function UserDashboard() {
           </div>
         </div>
       ) : (
-        /* Case 2: USER HAS REGISTERED 1 OR MORE STORES */
+        /* Case 2: MERCHANT IS AUTHENTICATED WITH STORES */
         <div className="space-y-5 sm:space-y-6">
           
-          {/* Multi-Store Navigation / Switcher Bar */}
-          <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              
-              {/* Store Tabs */}
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth pb-1 sm:pb-0">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 shrink-0 pr-1">
-                  <Layers className="w-4 h-4 text-emerald-600" />
-                  <span>{t('storeBranches', 'Stores')}:</span>
-                </div>
-
-                {stores.map((s, idx) => {
-                  const isSelected = selectedStoreIndex === idx;
-                  const devCount = s.devices?.length || 0;
-                  return (
-                    <button
-                      key={s.id}
-                      onClick={() => {
-                        setSelectedStoreIndex(idx);
-                        setEditName(s.name);
-                      }}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition flex items-center gap-2 shrink-0 border cursor-pointer ${
-                        isSelected
-                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                          : 'bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
-                      }`}
-                    >
-                      <Store className="w-3.5 h-3.5" />
-                      <span>{s.name}</span>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
-                        isSelected ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                      }`}>
-                        {devCount} {devCount === 1 ? 'Speaker' : 'Speakers'}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Add Another Store Button */}
+          {/* Top Merchant Sub-Navigation Pill Header */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-2.5 sm:p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <button
+                type="button"
+                onClick={() => changeTab('stores')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  merchantTab === 'stores'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Store className="w-3.5 h-3.5" />
+                <span>{t('storeBranches', 'Stores & Branches')}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                  merchantTab === 'stores' ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                }`}>
+                  {stores.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => changeTab('devices')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  merchantTab === 'devices'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>{isKhmer ? 'ព័ត៌មានឧបករណ៍ (Device Info)' : 'Device Info & Soundbox'}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                  merchantTab === 'devices' ? 'bg-indigo-800 text-indigo-100' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                }`}>
+                  {allUserDevices.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => changeTab('transactions')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  merchantTab === 'transactions'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Receipt className="w-3.5 h-3.5" />
+                <span>{isKhmer ? 'ប្រវត្តិប្រតិបត្តិការ (Transaction History)' : 'Transaction History'}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                  merchantTab === 'transactions' ? 'bg-blue-800 text-blue-100' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                }`}>
+                  {allUserTransactions.length}
+                </span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
                 onClick={() => {
                   resetRegisterForm();
                   setIsRegisterStoreOpen(true);
                 }}
-                className="w-full sm:w-auto px-4 py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 border border-emerald-200 dark:border-emerald-800 shrink-0 cursor-pointer shadow-2xs"
+                className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
               >
-                <Plus className="w-4 h-4" />
-                <span>{t('addStore', '+ Add New Store / Branch')}</span>
+                <Plus className="w-3.5 h-3.5" />
+                <span>New Store</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveCameraField(null);
+                  setScanFeedback({ field: '', message: '', isError: false });
+                  setIsDeviceModalOpen(true);
+                }}
+                className="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Link Soundbox</span>
               </button>
             </div>
           </div>
 
-          {/* Store Overview Banner & Touch Actions */}
-          {activeStore && (
-            <div className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-900/90 rounded-3xl shadow-xs border border-slate-200/90 dark:border-slate-800 p-5 sm:p-7">
-              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-5">
-                
-                <div className="flex items-start gap-4">
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20">
-                    <Store className="w-7 h-7 sm:w-8 sm:h-8" />
+          {/* ======================================================== */}
+          {/* TAB 1: STORES & BRANCHES OVERVIEW                        */}
+          {/* ======================================================== */}
+          {merchantTab === 'stores' && (
+            <div className="space-y-5 sm:space-y-6">
+              
+              {/* Store Switcher Bar */}
+              <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth">
+                  <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 shrink-0 pr-1">
+                    <Layers className="w-4 h-4 text-emerald-600" />
+                    <span>{t('storeBranches', 'Active Branch')}:</span>
                   </div>
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                        {activeStore.name}
-                      </h1>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        {t('activeStore', 'Active Store')}
-                      </span>
-                    </div>
-                    
-                    <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-                      <div className="flex items-center gap-1.5">
-                        <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>{activeStore.location || activeStore.place || 'Phnom Penh, Cambodia'}</span>
+
+                  {stores.map((s, idx) => {
+                    const isSelected = selectedStoreIndex === idx;
+                    const devCount = s.devices?.length || 0;
+                    return (
+                      <button
+                        key={s.id}
+                        onClick={() => {
+                          setSelectedStoreIndex(idx);
+                          setEditName(s.name);
+                        }}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition flex items-center gap-2 shrink-0 border cursor-pointer ${
+                          isSelected
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                            : 'bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        <Store className="w-3.5 h-3.5" />
+                        <span>{s.name}</span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
+                          isSelected ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                        }`}>
+                          {devCount} {devCount === 1 ? 'Speaker' : 'Speakers'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Active Store Banner */}
+              {activeStore && (
+                <div className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-900/90 rounded-3xl shadow-xs border border-slate-200/90 dark:border-slate-800 p-5 sm:p-7">
+                  <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-5">
+                    <div className="flex items-start gap-4">
+                      <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20">
+                        <Store className="w-7 h-7 sm:w-8 sm:h-8" />
                       </div>
-                      {activeStore.place && activeStore.place !== activeStore.location && (
-                        <div className="flex items-center gap-1.5">
-                          <Building className="w-4 h-4 text-slate-400 shrink-0" />
-                          <span>{activeStore.place}</span>
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                            {activeStore.name}
+                          </h1>
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            {t('activeStore', 'Active Branch')}
+                          </span>
                         </div>
-                      )}
-                      <div className="flex items-center gap-1.5 font-mono text-xs text-slate-500">
-                        <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span>{activeStore.owner_phone || user?.phone_number}</span>
+                        
+                        <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                          <div className="flex items-center gap-1.5">
+                            <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <span>{activeStore.location || activeStore.place || 'Phnom Penh, Cambodia'}</span>
+                          </div>
+                          {activeStore.place && activeStore.place !== activeStore.location && (
+                            <div className="flex items-center gap-1.5">
+                              <Building className="w-4 h-4 text-slate-400 shrink-0" />
+                              <span>{activeStore.place}</span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1.5 font-mono text-xs text-slate-500">
+                            <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span>{activeStore.owner_phone || user?.phone_number}</span>
+                          </div>
+                        </div>
                       </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 pt-3 xl:pt-0 border-t xl:border-t-0 border-slate-200/80 dark:border-slate-800">
+                      <button
+                        onClick={() => {
+                          if (!activeStore) return;
+                          setEditName(activeStore.name || '');
+                          const resolved = resolveStoreLocationCodes(activeStore);
+                          setEditProvinceId(resolved.provinceId);
+                          setEditDistrictId(resolved.districtId);
+                          setEditCommuneId(resolved.communeId);
+                          setEditVillageId(resolved.villageId);
+                          setEditStreetOrLandmark(resolved.streetOrLandmark);
+                          setIsEditStoreOpen(true);
+                        }}
+                        className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 shrink-0 text-slate-500" />
+                        <span>{t('editStore', 'Edit Store')}</span>
+                      </button>
+
+                      <button
+                        onClick={() => changeTab('devices')}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                      >
+                        <Volume2 className="w-3.5 h-3.5 shrink-0" />
+                        <span>Manage Speakers</span>
+                      </button>
+
+                      <button
+                        onClick={handleExportCSV}
+                        title="Export Store Statement CSV"
+                        className="p-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl transition cursor-pointer shadow-2xs"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 </div>
+              )}
 
-                {/* Touch Action Buttons */}
-                <div className="flex flex-wrap items-center gap-2 pt-3 xl:pt-0 border-t xl:border-t-0 border-slate-200/80 dark:border-slate-800">
-                  <button
-                    onClick={() => {
-                      if (!activeStore) return;
-                      setEditName(activeStore.name || '');
-                      const resolved = resolveStoreLocationCodes(activeStore);
-                      setEditProvinceId(resolved.provinceId);
-                      setEditDistrictId(resolved.districtId);
-                      setEditCommuneId(resolved.communeId);
-                      setEditVillageId(resolved.villageId);
-                      setEditStreetOrLandmark(resolved.streetOrLandmark);
-                      setIsEditStoreOpen(true);
-                    }}
-                    className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs"
-                  >
-                    <Edit3 className="w-3.5 h-3.5 shrink-0 text-slate-500" />
-                    <span>{t('editStore', 'Edit Store')}</span>
-                  </button>
+              {/* 4 Financial & Operational KPI Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Sales (USD)</span>
+                    <div className="p-2 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 rounded-xl">
+                      <DollarSign className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                    ${storeMetrics.totalUSD.toFixed(2)}
+                  </div>
+                  <p className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
+                    <TrendingUp className="w-3 h-3 text-emerald-500" />
+                    <span>Live branch revenue</span>
+                  </p>
+                </div>
 
-                  <button
-                    onClick={() => {
-                      setActiveCameraField(null);
-                      setScanFeedback({ field: '', message: '', isError: false });
-                      setIsDeviceModalOpen(true);
-                    }}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95"
-                  >
-                    <Plus className="w-3.5 h-3.5 shrink-0" />
-                    <span>{t('linkSoundbox', '+ Link Soundbox')}</span>
-                  </button>
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Sales (KHR)</span>
+                    <div className="p-2 bg-blue-50 dark:bg-blue-950/60 text-blue-600 rounded-xl">
+                      <span className="font-bold text-xs">៛</span>
+                    </div>
+                  </div>
+                  <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                    ៛{storeMetrics.totalKHR.toLocaleString()}
+                  </div>
+                  <p className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
+                    <TrendingUp className="w-3 h-3 text-blue-500" />
+                    <span>Bakong QR payments</span>
+                  </p>
+                </div>
 
-                  <button
-                    onClick={handleExportCSV}
-                    title="Export Store Statement CSV"
-                    className="p-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl transition cursor-pointer shadow-2xs"
-                  >
-                    <Download className="w-4 h-4" />
-                  </button>
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Payments</span>
+                    <div className="p-2 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 rounded-xl">
+                      <Receipt className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                    {storeMetrics.txCount} <span className="text-xs font-normal text-slate-400">total</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
+                    <CheckCircle2 className="w-3 h-3 text-indigo-500" />
+                    <span>Voice broadcasted</span>
+                  </p>
+                </div>
 
-                  {stores.length > 1 && (
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Soundboxes</span>
+                    <div className="p-2 bg-amber-50 dark:bg-amber-950/60 text-amber-600 rounded-xl">
+                      <Volume2 className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                    {activeStore?.devices?.length || 0} <span className="text-xs font-normal text-slate-400">active</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span>Ready for announcements</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Grid: Connected Speakers Preview & Recent Live Payments */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                
+                {/* Left: Connected Soundbox Speakers */}
+                <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <Volume2 className="w-5 h-5 text-emerald-600" />
+                      <span>{t('connectedSoundboxes', 'Soundbox Speakers')}</span>
+                    </h3>
                     <button
-                      onClick={() => setIsDeleteStoreOpen(true)}
-                      title={t('deleteStore', 'Delete this store')}
-                      className="p-2 text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 rounded-xl transition shrink-0 border border-rose-200 dark:border-rose-800 cursor-pointer"
+                      onClick={() => changeTab('devices')}
+                      className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      View All
                     </button>
+                  </div>
+
+                  {activeStore.devices && activeStore.devices.length > 0 ? (
+                    <div className="space-y-3">
+                      {activeStore.devices.map((device) => {
+                        const isTesting = testingDeviceId === device.id;
+                        return (
+                          <div 
+                            key={device.id} 
+                            className="p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-2.5 shadow-2xs"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="font-mono font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                <Smartphone className="w-4 h-4 text-emerald-600" />
+                                <span>{device.device_sn}</span>
+                              </div>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                {device.status || 'ACTIVE'}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-200/60 dark:border-slate-700/50">
+                              <span className="font-medium">Model: {device.device_model || 'Y6B'}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleTriggerTestVoice(device)}
+                                disabled={isTesting}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                              >
+                                <BellRing className={`w-3 h-3 ${isTesting ? 'animate-spin' : ''}`} />
+                                <span>Test Voice</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-2">
+                      <Volume2 className="w-8 h-8 text-slate-400 mx-auto" />
+                      <p className="text-xs font-bold text-slate-700 dark:text-slate-300">No Soundbox at this Branch</p>
+                      <button
+                        onClick={() => {
+                          setActiveCameraField(null);
+                          setScanFeedback({ field: '', message: '', isError: false });
+                          setIsDeviceModalOpen(true);
+                        }}
+                        className="text-xs font-bold px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs"
+                      >
+                        + Link Speaker
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: Recent Live Payments Stream */}
+                <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <CreditCard className="w-5 h-5 text-emerald-600" />
+                      <span>{t('livePayments', 'Recent Payments Stream')}</span>
+                    </h3>
+                    <button
+                      onClick={() => changeTab('transactions')}
+                      className="text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline flex items-center gap-1"
+                    >
+                      <span>Full History</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {activeStore.recent_transactions && activeStore.recent_transactions.length > 0 ? (
+                    <div className="space-y-2.5">
+                      {activeStore.recent_transactions.slice(0, 5).map((tx) => (
+                        <div 
+                          key={tx.id}
+                          onClick={() => {
+                            setSelectedTxSlip(tx);
+                            setIsTxSlipOpen(true);
+                          }}
+                          className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-2xl flex items-center justify-between cursor-pointer hover:border-emerald-400 transition shadow-2xs"
+                        >
+                          <div className="space-y-0.5">
+                            <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                              <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 rounded text-[10px] font-bold">
+                                {tx.bank_name || 'Bank'}
+                              </span>
+                              <span>{tx.payer_name || 'Customer'}</span>
+                            </div>
+                            <div className="text-[11px] text-slate-400 font-mono flex items-center gap-1.5">
+                              <span>SN: {tx.device_sn}</span>
+                              <span>•</span>
+                              <span>{tx.created_at ? new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            <div className="text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                              +{tx.currency === 'USD' ? `$${Number(tx.amount).toFixed(2)}` : `៛${Number(tx.amount).toLocaleString()}`}
+                            </div>
+                            <span className="text-[9px] text-emerald-700 bg-emerald-100/60 dark:bg-emerald-950 px-1 py-0.2 rounded font-bold uppercase">
+                              {tx.status || 'VERIFIED'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-10 text-slate-400 space-y-1">
+                      <DollarSign className="w-8 h-8 mx-auto text-slate-300" />
+                      <p className="text-xs font-bold">No payments received yet today</p>
+                    </div>
                   )}
                 </div>
 
@@ -908,292 +1271,328 @@ export default function UserDashboard() {
             </div>
           )}
 
-          {/* 4 Financial & Operational KPI Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
-            {/* Card 1: Today's Revenue USD */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Sales (USD)
-                </span>
-                <div className="p-2 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-xl">
-                  <DollarSign className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                ${storeMetrics.totalUSD.toFixed(2)}
-              </div>
-              <p className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
-                <TrendingUp className="w-3 h-3 text-emerald-500" />
-                <span>Live store revenue</span>
-              </p>
-            </div>
-
-            {/* Card 2: Today's Revenue KHR */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Sales (KHR)
-                </span>
-                <div className="p-2 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 rounded-xl">
-                  <span className="font-bold text-xs">៛</span>
-                </div>
-              </div>
-              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                ៛{storeMetrics.totalKHR.toLocaleString()}
-              </div>
-              <p className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
-                <TrendingUp className="w-3 h-3 text-blue-500" />
-                <span>Bakong QR payments</span>
-              </p>
-            </div>
-
-            {/* Card 3: Total Completed Transactions */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Transactions
-                </span>
-                <div className="p-2 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded-xl">
-                  <Receipt className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                {storeMetrics.txCount} <span className="text-xs font-normal text-slate-400">payments</span>
-              </div>
-              <p className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
-                <CheckCircle2 className="w-3 h-3 text-indigo-500" />
-                <span>100% voice broadcasted</span>
-              </p>
-            </div>
-
-            {/* Card 4: Connected Soundbox Fleet */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Soundbox Fleet
-                </span>
-                <div className="p-2 bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 rounded-xl">
-                  <Volume2 className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                {activeStore?.devices?.length || 0} <span className="text-xs font-normal text-slate-400">linked</span>
-              </div>
-              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                <span>{storeMetrics.activeDevices} Online & ready</span>
-              </p>
-            </div>
-          </div>
-
-          {/* Grid: Connected Soundbox Speakers & Live Payment Feed */}
-          {activeStore && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {/* ======================================================== */}
+          {/* TAB 2: DEDICATED DEVICE INFO & SOUNDBOX MANAGEMENT       */}
+          {/* ======================================================== */}
+          {merchantTab === 'devices' && (
+            <div className="space-y-5 sm:space-y-6">
               
-              {/* Left Column: Connected Soundbox Devices (1 Col) */}
-              <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Volume2 className="w-5 h-5 text-emerald-600" />
-                    <span>{t('connectedSoundboxes', 'Soundbox Speakers')}</span>
-                  </h3>
-                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                    {activeStore.devices?.length || 0} {t('devices', 'Units')}
-                  </span>
+              {/* Header & Fleet Stats */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
+                    <Volume2 className="w-6 h-6 text-indigo-600" />
+                    <span>Soundbox Fleet & Device Info</span>
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Manage your Y6B 4G Smart Speakers, audio volume, voice tests, and Telegram payment bindings.
+                  </p>
                 </div>
 
-                {activeStore.devices && activeStore.devices.length > 0 ? (
-                  <div className="space-y-3.5">
-                    {activeStore.devices.map((device) => {
-                      const isOnline = String(device.status).toUpperCase() === 'ACTIVE' || String(device.status).toUpperCase() === 'ONLINE';
-                      const isTesting = testingDeviceId === device.id;
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveCameraField(null);
+                      setScanFeedback({ field: '', message: '', isError: false });
+                      setIsDeviceModalOpen(true);
+                    }}
+                    className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ Link New Soundbox</span>
+                  </button>
 
-                      return (
-                        <div 
-                          key={device.id} 
-                          className="p-4 bg-gradient-to-b from-slate-50 to-slate-100/60 dark:from-slate-800/80 dark:to-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-3 shadow-2xs hover:border-emerald-400/60 transition"
-                        >
-                          {/* Top Row: SN & Status Badge */}
-                          <div className="flex items-center justify-between">
-                            <div className="font-mono font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                              <Smartphone className="w-4 h-4 text-emerald-600" />
+                  <button
+                    type="button"
+                    onClick={() => fetchStoresData(true)}
+                    className="p-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition cursor-pointer"
+                    title="Refresh soundbox fleet status"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Soundbox Cards Grid */}
+              {allUserDevices.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {allUserDevices.map((device) => {
+                    const isOnline = String(device.status).toUpperCase() === 'ACTIVE' || String(device.status).toUpperCase() === 'ONLINE';
+                    const isTesting = testingDeviceId === device.id;
+                    const isRebooting = rebootingDeviceId === device.id;
+
+                    return (
+                      <div
+                        key={device.id}
+                        className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 p-5 sm:p-6 space-y-4 shadow-xs hover:border-indigo-500/60 transition"
+                      >
+                        {/* Top SN Bar & Badge */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2 font-mono font-black text-base text-slate-900 dark:text-white">
+                              <Smartphone className="w-5 h-5 text-indigo-600 shrink-0" />
                               <span>{device.device_sn}</span>
                             </div>
-                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
-                              isOnline 
-                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' 
-                                : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
-                            }`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-ping' : 'bg-slate-400'}`}></span>
-                              {device.status || 'ACTIVE'}
+                            <span className="text-[11px] font-semibold text-slate-500">
+                              {device.device_model || 'Y6B 4G Speaker'}
                             </span>
                           </div>
-                          
-                          {/* Hardware Telemetry Specs */}
-                          <div className="grid grid-cols-2 gap-2 text-xs bg-white dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700/50 text-slate-600 dark:text-slate-400">
-                            <div className="flex items-center gap-1.5">
-                              <Signal className="w-3.5 h-3.5 text-blue-500" />
-                              <span className="font-medium text-slate-800 dark:text-slate-200">4G LTE Cellular</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 justify-end">
-                              <BatteryCharging className="w-3.5 h-3.5 text-emerald-500" />
-                              <span className="font-mono font-bold text-slate-800 dark:text-slate-200">95% (AC)</span>
-                            </div>
-                            <div className="col-span-2 flex items-start justify-between pt-1 border-t border-slate-100 dark:border-slate-800 text-[11px]">
-                              <span className="text-slate-400">Telegram Groups:</span>
-                              <div className="flex flex-wrap justify-end gap-1">
-                                {device.telegram_chat_id ? (
-                                  device.telegram_chat_id.split(',').map((id, idx) => (
-                                    <code key={idx} className="bg-slate-100 dark:bg-slate-700/80 px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-800 dark:text-slate-200">
-                                      {id.trim()}
-                                    </code>
-                                  ))
-                                ) : (
-                                  <span className="text-slate-400 italic">Not paired</span>
-                                )}
-                              </div>
-                            </div>
+
+                          <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 ${
+                            isOnline
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                              : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-ping' : 'bg-slate-400'}`}></span>
+                            <span>{device.status || 'ACTIVE'}</span>
+                          </span>
+                        </div>
+
+                        {/* Store Binding Info */}
+                        <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 space-y-2 text-xs">
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-400 font-medium">Assigned Store:</span>
+                            <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                              <Store className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>{device.storeName}</span>
+                            </span>
                           </div>
 
-                          {/* Interactive Merchant Controls */}
-                          <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                            {/* Test Broadcast Button */}
+                          <div className="flex justify-between items-center pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                            <span className="text-slate-400 font-medium">Location:</span>
+                            <span className="font-medium text-slate-600 dark:text-slate-400 truncate max-w-[180px]">
+                              {device.storeLocation || 'Phnom Penh'}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between items-start pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                            <span className="text-slate-400 font-medium shrink-0">Telegram Groups:</span>
+                            <div className="flex flex-wrap justify-end gap-1">
+                              {device.telegram_chat_id ? (
+                                device.telegram_chat_id.split(',').map((id, idx) => (
+                                  <code key={idx} className="bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-800 dark:text-slate-200">
+                                    {id.trim()}
+                                  </code>
+                                ))
+                              ) : (
+                                <span className="text-slate-400 italic">Not bound</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Hardware Telemetry Row */}
+                        <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-xl text-slate-600 dark:text-slate-400">
+                          <div className="flex items-center gap-1.5">
+                            <Signal className="w-3.5 h-3.5 text-blue-500" />
+                            <span className="font-semibold text-slate-800 dark:text-slate-200">4G LTE (Good)</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 justify-end">
+                            <BatteryCharging className="w-3.5 h-3.5 text-emerald-500" />
+                            <span className="font-mono font-bold text-slate-800 dark:text-slate-200">95% (Power OK)</span>
+                          </div>
+                        </div>
+
+                        {/* Primary Hardware Actions */}
+                        <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+                          <div className="grid grid-cols-2 gap-2">
+                            {/* Voice Test */}
                             <button
                               type="button"
                               onClick={() => handleTriggerTestVoice(device)}
                               disabled={isTesting}
-                              title="Send instant voice announcement test"
-                              className="flex-1 py-1.5 px-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer disabled:opacity-50"
+                              className="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
                             >
                               <BellRing className={`w-3.5 h-3.5 ${isTesting ? 'animate-spin' : ''}`} />
-                              <span>{isTesting ? 'Playing...' : 'Test Voice'}</span>
+                              <span>{isTesting ? 'Testing...' : 'Test Voice ($1)'}</span>
                             </button>
 
-                            {/* Volume Adjustment Button */}
+                            {/* Volume Control */}
                             <button
                               type="button"
                               onClick={() => handleOpenVolumeModal(device)}
-                              title="Adjust speaker volume"
-                              className="py-1.5 px-2.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+                              className="py-2 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
                             >
                               <Volume2 className="w-3.5 h-3.5 text-amber-500" />
-                              <span>Volume</span>
-                            </button>
-
-                            {/* Edit Pairing */}
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditDevice(device)}
-                              title="Edit device model and telegram chat IDs"
-                              className="p-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl transition cursor-pointer"
-                            >
-                              <Settings className="w-3.5 h-3.5" />
-                            </button>
-
-                            {/* Unlink */}
-                            <button
-                              type="button"
-                              onClick={() => handleOpenUnlinkDevice(device)}
-                              title="Unlink soundbox from this store"
-                              className="p-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 rounded-xl transition cursor-pointer"
-                            >
-                              <Unlink className="w-3.5 h-3.5" />
+                              <span>Set Volume</span>
                             </button>
                           </div>
 
+                          <div className="flex items-center justify-between gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleTriggerReboot(device)}
+                              disabled={isRebooting}
+                              className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center gap-1 transition cursor-pointer"
+                            >
+                              <RotateCcw className={`w-3.5 h-3.5 ${isRebooting ? 'animate-spin text-amber-500' : ''}`} />
+                              <span>{isRebooting ? 'Rebooting...' : 'Reboot Unit'}</span>
+                            </button>
+
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditDevice(device)}
+                                className="px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-lg transition"
+                              >
+                                Edit Pairing
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenUnlinkDevice(device)}
+                                className="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition"
+                                title="Unlink soundbox"
+                              >
+                                <Unlink className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                      );
-                    })}
+
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-8 space-y-3">
+                  <Volume2 className="w-12 h-12 text-slate-400 mx-auto" />
+                  <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">No Soundbox Connected Yet</h3>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    Link your first Y6B 4G speaker to announce live customer payments out loud across all your store branches.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setActiveCameraField(null);
+                      setScanFeedback({ field: '', message: '', isError: false });
+                      setIsDeviceModalOpen(true);
+                    }}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-sm"
+                  >
+                    + Link Soundbox Now
+                  </button>
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* TAB 3: DEDICATED TRANSACTION HISTORY & STATEMENT          */}
+          {/* ======================================================== */}
+          {merchantTab === 'transactions' && (
+            <div className="space-y-5 sm:space-y-6">
+              
+              {/* Top Financial Aggregation Banner */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total USD Volume</span>
+                  <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
+                    ${totalHistoryMetrics.usd.toFixed(2)}
                   </div>
-                ) : (
-                  <div className="text-center py-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-3">
-                    <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-400">
-                      <Volume2 className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{t('noSoundboxAtStore', 'No Soundbox at this Store')}</p>
-                      <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">{t('noSoundboxSub', 'Link a Y6B 4G speaker to announce live customer payments out loud.')}</p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setActiveCameraField(null);
-                        setScanFeedback({ field: '', message: '', isError: false });
-                        setIsDeviceModalOpen(true);
-                      }}
-                      className="inline-flex items-center justify-center gap-1.5 text-xs font-bold px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition shadow-sm cursor-pointer active:scale-95"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>{t('linkSoundboxDevice', 'Link Soundbox Device')}</span>
-                    </button>
+                  <span className="text-[11px] text-slate-400">Across filtered stores</span>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total KHR Volume</span>
+                  <div className="text-2xl font-black text-blue-600 dark:text-blue-400 font-mono tracking-tight">
+                    ៛{totalHistoryMetrics.khr.toLocaleString()}
                   </div>
-                )}
+                  <span className="text-[11px] text-slate-400">Bakong Khmer Riel</span>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Payment Count</span>
+                  <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                    {totalHistoryMetrics.count} <span className="text-xs font-normal text-slate-400">txns</span>
+                  </div>
+                  <span className="text-[11px] text-emerald-500 font-medium">100% Broadcast Success</span>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Avg Ticket Size</span>
+                  <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-tight">
+                    ${totalHistoryMetrics.avgUSD.toFixed(2)}
+                  </div>
+                  <span className="text-[11px] text-slate-400">Average transaction size</span>
+                </div>
               </div>
 
-              {/* Right Column: Live Payments Feed & Transaction Analytics (2 Cols) */}
-              <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
+              {/* Transactions Table & Advanced Filters */}
+              <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
                 
-                {/* Header & Controls */}
+                {/* Header & Export Actions */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100 dark:border-slate-800">
                   <div>
                     <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      <CreditCard className="w-5 h-5 text-emerald-600" />
-                      <span>{t('livePayments', 'Live Payments & Broadcasts')}</span>
+                      <Receipt className="w-5 h-5 text-blue-600" />
+                      <span>{isKhmer ? 'ប្រវត្តិប្រតិបត្តិការលម្អិត' : 'Full Payment History & Statements'}</span>
                     </h3>
                     <p className="text-xs text-slate-400">
-                      Real-time payment announcements received from ABA, Wing, ACLEDA & Bakong
+                      Audit all customer QR payments received via ABA, Bakong, Wing & ACLEDA
                     </p>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => fetchStoresData(true)}
-                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition flex items-center gap-1 cursor-pointer"
-                      title={t('refresh', 'Refresh live payments')}
+                      onClick={handleExportCSV}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
                     >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      <span>Sync</span>
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Export CSV</span>
+                    </button>
+
+                    <button
+                      onClick={() => fetchStoresData(true)}
+                      className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition cursor-pointer"
+                    >
+                      <RefreshCw className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
 
-                {/* Filter & Search Bar */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-                  {/* Search Input */}
-                  <div className="relative flex-1">
+                {/* Filter Toolbar */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {/* Search */}
+                  <div className="relative">
                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="text"
                       value={txSearchTerm}
                       onChange={(e) => setTxSearchTerm(e.target.value)}
-                      placeholder="Search customer, Tx ID, or amount..."
-                      className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      placeholder="Search payer, TxID, amount, SN..."
+                      className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
 
-                  {/* Currency Selector */}
-                  <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                    {['ALL', 'USD', 'KHR'].map((cur) => (
-                      <button
-                        key={cur}
-                        type="button"
-                        onClick={() => setTxCurrencyFilter(cur)}
-                        className={`px-3 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${
-                          txCurrencyFilter === cur
-                            ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-2xs'
-                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                        }`}
-                      >
-                        {cur === 'ALL' ? 'All' : cur === 'USD' ? '$ USD' : '៛ KHR'}
-                      </button>
+                  {/* Branch / Store Filter */}
+                  <select
+                    value={txStoreFilter}
+                    onChange={(e) => setTxStoreFilter(e.target.value)}
+                    className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                  >
+                    <option value="ALL">All Store Branches</option>
+                    {stores.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
-                  </div>
+                  </select>
+
+                  {/* Currency Filter */}
+                  <select
+                    value={txCurrencyFilter}
+                    onChange={(e) => setTxCurrencyFilter(e.target.value)}
+                    className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                  >
+                    <option value="ALL">All Currencies (USD & KHR)</option>
+                    <option value="USD">USD ($) Only</option>
+                    <option value="KHR">KHR (៛) Only</option>
+                  </select>
 
                   {/* Bank Filter */}
                   <select
                     value={txBankFilter}
                     onChange={(e) => setTxBankFilter(e.target.value)}
-                    className="px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                    className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                   >
                     <option value="ALL">All Banks</option>
                     <option value="ABA">ABA Bank</option>
@@ -1204,108 +1603,70 @@ export default function UserDashboard() {
                   </select>
                 </div>
 
-                {/* Live Transactions List */}
+                {/* Transactions Table */}
                 {filteredTransactions.length > 0 ? (
-                  <>
-                    {/* Mobile Feed Cards */}
-                    <div className="sm:hidden space-y-2.5">
-                      {filteredTransactions.map((tx) => (
-                        <div 
-                          key={tx.id}
-                          onClick={() => {
-                            setSelectedTxSlip(tx);
-                            setIsTxSlipOpen(true);
-                          }}
-                          className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/90 dark:border-slate-700/60 rounded-2xl flex items-center justify-between cursor-pointer hover:border-emerald-400/60 active:scale-[0.99] transition shadow-2xs"
-                        >
-                          <div className="space-y-1">
-                            <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 rounded-md text-[10px] font-bold">
-                                {tx.bank_name || 'Bakong'}
-                              </span>
-                              <span>{tx.payer_name || t('customer', 'Customer')}</span>
-                            </div>
-                            <div className="text-[11px] text-slate-400 font-mono flex items-center gap-1.5">
-                              <span>SN: {tx.device_sn}</span>
-                              <span>•</span>
-                              <span>{tx.created_at ? new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
-                            </div>
-                          </div>
-
-                          <div className="text-right space-y-0.5">
-                            <div className="text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800">
+                    <table className="w-full text-left text-sm min-w-[700px]">
+                      <thead>
+                        <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          <th className="py-3 px-4">{t('bank', 'Bank / Source')}</th>
+                          <th className="py-3 px-4">{t('amount', 'Amount')}</th>
+                          <th className="py-3 px-4">{t('payer', 'Customer / Payer')}</th>
+                          <th className="py-3 px-4">{t('txId', 'Bank Reference ID')}</th>
+                          <th className="py-3 px-4">Store Branch</th>
+                          <th className="py-3 px-4">{t('device', 'Soundbox SN')}</th>
+                          <th className="py-3 px-4">Date & Time</th>
+                          <th className="py-3 px-4 text-right">Receipt</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                        {filteredTransactions.map((tx) => (
+                          <tr 
+                            key={tx.id} 
+                            onClick={() => {
+                              setSelectedTxSlip(tx);
+                              setIsTxSlipOpen(true);
+                            }}
+                            className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition cursor-pointer group"
+                          >
+                            <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                              <span>{tx.bank_name || 'Bakong'}</span>
+                            </td>
+                            <td className="py-3.5 px-4 font-black text-emerald-600 dark:text-emerald-400 font-mono text-sm">
                               +{tx.currency === 'USD' ? `$${Number(tx.amount).toFixed(2)}` : `៛${Number(tx.amount).toLocaleString()}`}
-                            </div>
-                            <span className="text-[10px] text-emerald-700 bg-emerald-100/60 dark:bg-emerald-950 px-1.5 py-0.5 rounded font-bold uppercase">
-                              {tx.status || 'VERIFIED'}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Desktop Table View */}
-                    <div className="hidden sm:block overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800">
-                      <table className="w-full text-left text-sm min-w-[540px]">
-                        <thead>
-                          <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                            <th className="py-3 px-4">{t('bank', 'Bank / Source')}</th>
-                            <th className="py-3 px-4">{t('amount', 'Amount Received')}</th>
-                            <th className="py-3 px-4">{t('payer', 'Customer / Payer')}</th>
-                            <th className="py-3 px-4">{t('txId', 'Bank Reference ID')}</th>
-                            <th className="py-3 px-4">{t('device', 'Soundbox SN')}</th>
-                            <th className="py-3 px-4 text-right">Details</th>
+                            </td>
+                            <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 font-medium">
+                              {tx.payer_name || t('customer', 'Customer')}
+                            </td>
+                            <td className="py-3.5 px-4 font-mono text-slate-400">
+                              {tx.bank_tx_id || tx.id}
+                            </td>
+                            <td className="py-3.5 px-4 font-medium text-slate-800 dark:text-slate-200">
+                              {tx.storeName || activeStore?.name}
+                            </td>
+                            <td className="py-3.5 px-4 font-mono text-slate-500">
+                              {tx.device_sn}
+                            </td>
+                            <td className="py-3.5 px-4 text-slate-400">
+                              {tx.created_at ? new Date(tx.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : ''}
+                            </td>
+                            <td className="py-3.5 px-4 text-right">
+                              <span className="text-blue-600 dark:text-blue-400 font-bold group-hover:underline flex items-center justify-end gap-1">
+                                <span>Slip</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </span>
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-                          {filteredTransactions.map((tx) => (
-                            <tr 
-                              key={tx.id} 
-                              onClick={() => {
-                                setSelectedTxSlip(tx);
-                                setIsTxSlipOpen(true);
-                              }}
-                              className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition cursor-pointer group"
-                            >
-                              <td className="py-3 px-4 font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                <span>{tx.bank_name || 'Bank'}</span>
-                              </td>
-                              <td className="py-3 px-4 font-black text-emerald-600 dark:text-emerald-400 font-mono text-sm">
-                                +{tx.currency === 'USD' ? `$${Number(tx.amount).toFixed(2)}` : `៛${Number(tx.amount).toLocaleString()}`}
-                              </td>
-                              <td className="py-3 px-4 text-slate-700 dark:text-slate-300 font-medium">
-                                {tx.payer_name || t('customer', 'Customer')}
-                              </td>
-                              <td className="py-3 px-4 font-mono text-slate-400">
-                                {tx.bank_tx_id || tx.id}
-                              </td>
-                              <td className="py-3 px-4 font-mono text-slate-500">
-                                {tx.device_sn}
-                              </td>
-                              <td className="py-3 px-4 text-right">
-                                <span className="text-emerald-600 dark:text-emerald-400 font-bold group-hover:underline flex items-center justify-end gap-1">
-                                  <span>View Slip</span>
-                                  <ExternalLink className="w-3 h-3" />
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 ) : (
-                  <div className="text-center py-12 text-slate-500 space-y-2">
-                    <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-400">
-                      <DollarSign className="w-6 h-6" />
-                    </div>
-                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                      {txSearchTerm ? 'No transactions matched your search' : `No Transactions Yet for ${activeStore.name}`}
-                    </p>
-                    <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                      {txSearchTerm ? 'Try searching a different bank, amount, or name.' : 'When customers scan and pay via Bakong/ABA, payments will stream here and announce automatically.'}
-                    </p>
+                  <div className="text-center py-14 text-slate-500 space-y-2">
+                    <Receipt className="w-10 h-10 text-slate-300 mx-auto" />
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">No payment transactions match your filters</p>
+                    <p className="text-xs text-slate-400">Try clearing your search term or changing the currency/bank filter.</p>
                   </div>
                 )}
               </div>
@@ -1325,22 +1686,20 @@ export default function UserDashboard() {
           maxWidth="max-w-md"
         >
           <div className="space-y-4 text-center">
-            {/* Header Bank Badge */}
             <div className="w-16 h-16 rounded-3xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto shadow-sm">
               <CheckCircle2 className="w-8 h-8" />
             </div>
 
             <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Payment Received</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Payment Received & Broadcasted</span>
               <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">
                 +{selectedTxSlip.currency === 'USD' ? `$${Number(selectedTxSlip.amount).toFixed(2)}` : `៛${Number(selectedTxSlip.amount).toLocaleString()}`}
               </div>
               <p className="text-xs text-slate-500 font-medium mt-1">
-                Verified via {selectedTxSlip.bank_name || 'Bank System'}
+                Verified via {selectedTxSlip.bank_name || 'Bakong Gateway'}
               </p>
             </div>
 
-            {/* Slip Details Table */}
             <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-4 border border-slate-200 dark:border-slate-700/80 text-left space-y-2.5 text-xs">
               <div className="flex justify-between items-center">
                 <span className="text-slate-400">Payer / Customer:</span>
@@ -1355,8 +1714,8 @@ export default function UserDashboard() {
                 <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{selectedTxSlip.device_sn}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-400">Store / Branch:</span>
-                <span className="font-medium text-slate-800 dark:text-slate-200">{activeStore?.name}</span>
+                <span className="text-slate-400">Store Branch:</span>
+                <span className="font-medium text-slate-800 dark:text-slate-200">{selectedTxSlip.storeName || activeStore?.name}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-slate-400">Timestamp:</span>
@@ -1410,7 +1769,6 @@ export default function UserDashboard() {
                 className="w-full accent-emerald-600 cursor-pointer"
               />
 
-              {/* Quick Presets */}
               <div className="grid grid-cols-3 gap-2">
                 {[40, 75, 100].map((lvl) => (
                   <button
@@ -1599,14 +1957,14 @@ export default function UserDashboard() {
         </div>
       </Modal>
 
-      {/* Link New Device Modal with Field-Specific QR Scanner & Upload */}
+      {/* Link New Device Modal with Field-Specific QR Scanner & Store Target */}
       <Modal 
         isOpen={isDeviceModalOpen} 
         onClose={() => {
           setActiveCameraField(null);
           setIsDeviceModalOpen(false);
         }} 
-        title={`${t('linkSoundboxTo', 'Link Soundbox to')} '${activeStore?.name || 'Store'}'`}
+        title="Link Soundbox Speaker to Store"
         maxWidth="max-w-md"
       >
         <div className="space-y-4">
@@ -1629,6 +1987,24 @@ export default function UserDashboard() {
           )}
 
           <form onSubmit={handleRegisterDevice} className="space-y-4">
+            {/* Target Store Dropdown if user has multiple stores */}
+            {stores.length > 1 && (
+              <div>
+                <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
+                  Target Store Branch
+                </label>
+                <select
+                  value={targetStoreIdForNewDevice || activeStore?.id}
+                  onChange={(e) => setTargetStoreIdForNewDevice(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white"
+                >
+                  {stores.map(s => (
+                    <option key={s.id} value={s.id}>{s.name} ({s.location || s.place})</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div>
               <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
                 {t('deviceSn', 'Device Serial Number (SN)')} <span className="text-rose-500">*</span>
@@ -1966,7 +2342,7 @@ export default function UserDashboard() {
               <span>{t('confirmUnlinkSoundboxTitle', 'Are you sure you want to unlink this Soundbox?')}</span>
             </p>
             <p className="text-slate-600 dark:text-slate-400 text-xs">
-              {t('confirmUnlinkSoundboxDesc1', 'Device')} <strong>{selectedDevice?.device_sn}</strong> {t('confirmUnlinkSoundboxDesc2', 'will be disconnected from store')} <strong>{activeStore?.name}</strong>. {t('confirmUnlinkSoundboxDesc3', 'It will stop broadcasting payments until linked again.')}
+              {t('confirmUnlinkSoundboxDesc1', 'Device')} <strong>{selectedDevice?.device_sn}</strong> {t('confirmUnlinkSoundboxDesc2', 'will be disconnected from store')} <strong>{selectedDevice?.storeName || activeStore?.name}</strong>. {t('confirmUnlinkSoundboxDesc3', 'It will stop broadcasting payments until linked again.')}
             </p>
           </div>
 
