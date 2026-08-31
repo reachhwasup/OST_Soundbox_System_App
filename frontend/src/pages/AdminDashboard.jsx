@@ -103,6 +103,11 @@ export default function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState('');
   const [logTypeFilter, setLogTypeFilter] = useState(''); // 'TRANSACTION' | 'SECURITY' | ''
 
+  // Store & Location Filter States
+  const [storeSearch, setStoreSearch] = useState('');
+  const [storeProvinceFilter, setStoreProvinceFilter] = useState('');
+  const [storeSoundboxFilter, setStoreSoundboxFilter] = useState(''); // '' | 'WITH_DEVICE' | 'NO_DEVICE'
+
   // Cloud Speaker Device Manager Filter States
   const [devFilterId, setDevFilterId] = useState('');
   const [devFilterType, setDevFilterType] = useState('');
@@ -526,6 +531,106 @@ export default function AdminDashboard() {
     }
   };
 
+  // Filtered Users Logic
+  const filteredUsers = useMemo(() => {
+    return users.filter(u => {
+      if (searchTerm.trim()) {
+        const q = searchTerm.trim().toLowerCase();
+        const phoneMatch = String(u.phone_number || '').toLowerCase().includes(q);
+        const nameMatch = String(u.full_name || '').toLowerCase().includes(q);
+        const storeMatch = String(u.store?.name || '').toLowerCase().includes(q);
+        if (!phoneMatch && !nameMatch && !storeMatch) return false;
+      }
+      if (roleFilter && u.role !== roleFilter) return false;
+      if (statusFilter && u.status !== statusFilter) return false;
+      return true;
+    });
+  }, [users, searchTerm, roleFilter, statusFilter]);
+
+  // Available Provinces for Stores Filter
+  const availableProvinces = useMemo(() => {
+    const set = new Set();
+    stores.forEach(s => {
+      if (s.province && s.province.trim()) set.add(s.province.trim());
+      else if (s.place && s.place.trim()) set.add(s.place.trim());
+      else if (s.location && s.location.trim()) set.add(s.location.trim());
+    });
+    return Array.from(set).filter(Boolean).sort();
+  }, [stores]);
+
+  // Filtered Stores & Locations Logic
+  const filteredStores = useMemo(() => {
+    return stores.filter(s => {
+      if (storeSearch.trim()) {
+        const q = storeSearch.trim().toLowerCase();
+        const nameMatch = String(s.name || '').toLowerCase().includes(q);
+        const phoneMatch = String(s.owner_phone || '').toLowerCase().includes(q);
+        const ownerMatch = String(s.owner_name || '').toLowerCase().includes(q);
+        const locMatch = String(s.location || s.place || '').toLowerCase().includes(q);
+        const addrMatch = [s.street, s.village, s.commune, s.district, s.province]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(q);
+        const idMatch = String(s.id || '').includes(q);
+
+        if (!nameMatch && !phoneMatch && !ownerMatch && !locMatch && !addrMatch && !idMatch) {
+          return false;
+        }
+      }
+
+      if (storeProvinceFilter) {
+        const p = (s.province || s.place || s.location || '').toLowerCase();
+        if (!p.includes(storeProvinceFilter.toLowerCase())) return false;
+      }
+
+      if (storeSoundboxFilter === 'WITH_DEVICE') {
+        if (!s.device_count || s.device_count <= 0) return false;
+      } else if (storeSoundboxFilter === 'NO_DEVICE') {
+        if (s.device_count && s.device_count > 0) return false;
+      }
+
+      return true;
+    });
+  }, [stores, storeSearch, storeProvinceFilter, storeSoundboxFilter]);
+
+  // Reset Store Filters
+  const handleResetStoreFilters = () => {
+    setStoreSearch('');
+    setStoreProvinceFilter('');
+    setStoreSoundboxFilter('');
+  };
+
+  // Export Stores CSV
+  const handleExportStoresCSV = () => {
+    if (!filteredStores.length) {
+      showToast({ type: 'error', title: 'Export Failed', message: 'No stores matching current filters to export.' });
+      return;
+    }
+    const headers = ['Store ID', 'Store Name', 'Owner Name', 'Owner Phone', 'Province', 'District', 'Commune', 'Village', 'Street', 'Soundboxes'];
+    const rows = filteredStores.map(s => [
+      s.id,
+      `"${(s.name || '-').replace(/"/g, '""')}"`,
+      `"${(s.owner_name || '-').replace(/"/g, '""')}"`,
+      `"${s.owner_phone || '-'}"`,
+      `"${(s.province || s.place || '-').replace(/"/g, '""')}"`,
+      `"${(s.district || '-').replace(/"/g, '""')}"`,
+      `"${(s.commune || '-').replace(/"/g, '""')}"`,
+      `"${(s.village || '-').replace(/"/g, '""')}"`,
+      `"${(s.street || '-').replace(/"/g, '""')}"`,
+      s.device_count || 0
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `stores_locations_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast({ type: 'success', title: 'Export Successful', message: `Exported ${filteredStores.length} store records.` });
+  };
+
   // Cloud Speaker Device Filtering Logic
   const filteredDevices = useMemo(() => {
     return devices.filter(d => {
@@ -769,8 +874,8 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Universal Search & Filter Controls (For Users, Stores, and Logs) */}
-      {adminTab !== 'devices' && (
+      {/* Universal Search & Filter Controls (For Users and Logs) */}
+      {adminTab === 'users' && (
         <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200 dark:border-slate-800 p-3 sm:p-4">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
             
@@ -851,8 +956,8 @@ export default function AdminDashboard() {
           
           {/* Mobile User Cards (< md) */}
           <div className="md:hidden space-y-3">
-            {users.length > 0 ? (
-              users.map((u) => (
+            {filteredUsers.length > 0 ? (
+              filteredUsers.map((u) => (
                 <div key={u.id} className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200 dark:border-slate-800 p-4 space-y-3">
                   
                   {/* Phone and Name */}
@@ -989,8 +1094,8 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {users.length > 0 ? (
-                    users.map((u) => (
+                  {filteredUsers.length > 0 ? (
+                    filteredUsers.map((u) => (
                       <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
                         
                         {/* Emphasized User Phone Number */}
@@ -1127,11 +1232,80 @@ export default function AdminDashboard() {
       {/* TAB 2: STORES & PLACES DIRECTORY (RESPONSIVE CARDS & TABLE) */}
       {adminTab === 'stores' && (
         <div className="space-y-3">
+
+          {/* Stores Search & Filter Toolbar */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200 dark:border-slate-800 p-3 sm:p-4">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              
+              {/* Search Input */}
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute inset-y-0 left-3 my-auto pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder={t('searchStorePlaceholder', 'Search store name, owner, phone, street, location...')}
+                  value={storeSearch}
+                  onChange={(e) => setStoreSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-base sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-wrap items-center gap-2 justify-end">
+                {/* Province Filter */}
+                <select
+                  value={storeProvinceFilter}
+                  onChange={(e) => setStoreProvinceFilter(e.target.value)}
+                  className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer"
+                >
+                  <option value="">{t('allProvinces', 'All Provinces / Cities')}</option>
+                  {availableProvinces.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+
+                {/* Soundbox Filter */}
+                <select
+                  value={storeSoundboxFilter}
+                  onChange={(e) => setStoreSoundboxFilter(e.target.value)}
+                  className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer"
+                >
+                  <option value="">{t('allSoundboxStatus', 'All Soundboxes')}</option>
+                  <option value="WITH_DEVICE">{t('withSoundbox', 'With Soundbox (Assigned)')}</option>
+                  <option value="NO_DEVICE">{t('noSoundbox', 'No Soundbox (Unlinked)')}</option>
+                </select>
+
+                {/* Reset Button */}
+                {(storeSearch || storeProvinceFilter || storeSoundboxFilter) && (
+                  <button
+                    type="button"
+                    onClick={handleResetStoreFilters}
+                    className="px-3 py-2.5 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 rounded-xl transition flex items-center gap-1 cursor-pointer"
+                    title="Clear Filters"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>{t('reset', 'Reset')}</span>
+                  </button>
+                )}
+
+                {/* Export CSV Button */}
+                <button
+                  type="button"
+                  onClick={handleExportStoresCSV}
+                  className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                  title="Export Filtered Stores to CSV"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{t('exportCsv', 'Export')}</span>
+                </button>
+              </div>
+
+            </div>
+          </div>
           
           {/* Mobile Store Cards (< md) */}
           <div className="md:hidden space-y-3">
-            {stores.length > 0 ? (
-              stores.map((s) => (
+            {filteredStores.length > 0 ? (
+              filteredStores.map((s) => (
                 <div 
                   key={s.id}
                   onClick={() => {
@@ -1211,7 +1385,7 @@ export default function AdminDashboard() {
                 </p>
               </div>
               <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg">
-                {stores.length} {t('totalStores', 'Stores Total')}
+                {filteredStores.length} of {stores.length} {t('totalStores', 'Stores Total')}
               </span>
             </div>
 
@@ -1228,8 +1402,8 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {stores.length > 0 ? (
-                    stores.map((s) => (
+                  {filteredStores.length > 0 ? (
+                    filteredStores.map((s) => (
                       <tr 
                         key={s.id} 
                         onClick={() => {
