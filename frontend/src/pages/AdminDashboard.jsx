@@ -67,7 +67,10 @@ import {
   Undo2,
   ArrowLeftRight,
   Warehouse,
-  Boxes
+  Boxes,
+  DollarSign,
+  Unlink,
+  Smartphone
 } from 'lucide-react';
 
 export default function AdminDashboard() {
