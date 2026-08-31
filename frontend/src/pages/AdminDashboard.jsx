@@ -771,173 +771,81 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Admin Section Tabs (Modern Segmented Pill on Mobile & Desktop) */}
-      <div className="bg-slate-100 dark:bg-slate-800/80 p-1 sm:p-1.5 rounded-2xl flex flex-nowrap items-center gap-1.5 overflow-x-auto no-scrollbar border border-slate-200/60 dark:border-slate-700/60 w-full">
-        <button
-          type="button"
-          onClick={() => setAdminTab('users')}
-          className={`shrink-0 flex-1 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
-            adminTab === 'users'
-              ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Users className="w-4 h-4 shrink-0" />
-          <span>{isKhmer ? 'អ្នកប្រើប្រាស់' : 'Users & Merchants'}</span>
-          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
-            adminTab === 'users' ? 'bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-          }`}>
-            {users.length}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setAdminTab('stores')}
-          className={`shrink-0 flex-1 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
-            adminTab === 'stores'
-              ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Store className="w-4 h-4 shrink-0" />
-          <span>{isKhmer ? 'ហាង និងទីតាំង' : 'Stores & Places'}</span>
-          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
-            adminTab === 'stores' ? 'bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-          }`}>
-            {stores.length}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setAdminTab('devices')}
-          className={`shrink-0 flex-1 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
-            adminTab === 'devices'
-              ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Volume2 className="w-4 h-4 shrink-0 text-amber-500" />
-          <span>{isKhmer ? 'ឧបករណ៍ Soundbox' : 'Soundboxes'}</span>
-          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
-            adminTab === 'devices' ? 'bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-          }`}>
-            {devices.length}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setAdminTab('user_logs')}
-          className={`shrink-0 flex-1 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
-            adminTab === 'user_logs' || adminTab === 'logs'
-              ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Receipt className="w-4 h-4 shrink-0 text-emerald-500" />
-          <span>{isKhmer ? 'កំណត់ត្រាអតិថិជន' : 'User Logs'}</span>
-          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
-            adminTab === 'user_logs' || adminTab === 'logs' ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-          }`}>
-            {logs.filter(l => l.log_category === 'TRANSACTION').length}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setAdminTab('admin_logs')}
-          className={`shrink-0 flex-1 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
-            adminTab === 'admin_logs'
-              ? 'bg-white dark:bg-slate-900 text-rose-600 dark:text-rose-400 shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <ShieldAlert className="w-4 h-4 shrink-0 text-rose-500" />
-          <span>{isKhmer ? 'កំណត់ត្រា Admin' : 'Admin Logs'}</span>
-          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
-            adminTab === 'admin_logs' ? 'bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-          }`}>
-            {logs.filter(l => l.log_category === 'SECURITY').length}
-          </span>
-        </button>
-      </div>
-
-
-      {/* Universal Search & Filter Controls */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200 dark:border-slate-800 p-3 sm:p-4">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
-          
-          {/* Search Input */}
-          <div className="relative w-full sm:w-80 md:w-96">
-            <Search className="w-4 h-4 text-slate-400 absolute inset-y-0 left-3 my-auto pointer-events-none" />
-            <input
-              type="text"
-              placeholder={t('searchPlaceholder', 'Search by phone, name, store, or SN...')}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-base sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          {/* Filters and Actions */}
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+      {/* Universal Search & Filter Controls (For Users, Stores, and Logs) */}
+      {adminTab !== 'devices' && (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200 dark:border-slate-800 p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
             
-            {adminTab === 'users' && (
-              <>
-                <select
-                  value={roleFilter}
-                  onChange={(e) => setRoleFilter(e.target.value)}
-                  className="flex-1 sm:flex-none px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer"
+            {/* Search Input */}
+            <div className="relative w-full sm:w-80 md:w-96">
+              <Search className="w-4 h-4 text-slate-400 absolute inset-y-0 left-3 my-auto pointer-events-none" />
+              <input
+                type="text"
+                placeholder={t('searchPlaceholder', 'Search by phone, name, store, or SN...')}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-base sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            {/* Filters and Actions */}
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+              
+              {adminTab === 'users' && (
+                <>
+                  <select
+                    value={roleFilter}
+                    onChange={(e) => setRoleFilter(e.target.value)}
+                    className="flex-1 sm:flex-none px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer"
+                  >
+                    <option value="">{t('allRoles', 'All Roles')}</option>
+                    <option value="ADMIN">{t('admin', 'Admin')}</option>
+                    <option value="USER">{t('merchant', 'User')}</option>
+                  </select>
+
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="flex-1 sm:flex-none px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer"
+                  >
+                    <option value="">{t('allStatuses', 'All Statuses')}</option>
+                    <option value="ACTIVE">{t('active', 'Active')}</option>
+                    <option value="SUSPENDED">{t('inactive', 'Suspended')}</option>
+                  </select>
+                </>
+              )}
+
+              {(roleFilter || statusFilter || searchTerm) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRoleFilter('');
+                    setStatusFilter('');
+                    setSearchTerm('');
+                  }}
+                  className="px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 rounded-xl transition flex items-center gap-1 cursor-pointer"
+                  title="Clear Filters"
                 >
-                  <option value="">{t('allRoles', 'All Roles')}</option>
-                  <option value="ADMIN">{t('admin', 'Admin')}</option>
-                  <option value="USER">{t('merchant', 'User')}</option>
-                </select>
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  {t('close', 'Clear')}
+                </button>
+              )}
 
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="flex-1 sm:flex-none px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer"
+              {adminTab === 'users' && (
+                <button
+                  type="button"
+                  onClick={() => setIsAddUserOpen(true)}
+                  className="w-full sm:w-auto px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold rounded-xl transition flex items-center justify-center gap-1.5 shadow-2xs whitespace-nowrap cursor-pointer"
                 >
-                  <option value="">{t('allStatuses', 'All Statuses')}</option>
-                  <option value="ACTIVE">{t('active', 'Active')}</option>
-                  <option value="SUSPENDED">{t('inactive', 'Suspended')}</option>
-                </select>
-              </>
-            )}
+                  <Plus className="w-4 h-4" />
+                  {t('addNewUser', 'Add User')}
+                </button>
+              )}
+            </div>
 
-            {(roleFilter || statusFilter || searchTerm) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setRoleFilter('');
-                  setStatusFilter('');
-                  setSearchTerm('');
-                }}
-                className="px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 rounded-xl transition flex items-center gap-1 cursor-pointer"
-                title="Clear Filters"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                {t('close', 'Clear')}
-              </button>
-            )}
-
-            {adminTab === 'users' && (
-              <button
-                type="button"
-                onClick={() => setIsAddUserOpen(true)}
-                className="w-full sm:w-auto px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold rounded-xl transition flex items-center justify-center gap-1.5 shadow-2xs whitespace-nowrap cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                {t('addNewUser', 'Add User')}
-              </button>
-            )}
           </div>
-
         </div>
-      </div>
+      )}
 
       {/* TAB 1: USER MANAGEMENT */}
       {adminTab === 'users' && (
