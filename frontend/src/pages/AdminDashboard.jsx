@@ -1033,26 +1033,35 @@ export default function AdminDashboard() {
             <span className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
               {t('admin', 'Admin Portal')}
             </span>
-            <span className="text-[11px] sm:text-xs text-slate-400">{t('systemManagement', 'System Management & Hardware')}</span>
+            <span className="text-[11px] sm:text-xs text-slate-400">
+              {adminTab === 'users' ? 'User Accounts & Roles' :
+               adminTab === 'stores' ? 'Store & Merchant Branches' :
+               adminTab === 'devices' ? 'Cloud Speaker Fleet & Telemetry' :
+               adminTab === 'user_logs' || adminTab === 'logs' ? 'Customer QR Payments & Broadcasts' :
+               'System Security & Command Audit Trail'}
+            </span>
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1">
-            {t('systemAdministration', 'System Administration')}
+            {adminTab === 'users' ? 'User & Merchant Accounts' :
+             adminTab === 'stores' ? 'Stores & Merchant Locations' :
+             adminTab === 'devices' ? 'Cloud Speaker Device Fleet' :
+             adminTab === 'user_logs' || adminTab === 'logs' ? 'User & Payment Logs' :
+             'Admin & Security Audit Logs'}
           </h1>
         </div>
 
         <button
           onClick={fetchAllData}
           disabled={loading}
-          className="px-3.5 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/80 transition flex items-center justify-center gap-2 self-stretch sm:self-auto shadow-2xs"
+          className="px-3.5 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/80 transition flex items-center justify-center gap-2 self-stretch sm:self-auto shadow-2xs cursor-pointer"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           {t('refresh', 'Refresh Data')}
         </button>
       </div>
 
-      {/* KPI Stats Cards */}
-
-      {stats && (
+      {/* KPI Stats Cards - Dedicated to Users tab only */}
+      {stats && adminTab === 'users' && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3.5">
           <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
             <div className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('totalUsers', 'Total Users')}</div>
