@@ -884,16 +884,24 @@ export default function AdminDashboard() {
     if (!commandTargetDevice) return;
     setCommandSubmitting(true);
     try {
-      await new Promise(r => setTimeout(r, 600));
+      const res = await api.post(`/api/devices/${commandTargetDevice.id}/command`, {
+        command_type: commandType,
+        amount: commandAmount,
+        currency: commandCurrency,
+        volume: commandVolume,
+        custom_text: commandCustomText
+      });
       setIsDeviceCommandOpen(false);
       showToast({
         type: 'success',
         title: 'Command Dispatched',
-        message: `Command [${commandType}] sent to Device ${commandTargetDevice.device_id || commandTargetDevice.device_sn}.`,
+        message: res.data.message || `Command [${commandType}] sent to Device ${commandTargetDevice.device_id || commandTargetDevice.device_sn}.`,
         duration: 5000
       });
+      fetchAllData();
     } catch (err) {
-      showToast({ type: 'error', title: 'Dispatch Failed', message: 'Failed to send command.' });
+      const msg = err.response?.data?.detail || 'Failed to send command.';
+      showToast({ type: 'error', title: 'Dispatch Failed', message: msg });
     } finally {
       setCommandSubmitting(false);
     }
@@ -908,17 +916,23 @@ export default function AdminDashboard() {
     }
     setCommandSubmitting(true);
     try {
-      await new Promise(r => setTimeout(r, 800));
+      const res = await api.post('/api/devices/batch-command', {
+        device_ids: devSelectedIds,
+        command_type: batchCommandType,
+        volume: batchVolume
+      });
       setIsBatchCommandOpen(false);
       showToast({
         type: 'success',
         title: 'Batch Commands Sent',
-        message: `Dispatched [${batchCommandType}] to ${devSelectedIds.length} selected soundboxes.`,
+        message: res.data.message || `Dispatched [${batchCommandType}] to ${devSelectedIds.length} selected soundboxes.`,
         duration: 5000
       });
       setDevSelectedIds([]);
+      fetchAllData();
     } catch (err) {
-      showToast({ type: 'error', title: 'Batch Failed', message: 'Failed to send batch commands.' });
+      const msg = err.response?.data?.detail || 'Failed to send batch commands.';
+      showToast({ type: 'error', title: 'Batch Failed', message: msg });
     } finally {
       setCommandSubmitting(false);
     }
@@ -930,23 +944,24 @@ export default function AdminDashboard() {
     if (!selectedDeviceForMerchant) return;
     setCommandSubmitting(true);
     try {
-      await api.put(`/api/devices/${selectedDeviceForMerchant.id}`, {
+      const res = await api.put(`/api/devices/${selectedDeviceForMerchant.id}`, {
         device_sn: selectedDeviceForMerchant.device_sn,
         device_model: selectedDeviceForMerchant.device_model || 'Y6B',
         telegram_chat_id: selectedDeviceForMerchant.telegram_chat_id,
-        status: selectedDeviceForMerchant.status || 'ACTIVE',
+        status: targetMerchantStoreId ? 'ACTIVE' : 'IN_STOCK',
         merchant_id: targetMerchantStoreId ? parseInt(targetMerchantStoreId) : null
       });
       setIsEditMerchantOpen(false);
       showToast({
-        type: 'update',
-        title: 'Merchant Linked',
-        message: `Soundbox ${selectedDeviceForMerchant.device_sn} updated with new merchant assignment.`,
+        type: 'success',
+        title: 'Store Assignment Updated',
+        message: res.data.message || `Soundbox ${selectedDeviceForMerchant.device_sn} store assignment saved.`,
         duration: 5000
       });
       fetchAllData();
     } catch (err) {
-      showToast({ type: 'error', title: 'Update Failed', message: 'Failed to reassign merchant.' });
+      const msg = err.response?.data?.detail || 'Failed to reassign store.';
+      showToast({ type: 'error', title: 'Update Failed', message: msg });
     } finally {
       setCommandSubmitting(false);
     }

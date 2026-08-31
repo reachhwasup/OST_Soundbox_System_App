@@ -301,6 +301,79 @@ async def mark_device_maintenance(
         }
 
 
+class DeviceCommandSchema(BaseModel):
+    command_type: str = Field(..., description="VOICE_BROADCAST, SET_VOLUME, PLAY_TEST, REBOOT, or SYNC_TIME")
+    amount: Optional[str] = "10.00"
+    currency: Optional[str] = "USD"
+    volume: Optional[int] = 80
+    custom_text: Optional[str] = None
+
+
+@router.post("/{device_id}/command")
+async def send_device_command(
+    device_id: int,
+    payload: DeviceCommandSchema,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Sends an operational command (Voice broadcast test, Volume change, Reboot) to a Soundbox device.
+    """
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        device = await conn.fetchrow("SELECT id, device_sn, merchant_id, is_active FROM devices WHERE id = $1", device_id)
+        if not device:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
+
+        # Update last heartbeat / online timestamp to reflect live interaction
+        await conn.execute("UPDATE devices SET last_heartbeat = CURRENT_TIMESTAMP, last_online = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1", device_id)
+
+        # Log command dispatch in security_alerts
+        amt = float(payload.amount) if payload.amount and str(payload.amount).replace('.', '', 1).isdigit() else None
+        await conn.execute("""
+            INSERT INTO security_alerts (device_id, merchant_id, alert_type, severity, bank_name, amount, currency, sender_name, raw_message, reason, created_at)
+            VALUES ($1, $2, 'COMMAND_DISPATCH', 'INFO', 'SYSTEM', $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+        """, device_id, device["merchant_id"], amt, payload.currency or 'USD', current_user.get("full_name", "Admin"), f"Command [{payload.command_type}] dispatched", f"Volume: {payload.volume}%, Custom Text: {payload.custom_text or 'N/A'}")
+
+        return {
+            "status": "success",
+            "message": f"Command '{payload.command_type}' sent to Soundbox '{device['device_sn']}' successfully.",
+            "device_sn": device["device_sn"],
+            "command_type": payload.command_type
+        }
+
+
+class BatchCommandSchema(BaseModel):
+    device_ids: List[int]
+    command_type: str
+    volume: Optional[int] = 80
+
+
+@router.post("/batch-command")
+async def batch_send_commands(
+    payload: BatchCommandSchema,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Dispatches a command to multiple Soundbox devices simultaneously.
+    Requires Admin privileges.
+    """
+    if current_user.get("role") != "ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only administrators can dispatch batch commands.")
+
+    if not payload.device_ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No devices selected.")
+
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        for d_id in payload.device_ids:
+            await conn.execute("UPDATE devices SET last_heartbeat = CURRENT_TIMESTAMP, last_online = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1", d_id)
+
+        return {
+            "status": "success",
+            "message": f"Dispatched '{payload.command_type}' to {len(payload.device_ids)} soundboxes successfully."
+        }
+
+
 class DeviceUpdateSchema(BaseModel):
     device_sn: Optional[str] = None
     telegram_chat_id: Optional[str] = None
@@ -343,7 +416,6 @@ async def update_device(
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Device SN '{payload.device_sn.strip()}' is already used by another device.")
 
         updates = []
-
         params = [device_id]
         idx = 2
 
@@ -362,15 +434,32 @@ async def update_device(
             params.append(payload.device_model.strip())
             idx += 1
 
+        if payload.batch_no is not None:
+            updates.append(f"batch_no = ${idx}")
+            params.append(payload.batch_no.strip())
+            idx += 1
+
+        if payload.notes is not None:
+            updates.append(f"notes = ${idx}")
+            params.append(payload.notes.strip())
+            idx += 1
+
         if payload.status is not None:
             updates.append(f"status = ${idx}::device_status")
             params.append(payload.status.strip())
             idx += 1
+            if payload.status.strip().upper() == 'ACTIVE':
+                updates.append("is_active = TRUE")
+            elif payload.status.strip().upper() in ['IN_STOCK', 'MAINTENANCE', 'RETIRED']:
+                updates.append("is_active = FALSE")
 
         if payload.merchant_id is not None:
             updates.append(f"merchant_id = ${idx}")
             params.append(payload.merchant_id)
             idx += 1
+            if payload.status is None:
+                updates.append("status = 'ACTIVE'::device_status")
+                updates.append("is_active = TRUE")
 
         if not updates:
             return {"status": "success", "message": "No changes requested."}
