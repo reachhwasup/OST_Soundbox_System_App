@@ -156,7 +156,7 @@ export default function AdminDashboard() {
   });
 
   // User Management Modals state
-  const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
+  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [isEditUserOpen, setIsEditUserOpen] = useState(false);
   const [isResetPassOpen, setIsResetPassOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
