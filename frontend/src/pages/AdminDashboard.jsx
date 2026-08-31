@@ -981,6 +981,37 @@ export default function AdminDashboard() {
     }
   };
 
+  // Export User Payment Logs as CSV
+  const handleExportCSV = () => {
+    const listToExport = logs.filter(l => l.log_category === 'TRANSACTION');
+    if (!listToExport || listToExport.length === 0) {
+      showToast({ type: 'error', title: 'No Data', message: 'No user payment logs to export.' });
+      return;
+    }
+    const headers = ['Bank / Gateway', 'Amount', 'Currency', 'Customer / Payer', 'Bank Reference TxID', 'Store Name', 'Soundbox SN', 'Status', 'Date Time'];
+    const rows = listToExport.map(tx => [
+      tx.bank_name || 'Bakong',
+      tx.amount || 0,
+      tx.currency || 'USD',
+      `"${(tx.payer_name || 'Customer').replace(/"/g, '""')}"`,
+      tx.txid || tx.id || '',
+      `"${(tx.store_name || '').replace(/"/g, '""')}"`,
+      tx.device_sn || '',
+      tx.status || 'PROCESSED',
+      tx.created_at ? new Date(tx.created_at).toLocaleString() : ''
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `OST_User_Payment_Logs_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast({ type: 'success', title: 'Export Complete', message: `Exported ${listToExport.length} user payment log records.` });
+  };
+
   if (loading && !stats) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 flex items-center justify-center">
