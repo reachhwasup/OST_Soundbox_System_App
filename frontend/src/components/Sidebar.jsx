@@ -15,10 +15,13 @@ import {
   X, 
   User as UserIcon,
   ChevronRight,
+  ChevronDown,
   Smartphone,
   Layers,
   KeyRound,
-  UserCheck
+  UserCheck,
+  Users,
+  Activity
 } from 'lucide-react';
 import ChangePasswordModal from './ChangePasswordModal';
 import EditProfileModal from './EditProfileModal';
@@ -30,7 +33,8 @@ export default function Sidebar({ activeTab, setActiveTab }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
-
+  const [isAdminDropdownOpen, setIsAdminDropdownOpen] = useState(true);
+  const [currentSubTab, setCurrentSubTab] = useState(() => localStorage.getItem('soundbox_admin_tab') || 'users');
 
   // Close sidebar on route/tab change or resize
   useEffect(() => {
@@ -43,6 +47,17 @@ export default function Sidebar({ activeTab, setActiveTab }) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Listen to admin tab changes from dashboard
+  useEffect(() => {
+    const handleTabSync = (e) => {
+      if (e.detail) {
+        setCurrentSubTab(e.detail);
+      }
+    };
+    window.addEventListener('soundbox_admin_tab_change', handleTabSync);
+    return () => window.removeEventListener('soundbox_admin_tab_change', handleTabSync);
+  }, []);
+
   if (!user) return null;
 
   const isAdmin = String(user?.role || '').trim().toUpperCase() === 'ADMIN';
@@ -50,6 +65,16 @@ export default function Sidebar({ activeTab, setActiveTab }) {
   const handleNavClick = (tab) => {
     if (setActiveTab) {
       setActiveTab(tab);
+    }
+    setIsOpen(false);
+  };
+
+  const handleAdminSubTabClick = (subTab) => {
+    setCurrentSubTab(subTab);
+    localStorage.setItem('soundbox_admin_tab', subTab);
+    window.dispatchEvent(new CustomEvent('soundbox_admin_tab_change', { detail: subTab }));
+    if (setActiveTab) {
+      setActiveTab('admin');
     }
     setIsOpen(false);
   };
@@ -177,23 +202,100 @@ export default function Sidebar({ activeTab, setActiveTab }) {
 
             {/* Admin View Switcher (If user is Admin) */}
             {isAdmin && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => handleNavClick('admin')}
-                  className={`w-full flex items-center justify-between px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer ${
-                    activeTab === 'admin'
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 sm:gap-2.5">
-                    <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    <span>{t('systemAdministration', 'System Administration')}</span>
-                  </div>
-                  {activeTab === 'admin' && <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 opacity-70" />}
-                </button>
+              <div className="space-y-1.5">
+                
+                {/* Collapsible Admin Console Dropdown */}
+                <div className="rounded-xl overflow-hidden border border-slate-200/80 dark:border-slate-800 transition">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activeTab !== 'admin') {
+                        handleNavClick('admin');
+                      }
+                      setIsAdminDropdownOpen(!isAdminDropdownOpen);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 sm:px-3.5 sm:py-2.5 text-xs sm:text-sm font-semibold transition cursor-pointer ${
+                      activeTab === 'admin'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 sm:gap-2.5">
+                      <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <span>{t('systemAdministration', 'System Administration')}</span>
+                    </div>
+                    {isAdminDropdownOpen ? (
+                      <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-200 opacity-80" />
+                    ) : (
+                      <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-200 opacity-80" />
+                    )}
+                  </button>
 
+                  {/* Dropdown Items List */}
+                  {isAdminDropdownOpen && (
+                    <div className="bg-slate-50/90 dark:bg-slate-800/50 p-1.5 space-y-0.5 border-t border-slate-100 dark:border-slate-800/80">
+                      
+                      {/* Sub-item: Users & Merchants */}
+                      <button
+                        type="button"
+                        onClick={() => handleAdminSubTabClick('users')}
+                        className={`w-full flex items-center gap-2 px-2.5 py-1.5 sm:py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
+                          activeTab === 'admin' && currentSubTab === 'users'
+                            ? 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-bold shadow-2xs'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        <Users className="w-3.5 h-3.5 shrink-0 text-indigo-500" />
+                        <span>{isKhmer ? 'អ្នកប្រើប្រាស់ & អាជីវករ' : 'Users & Merchants'}</span>
+                      </button>
+
+                      {/* Sub-item: Stores & Locations */}
+                      <button
+                        type="button"
+                        onClick={() => handleAdminSubTabClick('stores')}
+                        className={`w-full flex items-center gap-2 px-2.5 py-1.5 sm:py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
+                          activeTab === 'admin' && currentSubTab === 'stores'
+                            ? 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-bold shadow-2xs'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        <Store className="w-3.5 h-3.5 shrink-0 text-blue-500" />
+                        <span>{isKhmer ? 'ហាង និងទីតាំង' : 'Stores & Locations'}</span>
+                      </button>
+
+                      {/* Sub-item: Soundboxes */}
+                      <button
+                        type="button"
+                        onClick={() => handleAdminSubTabClick('devices')}
+                        className={`w-full flex items-center gap-2 px-2.5 py-1.5 sm:py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
+                          activeTab === 'admin' && currentSubTab === 'devices'
+                            ? 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-bold shadow-2xs'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        <Volume2 className="w-3.5 h-3.5 shrink-0 text-amber-500" />
+                        <span>{isKhmer ? 'ឧបករណ៍ Soundbox' : 'Soundbox Devices'}</span>
+                      </button>
+
+                      {/* Sub-item: Audit & Logs */}
+                      <button
+                        type="button"
+                        onClick={() => handleAdminSubTabClick('logs')}
+                        className={`w-full flex items-center gap-2 px-2.5 py-1.5 sm:py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
+                          activeTab === 'admin' && currentSubTab === 'logs'
+                            ? 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-bold shadow-2xs'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        <Activity className="w-3.5 h-3.5 shrink-0 text-purple-500" />
+                        <span>{isKhmer ? 'កំណត់ត្រា & សុវត្ថិភាព' : 'Audit & Logs'}</span>
+                      </button>
+
+                    </div>
+                  )}
+                </div>
+
+                {/* Merchant Store View Switcher */}
                 <button
                   type="button"
                   onClick={() => handleNavClick('user')}
@@ -205,11 +307,12 @@ export default function Sidebar({ activeTab, setActiveTab }) {
                 >
                   <div className="flex items-center gap-2 sm:gap-2.5">
                     <Store className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    <span>{t('storeBranches', 'Stores & Soundboxes')}</span>
+                    <span>{t('storeBranches', 'Merchant Store View')}</span>
                   </div>
                   {activeTab === 'user' && <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 opacity-70" />}
                 </button>
-              </>
+
+              </div>
             )}
 
             {/* Standard Merchant View Navigation */}

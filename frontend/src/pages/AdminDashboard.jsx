@@ -50,8 +50,25 @@ export default function AdminDashboard() {
   const { t, isKhmer } = useLanguage();
   const { showToast } = useToast();
   
-  // Tab state
-  const [adminTab, setAdminTab] = useState('users'); // 'users' | 'stores' | 'devices' | 'logs'
+  // Tab state (persisted and synced with sidebar)
+  const [adminTab, setAdminTabState] = useState(() => localStorage.getItem('soundbox_admin_tab') || 'users');
+
+  const setAdminTab = (tab) => {
+    setAdminTabState(tab);
+    localStorage.setItem('soundbox_admin_tab', tab);
+    window.dispatchEvent(new CustomEvent('soundbox_admin_tab_change', { detail: tab }));
+  };
+
+  // Sync tab when changed from Sidebar dropdown
+  useEffect(() => {
+    const handleTabSync = (e) => {
+      if (e.detail) {
+        setAdminTabState(e.detail);
+      }
+    };
+    window.addEventListener('soundbox_admin_tab_change', handleTabSync);
+    return () => window.removeEventListener('soundbox_admin_tab_change', handleTabSync);
+  }, []);
 
   // Data states
   const [stats, setStats] = useState(null);
