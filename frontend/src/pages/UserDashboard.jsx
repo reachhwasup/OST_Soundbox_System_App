@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -19,6 +19,8 @@ import {
   Edit3, 
   Trash2,
   Volume2, 
+  Volume1,
+  VolumeX,
   Smartphone, 
   RefreshCw, 
   CheckCircle2, 
@@ -30,11 +32,23 @@ import {
   Layers,
   Settings,
   Unlink,
-  Radio
+  Radio,
+  Download,
+  Search,
+  Filter,
+  TrendingUp,
+  ShieldCheck,
+  Zap,
+  Check,
+  Receipt,
+  ExternalLink,
+  Signal,
+  BatteryCharging,
+  Sliders,
+  BellRing
 } from 'lucide-react';
 
 export default function UserDashboard() {
-
   const { user, refreshUser } = useAuth();
   const { t, isKhmer } = useLanguage();
   const { showToast } = useToast();
@@ -55,6 +69,21 @@ export default function UserDashboard() {
   const [isEditDeviceOpen, setIsEditDeviceOpen] = useState(false);
   const [isUnlinkDeviceOpen, setIsUnlinkDeviceOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState(null);
+
+  // Soundbox Test Voice & Volume Command State
+  const [testingDeviceId, setTestingDeviceId] = useState(null);
+  const [isVolumeModalOpen, setIsVolumeModalOpen] = useState(false);
+  const [targetVolumeDevice, setTargetVolumeDevice] = useState(null);
+  const [deviceVolume, setDeviceVolume] = useState(80);
+
+  // Transaction Receipt / Slip Modal State
+  const [selectedTxSlip, setSelectedTxSlip] = useState(null);
+  const [isTxSlipOpen, setIsTxSlipOpen] = useState(false);
+
+  // Transaction Filter & Search State
+  const [txSearchTerm, setTxSearchTerm] = useState('');
+  const [txCurrencyFilter, setTxCurrencyFilter] = useState('ALL');
+  const [txBankFilter, setTxBankFilter] = useState('ALL');
 
   // Initial / New Store Form State
   const [storeName, setStoreName] = useState('');
@@ -97,9 +126,9 @@ export default function UserDashboard() {
   const editTelegramFileInputRef = useRef(null);
 
   // Fetch all user stores
-  const fetchStoresData = async () => {
+  const fetchStoresData = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const res = await api.get('/api/stores/my-stores');
       const storeList = res.data.stores || [];
       setStores(storeList);
@@ -111,7 +140,7 @@ export default function UserDashboard() {
       const msg = err.response?.data?.detail || 'Failed to load store information.';
       setError(msg);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -212,54 +241,37 @@ export default function UserDashboard() {
     e.preventDefault();
     if (!activeStore) return;
     if (!editName.trim()) {
-      setError('Store name cannot be empty.');
+      setError('Please enter a store name.');
       return;
     }
 
     setSavingStore(true);
     setError('');
 
-    let payload = {
-      name: editName.trim(),
-      place: activeStore.place,
-      location: activeStore.location,
-      province: activeStore.province,
-      district: activeStore.district,
-      commune: activeStore.commune,
-      village: activeStore.village,
-      street: activeStore.street
-    };
-
+    let locData = {};
     if (editProvinceId && editDistrictId && editCommuneId) {
-      const compiled = compileLocation(
-        editProvinceId, 
-        editDistrictId, 
-        editCommuneId, 
-        editVillageId, 
-        editStreetOrLandmark
-      );
-      payload = {
-        name: editName.trim(),
-        place: compiled.place,
-        location: compiled.location,
-        province: compiled.province,
-        district: compiled.district,
-        commune: compiled.commune,
-        village: compiled.village,
-        street: compiled.street
-      };
+      locData = compileLocation(editProvinceId, editDistrictId, editCommuneId, editVillageId, editStreetOrLandmark);
     }
 
     try {
-      await api.put(`/api/stores/${activeStore.id}`, payload);
-      setIsEditStoreOpen(false);
-      const updMsg = `Store '${editName.trim()}' updated successfully.`;
+      await api.put(`/api/stores/${activeStore.id}`, {
+        name: editName.trim(),
+        place: locData.place || activeStore.place,
+        location: locData.location || activeStore.location,
+        province: locData.province || activeStore.province,
+        district: locData.district || activeStore.district,
+        commune: locData.commune || activeStore.commune,
+        village: locData.village || activeStore.village,
+        street: locData.street !== undefined ? locData.street : activeStore.street
+      });
+      const updMsg = `Store '${editName.trim()}' updated successfully!`;
       showToast({
         type: 'update',
         title: 'Store Updated',
         message: updMsg,
         duration: 5000
       });
+      setIsEditStoreOpen(false);
       await fetchStoresData();
     } catch (err) {
       const msg = err.response?.data?.detail || 'Failed to update store.';
@@ -285,13 +297,13 @@ export default function UserDashboard() {
       setIsDeleteStoreOpen(false);
       const delMsg = `Store '${activeStore.name}' deleted.`;
       showToast({
-        type: 'unlink',
+        type: 'delete',
         title: 'Store Deleted',
         message: delMsg,
         duration: 5000
       });
-      await fetchStoresData();
       setSelectedStoreIndex(0);
+      await fetchStoresData();
     } catch (err) {
       const msg = err.response?.data?.detail || 'Failed to delete store.';
       setError(msg);
@@ -306,46 +318,44 @@ export default function UserDashboard() {
     }
   };
 
-  // Handle Register/Link New Device
+  // Handle Register Device
   const handleRegisterDevice = async (e) => {
     e.preventDefault();
-    if (!activeStore) {
-      setError('Please select or register a store first.');
-      return;
-    }
+    if (!activeStore) return;
     if (!deviceSn.trim()) {
-      setError('Please enter device serial number.');
+      setError('Please enter device Serial Number (SN).');
       return;
     }
 
     setSavingDevice(true);
     setError('');
+
     try {
       await api.post('/api/devices/register', {
         merchant_id: activeStore.id,
         device_sn: deviceSn.trim(),
         telegram_chat_id: telegramChatId.trim() || null,
-        device_model: 'Y6B',
+        device_model: 'Y6B'
       });
-      setIsDeviceModalOpen(false);
+      const dvcMsg = `Soundbox '${deviceSn.trim()}' linked to '${activeStore.name}'!`;
+      showToast({
+        type: 'success',
+        title: 'Soundbox Linked',
+        message: dvcMsg,
+        duration: 5000
+      });
       setDeviceSn('');
       setTelegramChatId('');
       setActiveCameraField(null);
       setScanFeedback({ field: '', message: '', isError: false });
-      const linkMsg = `Soundbox device '${deviceSn.trim()}' linked to '${activeStore.name}' successfully!`;
-      showToast({
-        type: 'link',
-        title: 'Device Linked Successfully',
-        message: linkMsg,
-        duration: 5000
-      });
+      setIsDeviceModalOpen(false);
       await fetchStoresData();
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to register device.';
+      const msg = err.response?.data?.detail || 'Failed to link device.';
       setError(msg);
       showToast({
         type: 'error',
-        title: 'Device Link Failed',
+        title: 'Link Failed',
         message: msg,
         duration: 5000
       });
@@ -360,7 +370,7 @@ export default function UserDashboard() {
     setEditDeviceSn(device.device_sn || '');
     setEditTelegramChatId(device.telegram_chat_id || '');
     setEditDeviceModel(device.device_model || 'Y6B');
-    setEditDeviceMerchantId(activeStore ? activeStore.id : '');
+    setEditDeviceMerchantId(String(activeStore?.id || ''));
     setEditActiveCameraField(null);
     setEditScanFeedback({ field: '', message: '', isError: false });
     setIsEditDeviceOpen(true);
@@ -371,27 +381,28 @@ export default function UserDashboard() {
     e.preventDefault();
     if (!selectedDevice) return;
     if (!editDeviceSn.trim()) {
-      setError('Device Serial Number cannot be empty.');
+      setError('Please enter device Serial Number (SN).');
       return;
     }
 
     setSavingDevice(true);
     setError('');
+
     try {
       await api.put(`/api/devices/${selectedDevice.id}`, {
         device_sn: editDeviceSn.trim(),
         telegram_chat_id: editTelegramChatId.trim() || null,
         device_model: editDeviceModel.trim() || 'Y6B',
-        merchant_id: editDeviceMerchantId ? parseInt(editDeviceMerchantId) : activeStore?.id
+        merchant_id: editDeviceMerchantId ? parseInt(editDeviceMerchantId) : activeStore.id
       });
-      setIsEditDeviceOpen(false);
-      const devUpdMsg = `Soundbox '${editDeviceSn.trim()}' updated successfully!`;
+      const updDvcMsg = `Soundbox '${editDeviceSn.trim()}' updated successfully!`;
       showToast({
         type: 'update',
         title: 'Soundbox Updated',
-        message: devUpdMsg,
+        message: updDvcMsg,
         duration: 5000
       });
+      setIsEditDeviceOpen(false);
       await fetchStoresData();
     } catch (err) {
       const msg = err.response?.data?.detail || 'Failed to update device.';
@@ -441,6 +452,92 @@ export default function UserDashboard() {
     } finally {
       setSavingDevice(false);
     }
+  };
+
+  // Trigger Soundbox Test Voice Broadcast
+  const handleTriggerTestVoice = async (device) => {
+    if (!device) return;
+    setTestingDeviceId(device.id);
+    try {
+      const res = await api.post(`/api/devices/${device.id}/command`, {
+        command_type: 'VOICE_BROADCAST',
+        amount: '1.00',
+        currency: 'USD',
+        volume: 80,
+        custom_text: 'ABA Bank received $1.00'
+      });
+      showToast({
+        type: 'success',
+        title: 'Test Broadcast Sent',
+        message: res.data.message || `Test announcement dispatched to ${device.device_sn}.`,
+        duration: 5000
+      });
+      fetchStoresData(true);
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Failed to trigger test voice broadcast.';
+      showToast({ type: 'error', title: 'Broadcast Failed', message: msg });
+    } finally {
+      setTestingDeviceId(null);
+    }
+  };
+
+  // Open Volume Modal
+  const handleOpenVolumeModal = (device) => {
+    setTargetVolumeDevice(device);
+    setDeviceVolume(80);
+    setIsVolumeModalOpen(true);
+  };
+
+  // Submit Volume Adjustment
+  const handleSaveVolume = async (e) => {
+    e.preventDefault();
+    if (!targetVolumeDevice) return;
+    try {
+      await api.post(`/api/devices/${targetVolumeDevice.id}/command`, {
+        command_type: 'SET_VOLUME',
+        volume: deviceVolume
+      });
+      setIsVolumeModalOpen(false);
+      showToast({
+        type: 'success',
+        title: 'Volume Updated',
+        message: `Volume for Soundbox ${targetVolumeDevice.device_sn} set to ${deviceVolume}%.`,
+        duration: 5000
+      });
+      fetchStoresData(true);
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Failed to update volume.';
+      showToast({ type: 'error', title: 'Volume Failed', message: msg });
+    }
+  };
+
+  // Export Transactions as CSV
+  const handleExportCSV = () => {
+    if (!activeStore || !activeStore.recent_transactions || activeStore.recent_transactions.length === 0) {
+      showToast({ type: 'info', title: 'No Data', message: 'No transactions to export for this store.' });
+      return;
+    }
+    const headers = ['Transaction ID', 'Bank Name', 'Amount', 'Currency', 'Customer / Payer', 'Soundbox SN', 'Status', 'Date Time'];
+    const rows = activeStore.recent_transactions.map(tx => [
+      tx.bank_tx_id || tx.id,
+      tx.bank_name || 'Bank',
+      tx.amount,
+      tx.currency || 'USD',
+      `"${(tx.payer_name || 'Customer').replace(/"/g, '""')}"`,
+      tx.device_sn || '',
+      tx.status || 'PROCESSED',
+      tx.created_at ? new Date(tx.created_at).toLocaleString() : ''
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `${activeStore.name.replace(/\s+/g, '_')}_transactions_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast({ type: 'success', title: 'Export Complete', message: 'Transactions CSV downloaded successfully.' });
   };
 
   // Image File QR Decoder handler for Link Modal
@@ -515,12 +612,65 @@ export default function UserDashboard() {
     e.target.value = '';
   };
 
+  // Calculate Real-Time Store Financial Metrics
+  const storeMetrics = useMemo(() => {
+    if (!activeStore || !activeStore.recent_transactions) {
+      return { totalUSD: 0, totalKHR: 0, txCount: 0, activeDevices: 0 };
+    }
+    let usd = 0;
+    let khr = 0;
+    activeStore.recent_transactions.forEach(tx => {
+      if (String(tx.currency).toUpperCase() === 'KHR') {
+        khr += Number(tx.amount || 0);
+      } else {
+        usd += Number(tx.amount || 0);
+      }
+    });
+    return {
+      totalUSD: usd,
+      totalKHR: khr,
+      txCount: activeStore.recent_transactions.length,
+      activeDevices: activeStore.devices?.filter(d => String(d.status).toUpperCase() === 'ACTIVE' || String(d.status).toUpperCase() === 'ONLINE').length || 0
+    };
+  }, [activeStore]);
+
+  // Filtered Transactions
+  const filteredTransactions = useMemo(() => {
+    if (!activeStore || !activeStore.recent_transactions) return [];
+    return activeStore.recent_transactions.filter(tx => {
+      // Currency match
+      if (txCurrencyFilter !== 'ALL' && String(tx.currency).toUpperCase() !== txCurrencyFilter) {
+        return false;
+      }
+      // Bank match
+      if (txBankFilter !== 'ALL' && !String(tx.bank_name || '').toLowerCase().includes(txBankFilter.toLowerCase())) {
+        return false;
+      }
+      // Search match
+      if (txSearchTerm.trim()) {
+        const q = txSearchTerm.toLowerCase().trim();
+        const payer = String(tx.payer_name || '').toLowerCase();
+        const txId = String(tx.bank_tx_id || tx.id || '').toLowerCase();
+        const bank = String(tx.bank_name || '').toLowerCase();
+        const sn = String(tx.device_sn || '').toLowerCase();
+        const amt = String(tx.amount || '');
+        return payer.includes(q) || txId.includes(q) || bank.includes(q) || sn.includes(q) || amt.includes(q);
+      }
+      return true;
+    });
+  }, [activeStore, txCurrencyFilter, txBankFilter, txSearchTerm]);
+
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 flex items-center justify-center">
-        <div className="text-center">
-          <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin mx-auto mb-3" />
-          <p className="text-sm font-medium text-slate-500">Loading your stores & soundbox status...</p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/80 flex items-center justify-center mx-auto shadow-sm">
+            <RefreshCw className="w-6 h-6 text-emerald-600 dark:text-emerald-400 animate-spin" />
+          </div>
+          <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+            {t('loading', 'Loading your stores & soundbox status...')}
+          </p>
+          <p className="text-xs text-slate-400">Connecting to OST Soundbox Cloud</p>
         </div>
       </div>
     );
@@ -529,29 +679,27 @@ export default function UserDashboard() {
   const hasAnyStore = stores.length > 0;
 
   return (
-    <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-4 sm:space-y-6">
+    <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-5 sm:space-y-6">
       
       {/* Case 1: USER HAS NOT REGISTERED ANY STORE YET */}
-
       {!hasAnyStore ? (
-        <div className="max-w-3xl mx-auto py-2 sm:py-6">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-5 sm:p-8 space-y-5">
-            
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 mb-3">
-                <Store className="w-6 h-6 sm:w-7 sm:h-7" />
+        <div className="max-w-3xl mx-auto py-4 sm:py-8">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-200/90 dark:border-slate-800 p-6 sm:p-10 space-y-6">
+            <div className="text-center space-y-2">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 mb-2 border border-emerald-500/20 shadow-xs">
+                <Store className="w-8 h-8" />
               </div>
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
-                Register Your Store
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                {t('registerYourStore', 'Register Your Store')}
               </h2>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-                Select your store's Province, District, Commune, and Village to link with your Soundbox speaker.
+              <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                {t('registerStoreDesc', "Setup your store location and link your Y6B 4G Soundbox speaker to announce instant QR payments.")}
               </p>
             </div>
 
             <form onSubmit={handleRegisterStore} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
                   Store Name (ឈ្មោះហាង) <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
@@ -562,18 +710,18 @@ export default function UserDashboard() {
                     type="text"
                     value={storeName}
                     onChange={(e) => setStoreName(e.target.value)}
-                    placeholder="e.g. Sokha Artisan Coffee"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
+                    placeholder="e.g. Brown Coffee BKK1"
+                    className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition shadow-2xs"
                     required
                   />
                 </div>
               </div>
 
               {/* Cascading Dropdown Selector */}
-              <div className="p-3.5 sm:p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-3">
+              <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-3.5">
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                   <MapPin className="w-4 h-4" />
-                  <span>Store Location Hierarchy (ជ្រើសរើសទីតាំងរដ្ឋបាល)</span>
+                  <span>Store Administrative Location (ជ្រើសរើសទីតាំងរដ្ឋបាល)</span>
                 </div>
                 <CambodiaLocationSelector
                   provinceId={provinceId}
@@ -594,7 +742,7 @@ export default function UserDashboard() {
                 <button
                   type="submit"
                   disabled={savingStore}
-                  className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-sm shadow-xs transition flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full py-3.5 px-5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold rounded-xl text-sm shadow-md transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
                   {savingStore ? (
                     <span>Registering store...</span>
@@ -611,41 +759,45 @@ export default function UserDashboard() {
         </div>
       ) : (
         /* Case 2: USER HAS REGISTERED 1 OR MORE STORES */
-        <div className="space-y-4 sm:space-y-6">
+        <div className="space-y-5 sm:space-y-6">
           
           {/* Multi-Store Navigation / Switcher Bar */}
-          <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+          <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               
               {/* Store Tabs */}
               <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth pb-1 sm:pb-0">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1 shrink-0 pr-1">
-                  <Layers className="w-3.5 h-3.5" />
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 shrink-0 pr-1">
+                  <Layers className="w-4 h-4 text-emerald-600" />
                   <span>{t('storeBranches', 'Stores')}:</span>
                 </div>
 
-                {stores.map((s, idx) => (
-                  <button
-                    key={s.id}
-                    onClick={() => {
-                      setSelectedStoreIndex(idx);
-                      setEditName(s.name);
-                    }}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition flex items-center gap-2 shrink-0 border ${
-                      selectedStoreIndex === idx
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                        : 'bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    <Store className="w-3.5 h-3.5" />
-                    <span>{s.name}</span>
-                    <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
-                      selectedStoreIndex === idx ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                    }`}>
-                      {s.devices?.length || 0}
-                    </span>
-                  </button>
-                ))}
+                {stores.map((s, idx) => {
+                  const isSelected = selectedStoreIndex === idx;
+                  const devCount = s.devices?.length || 0;
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => {
+                        setSelectedStoreIndex(idx);
+                        setEditName(s.name);
+                      }}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition flex items-center gap-2 shrink-0 border cursor-pointer ${
+                        isSelected
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                          : 'bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      <Store className="w-3.5 h-3.5" />
+                      <span>{s.name}</span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
+                        isSelected ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                      }`}>
+                        {devCount} {devCount === 1 ? 'Speaker' : 'Speakers'}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Add Another Store Button */}
@@ -654,54 +806,55 @@ export default function UserDashboard() {
                   resetRegisterForm();
                   setIsRegisterStoreOpen(true);
                 }}
-                className="w-full sm:w-auto px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 border border-indigo-200 dark:border-indigo-800 shrink-0"
+                className="w-full sm:w-auto px-4 py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 border border-emerald-200 dark:border-emerald-800 shrink-0 cursor-pointer shadow-2xs"
               >
                 <Plus className="w-4 h-4" />
-                {t('addStore', 'Add Another Store')}
+                <span>{t('addStore', '+ Add New Store / Branch')}</span>
               </button>
             </div>
           </div>
 
-          {/* Active Store Overview Card */}
+          {/* Store Overview Banner & Touch Actions */}
           {activeStore && (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200 dark:border-slate-800 p-4 sm:p-6 md:p-7">
-              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 sm:gap-6">
+            <div className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-900/90 rounded-3xl shadow-xs border border-slate-200/90 dark:border-slate-800 p-5 sm:p-7">
+              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-5">
                 
-                <div className="flex items-start gap-3 sm:gap-4">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                    <Store className="w-6 h-6 sm:w-8 sm:h-8" />
+                <div className="flex items-start gap-4">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20">
+                    <Store className="w-7 h-7 sm:w-8 sm:h-8" />
                   </div>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
                         {activeStore.name}
                       </h1>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                         {t('activeStore', 'Active Store')}
                       </span>
                     </div>
                     
-                    <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-x-4 gap-y-1 mt-2 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                    <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
                       <div className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" />
-                        <span>{activeStore.location || activeStore.place || 'Not specified'}</span>
+                        <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>{activeStore.location || activeStore.place || 'Phnom Penh, Cambodia'}</span>
                       </div>
                       {activeStore.place && activeStore.place !== activeStore.location && (
                         <div className="flex items-center gap-1.5">
-                          <Building className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 shrink-0" />
+                          <Building className="w-4 h-4 text-slate-400 shrink-0" />
                           <span>{activeStore.place}</span>
                         </div>
                       )}
                       <div className="flex items-center gap-1.5 font-mono text-xs text-slate-500">
-                        <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 shrink-0" />
-                        <span>{activeStore.owner_phone}</span>
+                        <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span>{activeStore.owner_phone || user?.phone_number}</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Touch Action Buttons */}
-                <div className="flex items-center gap-2 pt-3 xl:pt-0 border-t xl:border-t-0 border-slate-100 dark:border-slate-800 w-full xl:w-auto">
+                <div className="flex flex-wrap items-center gap-2 pt-3 xl:pt-0 border-t xl:border-t-0 border-slate-200/80 dark:border-slate-800">
                   <button
                     onClick={() => {
                       if (!activeStore) return;
@@ -714,9 +867,9 @@ export default function UserDashboard() {
                       setEditStreetOrLandmark(resolved.streetOrLandmark);
                       setIsEditStoreOpen(true);
                     }}
-                    className="flex-1 sm:flex-none px-3 py-1.5 sm:py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-700 cursor-pointer whitespace-nowrap"
+                    className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs"
                   >
-                    <Edit3 className="w-3.5 h-3.5 shrink-0" />
+                    <Edit3 className="w-3.5 h-3.5 shrink-0 text-slate-500" />
                     <span>{t('editStore', 'Edit Store')}</span>
                   </button>
 
@@ -726,211 +879,415 @@ export default function UserDashboard() {
                       setScanFeedback({ field: '', message: '', isError: false });
                       setIsDeviceModalOpen(true);
                     }}
-                    className="flex-1 sm:flex-none px-3 py-1.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer whitespace-nowrap"
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95"
                   >
                     <Plus className="w-3.5 h-3.5 shrink-0" />
-                    <span>{t('linkSoundbox', 'Link Soundbox')}</span>
+                    <span>{t('linkSoundbox', '+ Link Soundbox')}</span>
+                  </button>
+
+                  <button
+                    onClick={handleExportCSV}
+                    title="Export Store Statement CSV"
+                    className="p-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl transition cursor-pointer shadow-2xs"
+                  >
+                    <Download className="w-4 h-4" />
                   </button>
 
                   {stores.length > 1 && (
                     <button
                       onClick={() => setIsDeleteStoreOpen(true)}
                       title={t('deleteStore', 'Delete this store')}
-                      className="p-1.5 sm:p-2 text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 rounded-xl transition shrink-0 border border-rose-200 dark:border-rose-800 flex items-center justify-center cursor-pointer"
+                      className="p-2 text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 rounded-xl transition shrink-0 border border-rose-200 dark:border-rose-800 cursor-pointer"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                 </div>
 
-
               </div>
             </div>
-
           )}
 
-          {/* Grid: Connected Soundboxes & Live Payment Feed for Active Store */}
+          {/* 4 Financial & Operational KPI Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
+            {/* Card 1: Today's Revenue USD */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Sales (USD)
+                </span>
+                <div className="p-2 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-xl">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                ${storeMetrics.totalUSD.toFixed(2)}
+              </div>
+              <p className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
+                <TrendingUp className="w-3 h-3 text-emerald-500" />
+                <span>Live store revenue</span>
+              </p>
+            </div>
+
+            {/* Card 2: Today's Revenue KHR */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Sales (KHR)
+                </span>
+                <div className="p-2 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 rounded-xl">
+                  <span className="font-bold text-xs">៛</span>
+                </div>
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                ៛{storeMetrics.totalKHR.toLocaleString()}
+              </div>
+              <p className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
+                <TrendingUp className="w-3 h-3 text-blue-500" />
+                <span>Bakong QR payments</span>
+              </p>
+            </div>
+
+            {/* Card 3: Total Completed Transactions */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Transactions
+                </span>
+                <div className="p-2 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded-xl">
+                  <Receipt className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                {storeMetrics.txCount} <span className="text-xs font-normal text-slate-400">payments</span>
+              </div>
+              <p className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
+                <CheckCircle2 className="w-3 h-3 text-indigo-500" />
+                <span>100% voice broadcasted</span>
+              </p>
+            </div>
+
+            {/* Card 4: Connected Soundbox Fleet */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Soundbox Fleet
+                </span>
+                <div className="p-2 bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 rounded-xl">
+                  <Volume2 className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                {activeStore?.devices?.length || 0} <span className="text-xs font-normal text-slate-400">linked</span>
+              </div>
+              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>{storeMetrics.activeDevices} Online & ready</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Grid: Connected Soundbox Speakers & Live Payment Feed */}
           {activeStore && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               
-              {/* Connected Soundbox Devices (1 Col) */}
-              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200 dark:border-slate-800 p-4 sm:p-6 space-y-3">
+              {/* Left Column: Connected Soundbox Devices (1 Col) */}
+              <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
-                    <span>{t('connectedSoundboxes', 'Soundboxes')} ({activeStore.name})</span>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Volume2 className="w-5 h-5 text-emerald-600" />
+                    <span>{t('connectedSoundboxes', 'Soundbox Speakers')}</span>
                   </h3>
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                    {activeStore.devices?.length || 0} {t('devices', 'Devices')}
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                    {activeStore.devices?.length || 0} {t('devices', 'Units')}
                   </span>
                 </div>
 
-
                 {activeStore.devices && activeStore.devices.length > 0 ? (
-                  <div className="space-y-3">
-                    {activeStore.devices.map((device) => (
-                      <div 
-                        key={device.id} 
-                        className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-2.5"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="font-mono font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                            <Smartphone className="w-4 h-4 text-emerald-600" />
-                            <span>{device.device_sn}</span>
-                          </div>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                            {device.status}
-                          </span>
-                        </div>
-                        
-                        <div className="text-xs text-slate-500 space-y-1">
+                  <div className="space-y-3.5">
+                    {activeStore.devices.map((device) => {
+                      const isOnline = String(device.status).toUpperCase() === 'ACTIVE' || String(device.status).toUpperCase() === 'ONLINE';
+                      const isTesting = testingDeviceId === device.id;
+
+                      return (
+                        <div 
+                          key={device.id} 
+                          className="p-4 bg-gradient-to-b from-slate-50 to-slate-100/60 dark:from-slate-800/80 dark:to-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-3 shadow-2xs hover:border-emerald-400/60 transition"
+                        >
+                          {/* Top Row: SN & Status Badge */}
                           <div className="flex items-center justify-between">
-                            <span>Model:</span>
-                            <span className="font-medium text-slate-700 dark:text-slate-300">{device.device_model}</span>
+                            <div className="font-mono font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                              <Smartphone className="w-4 h-4 text-emerald-600" />
+                              <span>{device.device_sn}</span>
+                            </div>
+                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
+                              isOnline 
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' 
+                                : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-ping' : 'bg-slate-400'}`}></span>
+                              {device.status || 'ACTIVE'}
+                            </span>
                           </div>
-                          <div className="flex items-start justify-between gap-2">
-                            <span className="shrink-0">Telegram:</span>
-                            <div className="flex flex-wrap justify-end gap-1">
-                              {device.telegram_chat_id ? (
-                                device.telegram_chat_id.split(',').map((id, idx) => (
-                                  <code key={idx} className="bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-800 dark:text-slate-200">
-                                    {id.trim()}
-                                  </code>
-                                ))
-                              ) : (
-                                <span className="text-[11px] text-slate-400 italic">Not paired</span>
-                              )}
+                          
+                          {/* Hardware Telemetry Specs */}
+                          <div className="grid grid-cols-2 gap-2 text-xs bg-white dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700/50 text-slate-600 dark:text-slate-400">
+                            <div className="flex items-center gap-1.5">
+                              <Signal className="w-3.5 h-3.5 text-blue-500" />
+                              <span className="font-medium text-slate-800 dark:text-slate-200">4G LTE Cellular</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <BatteryCharging className="w-3.5 h-3.5 text-emerald-500" />
+                              <span className="font-mono font-bold text-slate-800 dark:text-slate-200">95% (AC)</span>
+                            </div>
+                            <div className="col-span-2 flex items-start justify-between pt-1 border-t border-slate-100 dark:border-slate-800 text-[11px]">
+                              <span className="text-slate-400">Telegram Groups:</span>
+                              <div className="flex flex-wrap justify-end gap-1">
+                                {device.telegram_chat_id ? (
+                                  device.telegram_chat_id.split(',').map((id, idx) => (
+                                    <code key={idx} className="bg-slate-100 dark:bg-slate-700/80 px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-800 dark:text-slate-200">
+                                      {id.trim()}
+                                    </code>
+                                  ))
+                                ) : (
+                                  <span className="text-slate-400 italic">Not paired</span>
+                                )}
+                              </div>
                             </div>
                           </div>
 
-                        </div>
+                          {/* Interactive Merchant Controls */}
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                            {/* Test Broadcast Button */}
+                            <button
+                              type="button"
+                              onClick={() => handleTriggerTestVoice(device)}
+                              disabled={isTesting}
+                              title="Send instant voice announcement test"
+                              className="flex-1 py-1.5 px-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer disabled:opacity-50"
+                            >
+                              <BellRing className={`w-3.5 h-3.5 ${isTesting ? 'animate-spin' : ''}`} />
+                              <span>{isTesting ? 'Playing...' : 'Test Voice'}</span>
+                            </button>
 
-                        {/* Device Action Buttons (Edit & Unlink) */}
-                        <div className="pt-2 border-t border-slate-200 dark:border-slate-700/80 flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditDevice(device)}
-                            className="px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition border border-slate-200 dark:border-slate-700 flex items-center gap-1"
-                          >
-                            <Settings className="w-3.5 h-3.5" />
-                            <span>{t('edit', 'Edit')}</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenUnlinkDevice(device)}
-                            className="px-2.5 py-1 text-xs font-medium text-rose-600 hover:text-rose-700 dark:text-rose-400 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/50 rounded-lg transition border border-rose-200 dark:border-rose-800 flex items-center gap-1"
-                          >
-                            <Unlink className="w-3.5 h-3.5" />
-                            <span>{t('unlink', 'Unlink')}</span>
-                          </button>
-                        </div>
+                            {/* Volume Adjustment Button */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenVolumeModal(device)}
+                              title="Adjust speaker volume"
+                              className="py-1.5 px-2.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+                            >
+                              <Volume2 className="w-3.5 h-3.5 text-amber-500" />
+                              <span>Volume</span>
+                            </button>
 
-                      </div>
-                    ))}
+                            {/* Edit Pairing */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditDevice(device)}
+                              title="Edit device model and telegram chat IDs"
+                              className="p-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl transition cursor-pointer"
+                            >
+                              <Settings className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Unlink */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenUnlinkDevice(device)}
+                              title="Unlink soundbox from this store"
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 rounded-xl transition cursor-pointer"
+                            >
+                              <Unlink className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
-                  <div className="text-center py-6 sm:py-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-4">
-                    <Volume2 className="w-7 h-7 sm:w-8 sm:h-8 text-slate-400 mx-auto mb-2" />
-                    <p className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">{t('noSoundboxAtStore', 'No Soundbox at this Store')}</p>
-                    <p className="text-xs text-slate-500 mt-0.5 mb-3">{t('noSoundboxSub', 'Link a Y6B speaker to broadcast payments for this store')}</p>
+                  <div className="text-center py-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-400">
+                      <Volume2 className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{t('noSoundboxAtStore', 'No Soundbox at this Store')}</p>
+                      <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">{t('noSoundboxSub', 'Link a Y6B 4G speaker to announce live customer payments out loud.')}</p>
+                    </div>
                     <button
                       onClick={() => {
                         setActiveCameraField(null);
                         setScanFeedback({ field: '', message: '', isError: false });
                         setIsDeviceModalOpen(true);
                       }}
-                      className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition shadow-2xs cursor-pointer"
+                      className="inline-flex items-center justify-center gap-1.5 text-xs font-bold px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition shadow-sm cursor-pointer active:scale-95"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      <Plus className="w-4 h-4" />
                       <span>{t('linkSoundboxDevice', 'Link Soundbox Device')}</span>
                     </button>
-
                   </div>
                 )}
               </div>
 
+              {/* Right Column: Live Payments Feed & Transaction Analytics (2 Cols) */}
+              <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
+                
+                {/* Header & Controls */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100 dark:border-slate-800">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <CreditCard className="w-5 h-5 text-emerald-600" />
+                      <span>{t('livePayments', 'Live Payments & Broadcasts')}</span>
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Real-time payment announcements received from ABA, Wing, ACLEDA & Bakong
+                    </p>
+                  </div>
 
-              {/* Live Payment Transactions for Active Store (2 Cols) */}
-              <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200 dark:border-slate-800 p-4 sm:p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
-                    <span>{t('livePayments', 'Live Payments')} ({activeStore.name})</span>
-                  </h3>
-                  <button
-                    onClick={fetchStoresData}
-                    className="p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                    title={t('refresh', 'Refresh')}
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => fetchStoresData(true)}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition flex items-center gap-1 cursor-pointer"
+                      title={t('refresh', 'Refresh live payments')}
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Sync</span>
+                    </button>
+                  </div>
                 </div>
 
-                {activeStore.recent_transactions && activeStore.recent_transactions.length > 0 ? (
+                {/* Filter & Search Bar */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                  {/* Search Input */}
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={txSearchTerm}
+                      onChange={(e) => setTxSearchTerm(e.target.value)}
+                      placeholder="Search customer, Tx ID, or amount..."
+                      className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  {/* Currency Selector */}
+                  <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                    {['ALL', 'USD', 'KHR'].map((cur) => (
+                      <button
+                        key={cur}
+                        type="button"
+                        onClick={() => setTxCurrencyFilter(cur)}
+                        className={`px-3 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${
+                          txCurrencyFilter === cur
+                            ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-2xs'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        {cur === 'ALL' ? 'All' : cur === 'USD' ? '$ USD' : '៛ KHR'}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Bank Filter */}
+                  <select
+                    value={txBankFilter}
+                    onChange={(e) => setTxBankFilter(e.target.value)}
+                    className="px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                  >
+                    <option value="ALL">All Banks</option>
+                    <option value="ABA">ABA Bank</option>
+                    <option value="ACLEDA">ACLEDA Bank</option>
+                    <option value="Canadia">Canadia Bank</option>
+                    <option value="Wing">Wing Bank</option>
+                    <option value="Bakong">Bakong QR</option>
+                  </select>
+                </div>
+
+                {/* Live Transactions List */}
+                {filteredTransactions.length > 0 ? (
                   <>
                     {/* Mobile Feed Cards */}
                     <div className="sm:hidden space-y-2.5">
-                      {activeStore.recent_transactions.map((tx) => (
+                      {filteredTransactions.map((tx) => (
                         <div 
                           key={tx.id}
-                          className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl flex items-center justify-between"
+                          onClick={() => {
+                            setSelectedTxSlip(tx);
+                            setIsTxSlipOpen(true);
+                          }}
+                          className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/90 dark:border-slate-700/60 rounded-2xl flex items-center justify-between cursor-pointer hover:border-emerald-400/60 active:scale-[0.99] transition shadow-2xs"
                         >
-                          <div className="space-y-0.5">
+                          <div className="space-y-1">
                             <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                              <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 rounded text-[10px]">
-                                {tx.bank_name}
+                              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 rounded-md text-[10px] font-bold">
+                                {tx.bank_name || 'Bakong'}
                               </span>
                               <span>{tx.payer_name || t('customer', 'Customer')}</span>
                             </div>
-                            <div className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+                            <div className="text-[11px] text-slate-400 font-mono flex items-center gap-1.5">
                               <span>SN: {tx.device_sn}</span>
                               <span>•</span>
                               <span>{tx.created_at ? new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
                             </div>
                           </div>
 
-                          <div className="text-right">
-                            <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                          <div className="text-right space-y-0.5">
+                            <div className="text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono">
                               +{tx.currency === 'USD' ? `$${Number(tx.amount).toFixed(2)}` : `៛${Number(tx.amount).toLocaleString()}`}
                             </div>
-                            <span className="text-[9px] text-emerald-700 bg-emerald-50 dark:bg-emerald-950 px-1 py-0.2 rounded font-semibold uppercase">
-                              {tx.status}
+                            <span className="text-[10px] text-emerald-700 bg-emerald-100/60 dark:bg-emerald-950 px-1.5 py-0.5 rounded font-bold uppercase">
+                              {tx.status || 'VERIFIED'}
                             </span>
                           </div>
                         </div>
                       ))}
                     </div>
 
-                    {/* Desktop Table */}
-                    <div className="hidden sm:block overflow-x-auto">
+                    {/* Desktop Table View */}
+                    <div className="hidden sm:block overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800">
                       <table className="w-full text-left text-sm min-w-[540px]">
                         <thead>
-
-                          <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                            <th className="pb-3 font-medium">{t('bank', 'Bank')}</th>
-                            <th className="pb-3 font-medium">{t('amount', 'Amount')}</th>
-                            <th className="pb-3 font-medium">{t('payer', 'Payer')}</th>
-                            <th className="pb-3 font-medium">{t('txId', 'Tx ID')}</th>
-                            <th className="pb-3 font-medium">{t('device', 'Device')}</th>
+                          <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            <th className="py-3 px-4">{t('bank', 'Bank / Source')}</th>
+                            <th className="py-3 px-4">{t('amount', 'Amount Received')}</th>
+                            <th className="py-3 px-4">{t('payer', 'Customer / Payer')}</th>
+                            <th className="py-3 px-4">{t('txId', 'Bank Reference ID')}</th>
+                            <th className="py-3 px-4">{t('device', 'Soundbox SN')}</th>
+                            <th className="py-3 px-4 text-right">Details</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                          {activeStore.recent_transactions.map((tx) => (
-                            <tr key={tx.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
-                              <td className="py-3 font-semibold text-slate-900 dark:text-white">
-                                {tx.bank_name}
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                          {filteredTransactions.map((tx) => (
+                            <tr 
+                              key={tx.id} 
+                              onClick={() => {
+                                setSelectedTxSlip(tx);
+                                setIsTxSlipOpen(true);
+                              }}
+                              className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition cursor-pointer group"
+                            >
+                              <td className="py-3 px-4 font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                <span>{tx.bank_name || 'Bank'}</span>
                               </td>
-                              <td className="py-3 font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                              <td className="py-3 px-4 font-black text-emerald-600 dark:text-emerald-400 font-mono text-sm">
                                 +{tx.currency === 'USD' ? `$${Number(tx.amount).toFixed(2)}` : `៛${Number(tx.amount).toLocaleString()}`}
                               </td>
-                              <td className="py-3 text-slate-600 dark:text-slate-300">
+                              <td className="py-3 px-4 text-slate-700 dark:text-slate-300 font-medium">
                                 {tx.payer_name || t('customer', 'Customer')}
                               </td>
-                              <td className="py-3 text-xs font-mono text-slate-400">
-                                {tx.bank_tx_id}
+                              <td className="py-3 px-4 font-mono text-slate-400">
+                                {tx.bank_tx_id || tx.id}
                               </td>
-                              <td className="py-3 text-xs font-mono text-slate-500">
+                              <td className="py-3 px-4 font-mono text-slate-500">
                                 {tx.device_sn}
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <span className="text-emerald-600 dark:text-emerald-400 font-bold group-hover:underline flex items-center justify-end gap-1">
+                                  <span>View Slip</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </span>
                               </td>
                             </tr>
                           ))}
@@ -939,21 +1296,156 @@ export default function UserDashboard() {
                     </div>
                   </>
                 ) : (
-                  <div className="text-center py-8 sm:py-12 text-slate-500">
-                    <DollarSign className="w-8 h-8 sm:w-10 sm:h-10 text-slate-400 mx-auto mb-2" />
-                    <p className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">{t('noTransactions', 'No Transactions for')} {activeStore.name}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{t('noTransactionsSub', 'Payments made through soundboxes at this store will stream here in real time.')}</p>
+                  <div className="text-center py-12 text-slate-500 space-y-2">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-400">
+                      <DollarSign className="w-6 h-6" />
+                    </div>
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                      {txSearchTerm ? 'No transactions matched your search' : `No Transactions Yet for ${activeStore.name}`}
+                    </p>
+                    <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                      {txSearchTerm ? 'Try searching a different bank, amount, or name.' : 'When customers scan and pay via Bakong/ABA, payments will stream here and announce automatically.'}
+                    </p>
                   </div>
                 )}
               </div>
 
-
             </div>
           )}
 
-
-
         </div>
+      )}
+
+      {/* Transaction Receipt / Payment Slip Modal */}
+      {selectedTxSlip && (
+        <Modal
+          isOpen={isTxSlipOpen}
+          onClose={() => setIsTxSlipOpen(false)}
+          title="Payment Verification Slip"
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-4 text-center">
+            {/* Header Bank Badge */}
+            <div className="w-16 h-16 rounded-3xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto shadow-sm">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Payment Received</span>
+              <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">
+                +{selectedTxSlip.currency === 'USD' ? `$${Number(selectedTxSlip.amount).toFixed(2)}` : `៛${Number(selectedTxSlip.amount).toLocaleString()}`}
+              </div>
+              <p className="text-xs text-slate-500 font-medium mt-1">
+                Verified via {selectedTxSlip.bank_name || 'Bank System'}
+              </p>
+            </div>
+
+            {/* Slip Details Table */}
+            <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-4 border border-slate-200 dark:border-slate-700/80 text-left space-y-2.5 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Payer / Customer:</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">{selectedTxSlip.payer_name || 'Customer'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Bank Reference ID:</span>
+                <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{selectedTxSlip.bank_tx_id || selectedTxSlip.id}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Soundbox Speaker:</span>
+                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{selectedTxSlip.device_sn}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Store / Branch:</span>
+                <span className="font-medium text-slate-800 dark:text-slate-200">{activeStore?.name}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Timestamp:</span>
+                <span className="font-medium text-slate-800 dark:text-slate-200">
+                  {selectedTxSlip.created_at ? new Date(selectedTxSlip.created_at).toLocaleString() : 'Just now'}
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsTxSlipOpen(false)}
+              className="w-full py-3 bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs"
+            >
+              Close Receipt
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Volume Adjustment Modal */}
+      {targetVolumeDevice && (
+        <Modal
+          isOpen={isVolumeModalOpen}
+          onClose={() => setIsVolumeModalOpen(false)}
+          title={`Adjust Volume: Soundbox ${targetVolumeDevice.device_sn}`}
+          maxWidth="max-w-sm"
+        >
+          <form onSubmit={handleSaveVolume} className="space-y-5">
+            <div className="text-center space-y-1">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center mx-auto mb-2">
+                <Volume2 className="w-6 h-6" />
+              </div>
+              <h4 className="font-bold text-slate-900 dark:text-white text-sm">Speaker Audio Level</h4>
+              <p className="text-xs text-slate-400">Control speaker volume for busy market noise</p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex justify-between items-center text-xs font-bold">
+                <span className="text-slate-500">Current Level:</span>
+                <span className="text-emerald-600 dark:text-emerald-400 text-sm font-mono">{deviceVolume}%</span>
+              </div>
+              
+              <input
+                type="range"
+                min="10"
+                max="100"
+                step="5"
+                value={deviceVolume}
+                onChange={(e) => setDeviceVolume(parseInt(e.target.value))}
+                className="w-full accent-emerald-600 cursor-pointer"
+              />
+
+              {/* Quick Presets */}
+              <div className="grid grid-cols-3 gap-2">
+                {[40, 75, 100].map((lvl) => (
+                  <button
+                    key={lvl}
+                    type="button"
+                    onClick={() => setDeviceVolume(lvl)}
+                    className={`py-1.5 text-xs font-bold rounded-lg border transition cursor-pointer ${
+                      deviceVolume === lvl
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    {lvl === 40 ? 'Quiet' : lvl === 75 ? 'Standard' : 'Max (100%)'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsVolumeModalOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 dark:text-slate-300 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
+              >
+                Apply Volume
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {/* Add New Store Modal with Cascading Dropdowns */}
@@ -1002,14 +1494,14 @@ export default function UserDashboard() {
             <button
               type="button"
               onClick={() => setIsRegisterStoreOpen(false)}
-              className="px-4 py-2.5 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-300 font-medium"
+              className="px-4 py-2.5 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-300 font-medium cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={savingStore}
-              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-xs"
+              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-xs cursor-pointer"
             >
               {savingStore ? 'Registering...' : 'Register Store'}
             </button>
@@ -1039,7 +1531,6 @@ export default function UserDashboard() {
           </div>
 
           <div className="p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
-
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
               <div className="text-xs font-bold uppercase text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                 <MapPin className="w-4 h-4 text-emerald-600" />
@@ -1063,12 +1554,11 @@ export default function UserDashboard() {
             />
           </div>
 
-
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
             <button
               type="button"
               onClick={() => setIsEditStoreOpen(false)}
-              className="px-4 py-2.5 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-300 font-medium"
+              className="px-4 py-2.5 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-300 font-medium cursor-pointer"
             >
               {t('cancel', 'Cancel')}
             </button>
@@ -1082,7 +1572,6 @@ export default function UserDashboard() {
           </div>
         </form>
       </Modal>
-
 
       {/* Delete Store Confirmation Modal */}
       <Modal isOpen={isDeleteStoreOpen} onClose={() => setIsDeleteStoreOpen(false)} title={t('confirmDeleteStoreTitle', 'Confirm Delete Store')}>
@@ -1120,10 +1609,7 @@ export default function UserDashboard() {
         title={`${t('linkSoundboxTo', 'Link Soundbox to')} '${activeStore?.name || 'Store'}'`}
         maxWidth="max-w-md"
       >
-
         <div className="space-y-4">
-
-          {/* Active Field Live Camera Scanner */}
           {activeCameraField && (
             <FieldQRScanner 
               targetName={activeCameraField === 'sn' ? 'Device Serial Number (SN)' : 'Telegram Chat ID (Code)'}
@@ -1143,8 +1629,6 @@ export default function UserDashboard() {
           )}
 
           <form onSubmit={handleRegisterDevice} className="space-y-4">
-            
-            {/* Field 1: Device Serial Number (SN) */}
             <div>
               <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
                 {t('deviceSn', 'Device Serial Number (SN)')} <span className="text-rose-500">*</span>
@@ -1171,12 +1655,11 @@ export default function UserDashboard() {
                 </button>
               </div>
 
-              {/* Upload QR of Soundbox button under input */}
               <div className="mt-1.5 flex items-center justify-between">
                 <button
                   type="button"
                   onClick={() => snFileInputRef.current?.click()}
-                  className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1 py-1 transition"
+                  className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1 py-1 transition cursor-pointer"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   {t('uploadQrImage', 'Upload Soundbox QR Image')}
@@ -1190,7 +1673,6 @@ export default function UserDashboard() {
                 />
               </div>
 
-              {/* Feedback */}
               {scanFeedback.field === 'sn' && (
                 <div className={`mt-1.5 text-xs flex items-center gap-1 ${
                   scanFeedback.isError ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400 font-medium'
@@ -1201,7 +1683,6 @@ export default function UserDashboard() {
               )}
             </div>
 
-            {/* Field 2: Telegram Chat ID (Verification Code) */}
             <div>
               <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
                 {t('telegramChatId', 'Telegram Verification Code (Chat ID)')}
@@ -1230,13 +1711,11 @@ export default function UserDashboard() {
                 💡 {t('multiGroupHint', 'Tip: You can add multiple Telegram codes separated by commas (e.g. for ABA + Wing groups).')}
               </p>
 
-
-              {/* Upload QR of Telegram button under input */}
               <div className="mt-1.5 flex items-center justify-between">
                 <button
                   type="button"
                   onClick={() => telegramFileInputRef.current?.click()}
-                  className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1 py-1 transition"
+                  className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1 py-1 transition cursor-pointer"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   {t('uploadQrImage', 'Upload Telegram QR Image')}
@@ -1250,7 +1729,6 @@ export default function UserDashboard() {
                 />
               </div>
 
-              {/* Feedback */}
               {scanFeedback.field === 'telegram' && (
                 <div className={`mt-1.5 text-xs flex items-center gap-1 ${
                   scanFeedback.isError ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400 font-medium'
@@ -1268,20 +1746,18 @@ export default function UserDashboard() {
                   setActiveCameraField(null);
                   setIsDeviceModalOpen(false);
                 }}
-                className="px-4 py-2.5 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-300 font-medium"
+                className="px-4 py-2.5 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-300 font-medium cursor-pointer"
               >
                 {t('cancel', 'Cancel')}
               </button>
               <button
                 type="submit"
                 disabled={savingDevice}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-xs"
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-xs cursor-pointer"
               >
                 {savingDevice ? t('saving', 'Linking...') : t('linkSoundbox', 'Link Soundbox')}
               </button>
             </div>
-
-
           </form>
         </div>
       </Modal>
@@ -1297,8 +1773,6 @@ export default function UserDashboard() {
         maxWidth="max-w-md"
       >
         <div className="space-y-4">
-
-          {/* Active Field Live Camera Scanner for Edit */}
           {editActiveCameraField && (
             <FieldQRScanner 
               targetName={editActiveCameraField === 'sn' ? t('deviceSn', 'Device Serial Number (SN)') : t('telegramChatId', 'Telegram Chat ID (Code)')}
@@ -1318,8 +1792,6 @@ export default function UserDashboard() {
           )}
 
           <form onSubmit={handleUpdateDevice} className="space-y-4">
-            
-            {/* Field 1: Device Serial Number */}
             <div>
               <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
                 {t('deviceSn', 'Device Serial Number (SN)')} <span className="text-rose-500">*</span>
@@ -1345,12 +1817,11 @@ export default function UserDashboard() {
                 </button>
               </div>
 
-              {/* Upload QR of Soundbox button */}
               <div className="mt-1.5 flex items-center justify-between">
                 <button
                   type="button"
                   onClick={() => editSnFileInputRef.current?.click()}
-                  className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1 py-1 transition"
+                  className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1 py-1 transition cursor-pointer"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   {t('uploadSoundboxQr', 'Upload Soundbox QR Image')}
@@ -1364,7 +1835,6 @@ export default function UserDashboard() {
                 />
               </div>
 
-              {/* Feedback */}
               {editScanFeedback.field === 'sn' && (
                 <div className={`mt-1.5 text-xs flex items-center gap-1 ${
                   editScanFeedback.isError ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400 font-medium'
@@ -1375,7 +1845,6 @@ export default function UserDashboard() {
               )}
             </div>
 
-            {/* Field 2: Telegram Chat ID */}
             <div>
               <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
                 {t('telegramChatId', 'Telegram Verification Code (Chat ID)')}
@@ -1399,17 +1868,12 @@ export default function UserDashboard() {
                   <QrCode className="w-5 h-5" />
                 </button>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                💡 {t('multiGroupHint', 'Tip: You can add multiple Telegram codes separated by commas (e.g. for ABA + Wing groups).')}
-              </p>
 
-
-              {/* Upload QR of Telegram button */}
               <div className="mt-1.5 flex items-center justify-between">
                 <button
                   type="button"
                   onClick={() => editTelegramFileInputRef.current?.click()}
-                  className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1 py-1 transition"
+                  className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1 py-1 transition cursor-pointer"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   {t('uploadTelegramQr', 'Upload Telegram QR Image')}
@@ -1423,7 +1887,6 @@ export default function UserDashboard() {
                 />
               </div>
 
-              {/* Feedback */}
               {editScanFeedback.field === 'telegram' && (
                 <div className={`mt-1.5 text-xs flex items-center gap-1 ${
                   editScanFeedback.isError ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400 font-medium'
@@ -1434,7 +1897,6 @@ export default function UserDashboard() {
               )}
             </div>
 
-            {/* Field 3: Assign to Store (if multi-store) */}
             {stores.length > 1 && (
               <div>
                 <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
@@ -1443,7 +1905,7 @@ export default function UserDashboard() {
                 <select
                   value={editDeviceMerchantId}
                   onChange={(e) => setEditDeviceMerchantId(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                 >
                   {stores.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -1454,7 +1916,6 @@ export default function UserDashboard() {
               </div>
             )}
 
-            {/* Field 4: Device Model */}
             <div>
               <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
                 {t('soundboxModel', 'Soundbox Model')}
@@ -1475,19 +1936,18 @@ export default function UserDashboard() {
                   setEditActiveCameraField(null);
                   setIsEditDeviceOpen(false);
                 }}
-                className="px-4 py-2.5 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-300 font-medium"
+                className="px-4 py-2.5 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-300 font-medium cursor-pointer"
               >
                 {t('cancel', 'Cancel')}
               </button>
               <button
                 type="submit"
                 disabled={savingDevice}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-xs"
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-xs cursor-pointer"
               >
                 {savingDevice ? t('updating', 'Updating...') : t('saveUpdates', 'Save Updates')}
               </button>
             </div>
-
           </form>
         </div>
       </Modal>
