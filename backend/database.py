@@ -128,7 +128,6 @@ async def init_db():
                 device_sn VARCHAR(100),
                 device_model VARCHAR(50) DEFAULT 'Y6B',
                 telegram_chat_id VARCHAR(100),
-                till_id VARCHAR(100),
                 status device_status DEFAULT 'ACTIVE',
                 last_heartbeat TIMESTAMP WITH TIME ZONE,
                 battery VARCHAR(50),
@@ -148,7 +147,6 @@ async def init_db():
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS merchant_id INT REFERENCES merchants(id) ON DELETE SET NULL;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_sn VARCHAR(100);
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_model VARCHAR(50) DEFAULT 'Y6B';
-            ALTER TABLE devices ADD COLUMN IF NOT EXISTS till_id VARCHAR(100);
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(100);
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS status device_status DEFAULT 'ACTIVE';
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS last_heartbeat TIMESTAMP WITH TIME ZONE;

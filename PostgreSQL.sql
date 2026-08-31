@@ -52,7 +52,6 @@ CREATE TABLE IF NOT EXISTS devices (
     device_name VARCHAR(255),
     device_sn VARCHAR(100),
     device_model VARCHAR(50) DEFAULT 'Y6B',
-    till_id VARCHAR(100),
     telegram_chat_id VARCHAR(100),
     is_active BOOLEAN DEFAULT TRUE,
     status VARCHAR(50) DEFAULT 'ACTIVE',

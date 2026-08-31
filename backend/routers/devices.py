@@ -111,7 +111,6 @@ async def list_devices(
                    COALESCE(d.device_sn, d.device_id, d.id::text) AS device_sn,
                    COALESCE(d.device_model, d.device_name, 'Y6B') AS device_model,
                    d.merchant_id,
-                   COALESCE(d.till_id, d.chat_id, d.telegram_chat_id, '-') AS till_id,
                    COALESCE(d.telegram_chat_id, d.chat_id) AS telegram_chat_id,
                    COALESCE(d.status, CASE WHEN d.is_active = FALSE THEN 'Offline' ELSE 'Online' END, 'Offline') AS status,
                    COALESCE(d.battery, '100%') AS battery,
@@ -146,7 +145,6 @@ async def list_devices(
 
 class DeviceUpdateSchema(BaseModel):
     device_sn: Optional[str] = None
-    till_id: Optional[str] = None
     telegram_chat_id: Optional[str] = None
     device_model: Optional[str] = None
     status: Optional[str] = None
@@ -159,38 +157,23 @@ async def update_device(
     payload: DeviceUpdateSchema,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
+    """
+    Updates device configurations (SN, Telegram Chat ID, Model, Status, or Assigned Store).
+    Requires Admin privileges.
+    """
+    if current_user.get("role") != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can update device configurations."
+        )
+
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        # Check device existence and permission
-        device = await conn.fetchrow(
-            """
-            SELECT d.id, d.merchant_id, d.device_sn, m.user_id, m.owner_phone
-            FROM devices d
-            LEFT JOIN merchants m ON d.merchant_id = m.id
-            WHERE d.id = $1
-            """,
-            device_id
-        )
+        device = await conn.fetchrow("SELECT id, device_sn FROM devices WHERE id = $1", device_id)
         if not device:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
 
-        # Permission check
-        if current_user["role"] != "ADMIN":
-            if device["merchant_id"] is not None:
-                if device["user_id"] != current_user["id"] and device["owner_phone"] != current_user["phone_number"]:
-                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not own this device.")
-
-        # If reassigning to another store, check permission for target merchant
-        if payload.merchant_id is not None and payload.merchant_id != device["merchant_id"]:
-            if current_user["role"] != "ADMIN":
-                target_merchant = await conn.fetchrow(
-                    "SELECT id FROM merchants WHERE id = $1 AND (user_id = $2 OR owner_phone = $3)",
-                    payload.merchant_id, current_user["id"], current_user["phone_number"]
-                )
-                if not target_merchant:
-                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not own the target store.")
-
-        # Check for device_sn collision with another device
+        # Check if new SN conflicts with existing
         if payload.device_sn and payload.device_sn.strip() != device["device_sn"]:
             existing_sn = await conn.fetchrow(
                 "SELECT id FROM devices WHERE device_sn = $1 AND id != $2",
@@ -207,11 +190,6 @@ async def update_device(
         if payload.device_sn is not None:
             updates.append(f"device_sn = ${idx}")
             params.append(payload.device_sn.strip())
-            idx += 1
-
-        if payload.till_id is not None:
-            updates.append(f"till_id = ${idx}")
-            params.append(payload.till_id.strip() if payload.till_id.strip() else None)
             idx += 1
 
         if payload.telegram_chat_id is not None:

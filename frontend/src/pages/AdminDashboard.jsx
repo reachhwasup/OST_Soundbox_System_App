@@ -145,7 +145,6 @@ export default function AdminDashboard() {
     deviceId: true,
     deviceType: true,
     merchantId: true,
-    tillId: true,
     status: true,
     battery: true,
     signal: true,
@@ -588,13 +587,12 @@ export default function AdminDashboard() {
       showToast({ type: 'error', title: 'Export Failed', message: 'No devices matching current filters to export.' });
       return;
     }
-    const headers = ['Device ID', 'Device Type', 'Merchant ID', 'Store Name', 'Till ID', 'Status', 'Battery', 'Signal', '4G Version', 'WiFi Version', 'Last Time'];
+    const headers = ['Device ID', 'Device Type', 'Merchant ID', 'Store Name', 'Status', 'Battery', 'Signal', '4G Version', 'WiFi Version', 'Last Time'];
     const rows = filteredDevices.map(d => [
       d.device_id || d.device_sn || d.id,
       d.device_model || 'Y6B',
       d.merchant_id || '-',
       `"${(d.store_name || '-').replace(/"/g, '""')}"`,
-      d.till_id || d.telegram_chat_id || '-',
       d.status || 'Offline',
       d.battery || '100%',
       d.signal || 'Good',
@@ -1526,7 +1524,6 @@ export default function AdminDashboard() {
                     {visibleColumns.deviceId && <th className="py-3 px-3 font-semibold">{t('deviceId', 'Device ID')}</th>}
                     {visibleColumns.deviceType && <th className="py-3 px-3 font-semibold">{t('deviceType', 'Device Type')}</th>}
                     {visibleColumns.merchantId && <th className="py-3 px-3 font-semibold">{t('merchantId', 'Merchant ID')}</th>}
-                    {visibleColumns.tillId && <th className="py-3 px-3 font-semibold">{t('tillId', 'Till ID')}</th>}
                     {visibleColumns.status && <th className="py-3 px-3 font-semibold text-center">{t('status', 'Status')}</th>}
                     {visibleColumns.battery && <th className="py-3 px-3 font-semibold text-center">{t('battery', 'Battery')}</th>}
                     {visibleColumns.signal && <th className="py-3 px-3 font-semibold text-center">{t('signal', 'Signal')}</th>}
@@ -1590,13 +1587,6 @@ export default function AdminDashboard() {
                               ) : (
                                 <span className="text-slate-400 font-mono">-</span>
                               )}
-                            </td>
-                          )}
-
-                          {/* Till ID */}
-                          {visibleColumns.tillId && (
-                            <td className="py-3.5 px-3 font-mono text-slate-500 dark:text-slate-400 text-[11px]">
-                              {d.till_id && d.till_id !== '-' ? d.till_id : (d.telegram_chat_id || '-')}
                             </td>
                           )}
 
@@ -2986,13 +2976,6 @@ export default function AdminDashboard() {
               </div>
 
               <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold">Till / Cashier ID</span>
-                <div className="font-mono text-slate-900 dark:text-white font-bold mt-0.5 truncate">
-                  {selectedDeviceDetail.till_id || selectedDeviceDetail.telegram_chat_id || '—'}
-                </div>
-              </div>
-
-              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
                 <span className="text-[10px] text-slate-400 uppercase font-semibold">4G Firmware</span>
                 <div className="font-mono text-slate-700 dark:text-slate-300 font-bold mt-0.5 truncate" title={selectedDeviceDetail.version_4g}>
                   {selectedDeviceDetail.version_4g || 'Y6_LCD_1605_V1.0'}
@@ -3191,7 +3174,6 @@ export default function AdminDashboard() {
               deviceId: 'Device ID',
               deviceType: 'Device Type',
               merchantId: 'Merchant ID',
-              tillId: 'Till ID',
               status: 'Status',
               battery: 'Battery',
               signal: 'Signal',
@@ -3222,7 +3204,6 @@ export default function AdminDashboard() {
                 deviceId: true,
                 deviceType: true,
                 merchantId: true,
-                tillId: true,
                 status: true,
                 battery: true,
                 signal: true,
