@@ -415,13 +415,11 @@ async def get_admin_logs(
             s = f"%{search.strip()}%"
             tx_where.append(f"""(
                 t.bank_tx_id ILIKE ${param_idx}
-                OR t.txid ILIKE ${param_idx}
                 OR t.bank_name ILIKE ${param_idx}
                 OR t.payer_name ILIKE ${param_idx}
                 OR d.device_sn ILIKE ${param_idx}
                 OR d.device_id ILIKE ${param_idx}
                 OR m.name ILIKE ${param_idx}
-                OR m.merchant_name ILIKE ${param_idx}
                 OR m.owner_phone ILIKE ${param_idx}
             )""")
             tx_params.append(s)
@@ -431,23 +429,20 @@ async def get_admin_logs(
             SELECT 
                 'TRANSACTION' AS log_category,
                 t.id,
-                COALESCE(t.bank_tx_id, t.txid, t.id::text) AS txid,
+                COALESCE(t.bank_tx_id, t.id::text) AS txid,
                 COALESCE(t.bank_name, 'Bank') AS bank_name,
                 t.amount,
-                COALESCE(t.currency, 'USD') AS currency,
+                COALESCE(t.currency::text, 'USD') AS currency,
                 t.payer_name,
-                COALESCE(t.status, 'PROCESSED') AS status,
-                t.device_ack,
-                t.ack_status,
-                t.ack_at,
+                COALESCE(t.status::text, 'PROCESSED') AS status,
                 t.created_at,
-                COALESCE(t.raw_telegram_message, t.raw_payload) AS raw_message,
-                COALESCE(d.device_sn, d.device_id, d.device_name, 'Y6B') AS device_sn,
-                COALESCE(m.name, m.merchant_name, 'Store') AS store_name,
+                COALESCE(t.raw_telegram_message, '') AS raw_message,
+                COALESCE(d.device_sn, d.device_id, 'Y6B') AS device_sn,
+                COALESCE(m.name, 'Store') AS store_name,
                 m.owner_phone
             FROM transactions t
-            LEFT JOIN devices d ON t.device_id = d.id OR t.device_id::text = d.device_id
-            LEFT JOIN merchants m ON d.merchant_id = m.id OR d.merchant_id = m.merchant_id
+            LEFT JOIN devices d ON t.device_id = d.id
+            LEFT JOIN merchants m ON d.merchant_id = m.id
             WHERE {" AND ".join(tx_where)}
             ORDER BY t.created_at DESC
             LIMIT ${param_idx} OFFSET ${param_idx + 1}
@@ -488,11 +483,11 @@ async def get_admin_logs(
                 a.created_at,
                 a.raw_message,
                 COALESCE(d.device_sn, d.device_id, 'Y6B') AS device_sn,
-                COALESCE(m.name, m.merchant_name, 'Store') AS store_name,
+                COALESCE(m.name, 'Store') AS store_name,
                 m.owner_phone
             FROM security_alerts a
-            LEFT JOIN devices d ON a.device_id = d.id OR a.device_id::text = d.device_id
-            LEFT JOIN merchants m ON a.merchant_id = m.id OR a.merchant_id = m.merchant_id
+            LEFT JOIN devices d ON a.device_id = d.id
+            LEFT JOIN merchants m ON a.merchant_id = m.id
             WHERE {" AND ".join(sec_where)}
             ORDER BY a.created_at DESC
             LIMIT ${s_idx} OFFSET ${s_idx + 1}
@@ -510,12 +505,12 @@ async def get_admin_logs(
                         **dict(r),
                         "amount": float(r["amount"]) if r["amount"] is not None else 0.0,
                         "created_at": r["created_at"].isoformat() if r["created_at"] else None,
-                        "ack_at": r["ack_at"].isoformat() if r.get("ack_at") else None
+                        "ack_at": None
                     }
                     for r in tx_rows
                 ]
             except Exception as e:
-                logger.error(f"Error fetching tx logs: {e}")
+                print(f"Error fetching tx logs: {e}")
 
         if log_type in ["all", "security"]:
             try:
@@ -529,7 +524,7 @@ async def get_admin_logs(
                     for r in sec_rows
                 ]
             except Exception as e:
-                logger.error(f"Error fetching security logs: {e}")
+                print(f"Error fetching security logs: {e}")
 
         # Combine and sort by timestamp
         all_logs = transactions + security_alerts

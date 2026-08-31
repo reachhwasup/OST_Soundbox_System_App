@@ -122,9 +122,11 @@ async def list_devices(
                    COALESCE(d.last_online, d.last_heartbeat, d.updated_at, d.created_at) AS last_time,
                    COALESCE(d.last_heartbeat, d.last_online) AS last_heartbeat,
                    d.created_at,
-                   m.name AS store_name, m.owner_phone, m.owner_name
+                   m.name AS store_name, m.owner_phone,
+                   COALESCE(u.full_name, m.name) AS owner_name
             FROM devices d
-            LEFT JOIN merchants m ON (d.merchant_id::text = m.id::text OR d.merchant_id::text = m.merchant_id::text)
+            LEFT JOIN merchants m ON d.merchant_id = m.id
+            LEFT JOIN users u ON m.user_id = u.id
             WHERE {where_sql}
             ORDER BY d.id DESC
         """

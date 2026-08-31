@@ -101,16 +101,37 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user_id = payload.get("user_id") or int(payload["sub"])
+    user_id = payload.get("user_id") or payload.get("id")
+    sub_val = payload.get("sub")
+    phone_val = payload.get("phone_number")
+
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        user = await conn.fetchrow(
-            """
-            SELECT id, phone_number, full_name, role, status, last_login_at, created_at, updated_at
-            FROM users WHERE id = $1
-            """,
-            user_id
-        )
+        user = None
+        if user_id is not None and str(user_id).isdigit():
+            user = await conn.fetchrow(
+                """
+                SELECT id, phone_number, full_name, role, status, last_login_at, created_at, updated_at
+                FROM users WHERE id = $1
+                """,
+                int(user_id)
+            )
+
+        if not user and sub_val:
+            if str(sub_val).isdigit() and len(str(sub_val)) <= 8:
+                # Could be integer ID
+                user = await conn.fetchrow(
+                    "SELECT id, phone_number, full_name, role, status, last_login_at, created_at, updated_at FROM users WHERE id = $1",
+                    int(sub_val)
+                )
+
+        if not user:
+            lookup_phone = phone_val or (str(sub_val) if sub_val and not str(sub_val).isdigit() or len(str(sub_val)) >= 9 else None)
+            if lookup_phone:
+                user = await conn.fetchrow(
+                    "SELECT id, phone_number, full_name, role, status, last_login_at, created_at, updated_at FROM users WHERE phone_number = $1",
+                    lookup_phone
+                )
 
     if not user:
         raise HTTPException(
