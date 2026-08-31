@@ -1,17 +1,4 @@
 services:
-  postgres:
-    image: postgres:15-alpine
-    container_name: ost_app_postgres
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: fDdiFw_KB2930otN
-      POSTGRES_DB: postgres
-    ports:
-      - "5433:5432"
-    volumes:
-      - ost_app_pgdata:/var/lib/postgresql/data
-    restart: always
-
   fastapi-gateway:
     build:
       context: .
@@ -21,13 +8,11 @@ services:
     ports:
       - "8001:8000"
     environment:
-      - DATABASE_URL=postgresql://postgres:fDdiFw_KB2930otN@postgres:5432/postgres
+      - DATABASE_URL=postgresql://postgres:fDdiFw_KB2930otN@ost_postgres:5432/postgres
       - API_SECRET_KEY=your-api-key
       - ADMIN_PHONE=016441474
       - ADMIN_PASSWORD=reach1234
       - ADMIN_NAME=Admin Reach
-    depends_on:
-      - postgres
     restart: always
 
   frontend:
@@ -41,6 +26,3 @@ services:
     depends_on:
       - fastapi-gateway
     restart: always
-
-volumes:
-  ost_app_pgdata:
