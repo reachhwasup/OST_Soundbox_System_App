@@ -138,6 +138,7 @@ export const translations = {
     userManagement: "Users & Merchants",
     storeManagement: "Stores & Locations",
     deviceManagement: "Hardware Devices (Soundboxes)",
+    auditLogs: "Audit & Payment Logs",
     addNewUser: "Add New User",
     searchPlaceholder: "Search by phone, name, store, or SN...",
     role: "Role",
@@ -156,6 +157,13 @@ export const translations = {
     fullAddressHierarchy: "Full Administrative Location",
     merchantInformation: "Merchant Information",
     noSoundboxesLinked: "No Soundboxes currently linked",
+    allLogs: "All Logs",
+    paymentLogs: "Payment Transactions",
+    securityAlerts: "Security & Fraud Alerts",
+    rawPayload: "Raw Telegram Message",
+    severity: "Severity",
+    reason: "Reason",
+    time: "Timestamp",
 
     // Buttons & Common
     cancel: "Cancel",
@@ -344,6 +352,7 @@ export const translations = {
     userManagement: "អ្នកប្រើប្រាស់ និងអាជីវករ",
     storeManagement: "ហាង និងទីតាំង",
     deviceManagement: "ឧបករណ៍ Soundbox",
+    auditLogs: "កំណត់ត្រាប្រតិបត្តិការ & សុវត្ថិភាព",
     addNewUser: "បង្កើតអ្នកប្រើប្រាស់ថ្មី",
     searchPlaceholder: "ស្វែងរកតាមលេខទូរស័ព្ទ ឈ្មោះ ហាង ឬ SN ឧបករណ៍...",
     role: "តួនាទី",
@@ -362,6 +371,12 @@ export const translations = {
     fullAddressHierarchy: "ព័ត៌មានលម្អិតអំពីទីតាំងរដ្ឋបាល",
     merchantInformation: "ព័ត៌មានម្ចាស់ហាង",
     noSoundboxesLinked: "មិនទាន់មាន Soundbox ភ្ជាប់នៅឡើយទេ",
+    allLogs: "កំណត់ត្រាទាំងអស់",
+    paymentLogs: "ប្រតិបត្តិការទូទាត់ប្រាក់",
+    securityAlerts: "ការជូនដំណឹងសុវត្ថិភាព & ការទប់ស្កាត់ Fraud",
+    rawPayload: "សារដើម Telegram",
+    severity: "កម្រិតហានិភ័យ",
+    reason: "មូលហេតុ",
 
     // Buttons & Common
     cancel: "បោះបង់",

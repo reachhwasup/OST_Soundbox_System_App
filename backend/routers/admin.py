@@ -393,3 +393,150 @@ async def list_stores(
                 for s in stores
             ]
         }
+
+
+@router.get("/logs")
+async def get_admin_logs(
+    search: Optional[str] = Query(None, description="Search TxID, Bank, Store, Device SN, or Phone"),
+    log_type: Optional[str] = Query("all", description="all, transactions, or security"),
+    limit: int = Query(100, ge=1, le=500),
+    page: int = Query(1, ge=1)
+):
+    pool = await get_db_pool()
+    offset = (page - 1) * limit
+
+    async with pool.acquire() as conn:
+        # 1. Fetch Transactions Logs
+        tx_where = ["1=1"]
+        tx_params = []
+        param_idx = 1
+
+        if search and search.strip():
+            s = f"%{search.strip()}%"
+            tx_where.append(f"""(
+                t.bank_tx_id ILIKE ${param_idx}
+                OR t.txid ILIKE ${param_idx}
+                OR t.bank_name ILIKE ${param_idx}
+                OR t.payer_name ILIKE ${param_idx}
+                OR d.device_sn ILIKE ${param_idx}
+                OR d.device_id ILIKE ${param_idx}
+                OR m.name ILIKE ${param_idx}
+                OR m.merchant_name ILIKE ${param_idx}
+                OR m.owner_phone ILIKE ${param_idx}
+            )""")
+            tx_params.append(s)
+            param_idx += 1
+
+        tx_query = f"""
+            SELECT 
+                'TRANSACTION' AS log_category,
+                t.id,
+                COALESCE(t.bank_tx_id, t.txid, t.id::text) AS txid,
+                COALESCE(t.bank_name, 'Bank') AS bank_name,
+                t.amount,
+                COALESCE(t.currency, 'USD') AS currency,
+                t.payer_name,
+                COALESCE(t.status, 'PROCESSED') AS status,
+                t.device_ack,
+                t.ack_status,
+                t.ack_at,
+                t.created_at,
+                COALESCE(t.raw_telegram_message, t.raw_payload) AS raw_message,
+                COALESCE(d.device_sn, d.device_id, d.device_name, 'Y6B') AS device_sn,
+                COALESCE(m.name, m.merchant_name, 'Store') AS store_name,
+                m.owner_phone
+            FROM transactions t
+            LEFT JOIN devices d ON t.device_id = d.id OR t.device_id::text = d.device_id
+            LEFT JOIN merchants m ON d.merchant_id = m.id OR d.merchant_id = m.merchant_id
+            WHERE {" AND ".join(tx_where)}
+            ORDER BY t.created_at DESC
+            LIMIT ${param_idx} OFFSET ${param_idx + 1}
+        """
+        tx_params.extend([limit, offset])
+
+        # 2. Fetch Security Alerts Logs
+        sec_where = ["1=1"]
+        sec_params = []
+        s_idx = 1
+        if search and search.strip():
+            s = f"%{search.strip()}%"
+            sec_where.append(f"""(
+                a.alert_type ILIKE ${s_idx}
+                OR a.bank_tx_id ILIKE ${s_idx}
+                OR a.bank_name ILIKE ${s_idx}
+                OR a.sender_name ILIKE ${s_idx}
+                OR a.reason ILIKE ${s_idx}
+                OR d.device_sn ILIKE ${s_idx}
+                OR m.name ILIKE ${s_idx}
+            )""")
+            sec_params.append(s)
+            s_idx += 1
+
+        sec_query = f"""
+            SELECT 
+                'SECURITY' AS log_category,
+                a.id,
+                COALESCE(a.bank_tx_id, a.id::text) AS txid,
+                COALESCE(a.bank_name, 'Security') AS bank_name,
+                a.amount,
+                COALESCE(a.currency, 'USD') AS currency,
+                a.sender_name AS payer_name,
+                a.severity AS status,
+                a.alert_type,
+                a.reason,
+                a.sender_user_id,
+                a.created_at,
+                a.raw_message,
+                COALESCE(d.device_sn, d.device_id, 'Y6B') AS device_sn,
+                COALESCE(m.name, m.merchant_name, 'Store') AS store_name,
+                m.owner_phone
+            FROM security_alerts a
+            LEFT JOIN devices d ON a.device_id = d.id OR a.device_id::text = d.device_id
+            LEFT JOIN merchants m ON a.merchant_id = m.id OR a.merchant_id = m.merchant_id
+            WHERE {" AND ".join(sec_where)}
+            ORDER BY a.created_at DESC
+            LIMIT ${s_idx} OFFSET ${s_idx + 1}
+        """
+        sec_params.extend([limit, offset])
+
+        transactions = []
+        security_alerts = []
+
+        if log_type in ["all", "transactions"]:
+            try:
+                tx_rows = await conn.fetch(tx_query, *tx_params)
+                transactions = [
+                    {
+                        **dict(r),
+                        "amount": float(r["amount"]) if r["amount"] is not None else 0.0,
+                        "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+                        "ack_at": r["ack_at"].isoformat() if r.get("ack_at") else None
+                    }
+                    for r in tx_rows
+                ]
+            except Exception as e:
+                logger.error(f"Error fetching tx logs: {e}")
+
+        if log_type in ["all", "security"]:
+            try:
+                sec_rows = await conn.fetch(sec_query, *sec_params)
+                security_alerts = [
+                    {
+                        **dict(r),
+                        "amount": float(r["amount"]) if r["amount"] is not None else 0.0,
+                        "created_at": r["created_at"].isoformat() if r["created_at"] else None
+                    }
+                    for r in sec_rows
+                ]
+            except Exception as e:
+                logger.error(f"Error fetching security logs: {e}")
+
+        # Combine and sort by timestamp
+        all_logs = transactions + security_alerts
+        all_logs.sort(key=lambda x: x["created_at"] or "", reverse=True)
+
+        return {
+            "status": "success",
+            "total_count": len(all_logs),
+            "logs": all_logs[:limit]
+        }

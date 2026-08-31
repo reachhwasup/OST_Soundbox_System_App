@@ -30,7 +30,19 @@ import {
   Copy,
   Eye,
   Info,
-  ChevronRight
+  ChevronRight,
+  Activity,
+  ShieldAlert,
+  FileText,
+  AlertTriangle,
+  AlertOctagon,
+  Terminal,
+  Receipt,
+  CheckCircle,
+  Clock,
+  CheckCheck,
+  XCircle,
+  ArrowUpRight
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -39,13 +51,14 @@ export default function AdminDashboard() {
   const { showToast } = useToast();
   
   // Tab state
-  const [adminTab, setAdminTab] = useState('users'); // 'users' | 'stores' | 'devices'
+  const [adminTab, setAdminTab] = useState('users'); // 'users' | 'stores' | 'devices' | 'logs'
 
   // Data states
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [stores, setStores] = useState([]);
   const [devices, setDevices] = useState([]);
+  const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -53,6 +66,7 @@ export default function AdminDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [logTypeFilter, setLogTypeFilter] = useState('all'); // 'all' | 'transactions' | 'security'
 
   // Modals state
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -64,6 +78,10 @@ export default function AdminDashboard() {
   // Store Details Modal state
   const [isStoreDetailsOpen, setIsStoreDetailsOpen] = useState(false);
   const [selectedStoreForDetails, setSelectedStoreForDetails] = useState(null);
+
+  // Logs Detail Modal state
+  const [isLogDetailOpen, setIsLogDetailOpen] = useState(false);
+  const [selectedLog, setSelectedLog] = useState(null);
 
 
   // Soundbox Device Modals state
@@ -101,17 +119,19 @@ export default function AdminDashboard() {
       const roleParam = encodeURIComponent(roleFilter.trim());
       const statusParam = encodeURIComponent(statusFilter.trim());
 
-      const [statsRes, usersRes, storesRes, devicesRes] = await Promise.all([
+      const [statsRes, usersRes, storesRes, devicesRes, logsRes] = await Promise.all([
         api.get('/api/admin/stats'),
         api.get(`/api/admin/users?search=${searchParam}&role=${roleParam}&status=${statusParam}`),
         api.get(`/api/admin/stores?search=${searchParam}`),
-        api.get(`/api/devices/?search=${searchParam}`)
+        api.get(`/api/devices/?search=${searchParam}`),
+        api.get(`/api/admin/logs?search=${searchParam}&log_type=${logTypeFilter}&limit=100`)
       ]);
 
       setStats(statsRes.data.stats);
       setUsers(usersRes.data.users || []);
       setStores(storesRes.data.stores || []);
       setDevices(devicesRes.data.devices || []);
+      setLogs(logsRes.data?.logs || []);
     } catch (err) {
       console.error(err);
       const msg = err.response?.data?.detail || 'Failed to fetch administrative data.';
@@ -126,7 +146,7 @@ export default function AdminDashboard() {
       fetchAllData();
     }, 150);
     return () => clearTimeout(timer);
-  }, [searchTerm, roleFilter, statusFilter]);
+  }, [searchTerm, roleFilter, statusFilter, logTypeFilter]);
 
   const hasActiveFilters = Boolean(searchTerm || roleFilter || statusFilter);
 
@@ -542,6 +562,24 @@ export default function AdminDashboard() {
             adminTab === 'devices' ? 'bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
           }`}>
             {devices.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setAdminTab('logs')}
+          className={`shrink-0 flex-1 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            adminTab === 'logs'
+              ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Activity className="w-4 h-4 shrink-0" />
+          <span>{isKhmer ? 'កំណត់ត្រា & សុវត្ថិភាព' : 'Audit & Logs'}</span>
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+            adminTab === 'logs' ? 'bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+          }`}>
+            {logs.length}
           </span>
         </button>
       </div>
@@ -1264,6 +1302,289 @@ export default function AdminDashboard() {
       )}
 
 
+      {/* Tab: System & Audit Logs */}
+      {adminTab === 'logs' && (
+        <div className="space-y-4">
+          
+          {/* Logs Filter Sub-Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+              <button
+                type="button"
+                onClick={() => setLogTypeFilter('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                  logTypeFilter === 'all'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Activity className="w-3.5 h-3.5" />
+                <span>{t('allLogs', 'All Logs')}</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10 font-bold">
+                  {logs.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLogTypeFilter('transactions')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                  logTypeFilter === 'transactions'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Receipt className="w-3.5 h-3.5" />
+                <span>{t('paymentLogs', 'Payment Transactions')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLogTypeFilter('security')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                  logTypeFilter === 'security'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <ShieldAlert className="w-3.5 h-3.5" />
+                <span>{t('securityAlerts', 'Security & Fraud Alerts')}</span>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={fetchAllData}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 cursor-pointer ml-auto"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              <span>{isKhmer ? 'ផ្ទុកទិន្នន័យឡើងវិញ' : 'Refresh Logs'}</span>
+            </button>
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden lg:block bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    <th className="py-3 px-4">Type</th>
+                    <th className="py-3 px-4">Time</th>
+                    <th className="py-3 px-4">Store & Soundbox</th>
+                    <th className="py-3 px-4">Bank & TxID</th>
+                    <th className="py-3 px-4">Amount</th>
+                    <th className="py-3 px-4">Payer / Sender</th>
+                    <th className="py-3 px-4">Status / Action</th>
+                    <th className="py-3 px-4 text-right">Details</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                  {logs.length > 0 ? (
+                    logs.map((log, idx) => {
+                      const isTx = log.log_category === 'TRANSACTION';
+
+                      return (
+                        <tr key={log.id || idx} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
+                          {/* Type Badge */}
+                          <td className="py-3.5 px-4">
+                            {isTx ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-semibold text-[10px] uppercase border border-emerald-200/50 dark:border-emerald-800/50">
+                                <Receipt className="w-3 h-3" />
+                                Payment
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-semibold text-[10px] uppercase border border-rose-200/50 dark:border-rose-800/50">
+                                <ShieldAlert className="w-3 h-3" />
+                                {log.alert_type || 'Alert'}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Timestamp */}
+                          <td className="py-3.5 px-4 whitespace-nowrap text-slate-500 font-mono text-[11px]">
+                            {log.created_at ? new Date(log.created_at).toLocaleString() : '—'}
+                          </td>
+
+                          {/* Store & Device */}
+                          <td className="py-3.5 px-4">
+                            <div className="font-semibold text-slate-900 dark:text-white">
+                              {log.store_name || '—'}
+                            </div>
+                            <div className="flex items-center gap-1 font-mono text-[10px] text-slate-400 mt-0.5">
+                              <Volume2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                              <span>{log.device_sn || '—'}</span>
+                            </div>
+                          </td>
+
+                          {/* Bank & TxID */}
+                          <td className="py-3.5 px-4">
+                            <div className="font-semibold text-indigo-600 dark:text-indigo-400">
+                              {log.bank_name || 'Bank'}
+                            </div>
+                            <div className="flex items-center gap-1 font-mono text-[10px] text-slate-400 mt-0.5">
+                              <span>{log.txid ? log.txid.substring(0, 16) : '—'}</span>
+                              {log.txid && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(log.txid);
+                                    showToast('Transaction ID copied!', 'success');
+                                  }}
+                                  className="text-slate-400 hover:text-indigo-600 transition cursor-pointer"
+                                >
+                                  <Copy className="w-2.5 h-2.5" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Amount */}
+                          <td className="py-3.5 px-4 whitespace-nowrap font-mono font-bold">
+                            {isTx ? (
+                              <span className="text-emerald-600 dark:text-emerald-400">
+                                {log.currency === 'KHR'
+                                  ? `${Number(log.amount).toLocaleString()} ៛`
+                                  : `$${Number(log.amount).toFixed(2)}`}
+                              </span>
+                            ) : (
+                              <span className="text-rose-600 dark:text-rose-400">
+                                {log.amount ? `$${Number(log.amount).toFixed(2)}` : '—'}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Payer / Sender */}
+                          <td className="py-3.5 px-4">
+                            <div className="text-slate-700 dark:text-slate-300 font-medium">
+                              {log.payer_name || log.sender_name || '—'}
+                            </div>
+                            {log.sender_user_id && (
+                              <div className="text-[10px] text-slate-400 font-mono">
+                                ID: {log.sender_user_id}
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Status / Action */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            {isTx ? (
+                              <div className="flex flex-col gap-1">
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 w-fit">
+                                  <CheckCheck className="w-3 h-3" />
+                                  {log.status || 'PROCESSED'}
+                                </span>
+                                {log.device_ack && (
+                                  <span className="text-[9px] text-indigo-500 font-medium flex items-center gap-0.5">
+                                    <Volume2 className="w-2.5 h-2.5" /> Soundbox Announced
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
+                                <AlertTriangle className="w-3 h-3" />
+                                {log.status || 'BLOCKED'}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* View Raw Action */}
+                          <td className="py-3.5 px-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedLog(log);
+                                setIsLogDetailOpen(true);
+                              }}
+                              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg transition cursor-pointer"
+                              title="View Raw Message & Audit Payload"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
+                        <Activity className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                        <p className="font-semibold text-slate-600 dark:text-slate-400">No logs found</p>
+                        <p className="text-xs text-slate-400 mt-1">Transaction and security events will appear here in real time.</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="lg:hidden space-y-3">
+            {logs.length > 0 ? (
+              logs.map((log, idx) => {
+                const isTx = log.log_category === 'TRANSACTION';
+
+                return (
+                  <div
+                    key={log.id || idx}
+                    onClick={() => {
+                      setSelectedLog(log);
+                      setIsLogDetailOpen(true);
+                    }}
+                    className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3 cursor-pointer active:scale-[0.99] transition"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        {isTx ? (
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold text-[10px] uppercase">
+                            Payment
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-bold text-[10px] uppercase">
+                            {log.alert_type || 'Alert'}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {log.created_at ? new Date(log.created_at).toLocaleTimeString() : '—'}
+                        </span>
+                      </div>
+                      <span className="font-bold text-sm font-mono text-emerald-600 dark:text-emerald-400">
+                        {log.currency === 'KHR'
+                          ? `${Number(log.amount || 0).toLocaleString()} ៛`
+                          : `$${Number(log.amount || 0).toFixed(2)}`}
+                      </span>
+                    </div>
+
+                    <div className="text-xs space-y-1">
+                      <div className="font-bold text-slate-900 dark:text-white flex items-center justify-between">
+                        <span>{log.store_name || 'Store'}</span>
+                        <span className="text-slate-400 font-mono font-normal text-[11px]">{log.bank_name}</span>
+                      </div>
+                      <div className="text-slate-500 font-mono text-[11px] flex items-center gap-1">
+                        <Volume2 className="w-3 h-3 text-emerald-500" />
+                        <span>{log.device_sn || '—'}</span>
+                      </div>
+                    </div>
+
+                    {log.payer_name && (
+                      <div className="text-[11px] text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 p-2 rounded-lg">
+                        Payer: <span className="font-semibold text-slate-900 dark:text-white">{log.payer_name}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 text-center text-slate-400 text-sm">
+                No logs recorded yet.
+              </div>
+            )}
+          </div>
+
+        </div>
+      )}
+
+
 
       {/* Modal: Create User */}
       <Modal isOpen={isAddUserOpen} onClose={() => setIsAddUserOpen(false)} title={t('addNewUser', 'Create New User Account')}>
@@ -1772,7 +2093,140 @@ export default function AdminDashboard() {
               <button
                 type="button"
                 onClick={() => setIsStoreDetailsOpen(false)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
+              >
+                {t('close', 'Close')}
+              </button>
+            </div>
+
+          </div>
+        )}
+      </Modal>
+
+
+      {/* Modal: Log Details & Raw Payload */}
+      <Modal isOpen={isLogDetailOpen} onClose={() => setIsLogDetailOpen(false)} title="Audit Log & Raw Payload Details">
+        {selectedLog && (
+          <div className="space-y-4">
+            
+            {/* Header info */}
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400">Log Category</span>
+                <div className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-1.5 mt-0.5">
+                  {selectedLog.log_category === 'TRANSACTION' ? (
+                    <>
+                      <Receipt className="w-4 h-4 text-emerald-500" />
+                      <span>Bank Payment Transaction</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldAlert className="w-4 h-4 text-rose-500" />
+                      <span>Security & Fraud Prevention Alert</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] uppercase font-bold text-slate-400">Timestamp</span>
+                <div className="text-xs font-mono text-slate-600 dark:text-slate-300 mt-0.5">
+                  {selectedLog.created_at ? new Date(selectedLog.created_at).toLocaleString() : '—'}
+                </div>
+              </div>
+            </div>
+
+            {/* Quick stats grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                <div className="text-[10px] text-slate-400 font-semibold uppercase">Amount</div>
+                <div className="font-bold text-emerald-600 dark:text-emerald-400 text-sm font-mono mt-0.5">
+                  {selectedLog.currency === 'KHR'
+                    ? `${Number(selectedLog.amount || 0).toLocaleString()} ៛`
+                    : `$${Number(selectedLog.amount || 0).toFixed(2)}`}
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                <div className="text-[10px] text-slate-400 font-semibold uppercase">Bank / Channel</div>
+                <div className="font-semibold text-slate-900 dark:text-white mt-0.5">
+                  {selectedLog.bank_name || 'Bank'}
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                <div className="text-[10px] text-slate-400 font-semibold uppercase">Transaction ID</div>
+                <div className="font-mono text-slate-600 dark:text-slate-300 font-bold truncate mt-0.5">
+                  {selectedLog.txid || '—'}
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                <div className="text-[10px] text-slate-400 font-semibold uppercase">Store / Merchant</div>
+                <div className="font-semibold text-slate-900 dark:text-white mt-0.5">
+                  {selectedLog.store_name || '—'}
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                <div className="text-[10px] text-slate-400 font-semibold uppercase">Soundbox Hardware</div>
+                <div className="font-mono text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
+                  {selectedLog.device_sn || '—'}
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                <div className="text-[10px] text-slate-400 font-semibold uppercase">Status</div>
+                <div className="font-bold text-slate-900 dark:text-white mt-0.5">
+                  {selectedLog.status || 'PROCESSED'}
+                </div>
+              </div>
+            </div>
+
+            {/* Fraud Reason (if security alert) */}
+            {selectedLog.reason && (
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/40 rounded-xl border border-rose-200 dark:border-rose-800/50 text-xs">
+                <div className="font-bold text-rose-800 dark:text-rose-300 flex items-center gap-1.5 mb-1">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Security Alert Reason
+                </div>
+                <div className="text-rose-700 dark:text-rose-400 font-mono">
+                  {selectedLog.reason}
+                </div>
+              </div>
+            )}
+
+            {/* Raw Telegram Message */}
+            <div>
+              <div className="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                <span className="flex items-center gap-1.5">
+                  <Terminal className="w-3.5 h-3.5 text-indigo-500" />
+                  {t('rawPayload', 'Raw Telegram Message / Webhook Payload')}
+                </span>
+                {selectedLog.raw_message && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedLog.raw_message);
+                      showToast('Raw message copied!', 'success');
+                    }}
+                    className="text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 text-[11px] cursor-pointer"
+                  >
+                    <Copy className="w-3 h-3" />
+                    Copy Payload
+                  </button>
+                )}
+              </div>
+              <pre className="p-3 bg-slate-950 text-emerald-400 font-mono text-xs rounded-xl overflow-x-auto max-h-56 border border-slate-800 whitespace-pre-wrap leading-relaxed select-all">
+                {selectedLog.raw_message || 'No raw telegram payload content available for this record.'}
+              </pre>
+            </div>
+
+            {/* Modal Close Button */}
+            <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsLogDetailOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
               >
                 {t('close', 'Close')}
               </button>
