@@ -51,10 +51,7 @@ export default function AdminDashboard() {
   const { showToast } = useToast();
   
   // Tab state (persisted and synced with sidebar)
-  const [adminTab, setAdminTabState] = useState(() => {
-    const saved = localStorage.getItem('soundbox_admin_tab');
-    return (saved === 'stores' || !saved) ? 'users' : saved;
-  });
+  const [adminTab, setAdminTabState] = useState(() => localStorage.getItem('soundbox_admin_tab') || 'users');
 
   const setAdminTab = (tab) => {
     setAdminTabState(tab);
@@ -551,6 +548,24 @@ export default function AdminDashboard() {
 
         <button
           type="button"
+          onClick={() => setAdminTab('stores')}
+          className={`shrink-0 flex-1 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            adminTab === 'stores'
+              ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Store className="w-4 h-4 shrink-0" />
+          <span>{isKhmer ? 'ហាង និងទីតាំង' : 'Stores & Places'}</span>
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+            adminTab === 'stores' ? 'bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+          }`}>
+            {stores.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setAdminTab('devices')}
           className={`shrink-0 flex-1 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
             adminTab === 'devices'
@@ -958,7 +973,211 @@ export default function AdminDashboard() {
       </div>
       )}
 
-      {/* TAB: SOUNDBOX HARDWARE (RESPONSIVE CARDS & TABLE) */}
+      {/* TAB 2: STORES & PLACES DIRECTORY (RESPONSIVE CARDS & TABLE) */}
+      {adminTab === 'stores' && (
+        <div className="space-y-3">
+          
+          {/* Mobile Store Cards (< md) */}
+          <div className="md:hidden space-y-3">
+            {stores.length > 0 ? (
+              stores.map((s) => (
+                <div 
+                  key={s.id}
+                  onClick={() => {
+                    setSelectedStoreForDetails(s);
+                    setIsStoreDetailsOpen(true);
+                  }}
+                  className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200 dark:border-slate-800 p-4 space-y-3 cursor-pointer"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold shrink-0">
+                        <Store className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-900 dark:text-white text-base">
+                          {s.name}
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          ID: #{s.id}
+                        </div>
+                      </div>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
+                      s.device_count > 0 
+                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' 
+                        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                    }`}>
+                      {s.device_count} {t('soundbox', 'Devices')}
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl text-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">{t('owner', 'Owner')}:</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{s.owner_name || '—'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">{t('phoneNumber', 'Phone')}:</span>
+                      <span className="font-mono text-slate-700 dark:text-slate-300">{s.owner_phone}</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                      <span className="text-slate-400">{t('location', 'Location')}:</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{s.province || s.location || '—'}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedStoreForDetails(s);
+                      setIsStoreDetailsOpen(true);
+                    }}
+                    className="w-full py-2 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-indigo-100 dark:border-indigo-900/40"
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                    <span>{t('viewDetails', 'View Full Location Details')}</span>
+                  </button>
+                </div>
+              ))
+            ) : (
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 text-center text-slate-400 text-sm border border-slate-200 dark:border-slate-800">
+                No stores found matching your search.
+              </div>
+            )}
+          </div>
+
+          {/* Desktop Store Table (>= md) */}
+          <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900 dark:text-white">{t('storeManagement', 'Stores & Locations')}</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {isKhmer 
+                    ? 'ចុចលើជួរដេក ឬប៊ូតុង ដើម្បីមើលព័ត៌មានលម្អិតទីតាំងរដ្ឋបាល (ខេត្ត, ស្រុក, ឃុំ, ភូមិ)' 
+                    : 'Click on any store to view full administrative location hierarchy'}
+                </p>
+              </div>
+              <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg">
+                {stores.length} {t('totalStores', 'Stores Total')}
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm min-w-[620px]">
+                <thead>
+
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <th className="pb-3 font-medium">{t('storeName', 'Store Name')}</th>
+                    <th className="pb-3 font-medium">{t('owner', 'Merchant / Owner')}</th>
+                    <th className="pb-3 font-medium">{t('location', 'Location (Province / District)')}</th>
+                    <th className="pb-3 font-medium">{t('connectedSoundboxes', 'Soundboxes')}</th>
+                    <th className="pb-3 font-medium text-right">{t('actions', 'Details')}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {stores.length > 0 ? (
+                    stores.map((s) => (
+                      <tr 
+                        key={s.id} 
+                        onClick={() => {
+                          setSelectedStoreForDetails(s);
+                          setIsStoreDetailsOpen(true);
+                        }}
+                        className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition cursor-pointer group"
+                      >
+                        
+                        {/* Store Name */}
+                        <td className="py-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold shrink-0">
+                              <Store className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <div className="font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">
+                                {s.name}
+                              </div>
+                              <div className="text-[11px] text-slate-400">
+                                ID: #{s.id}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Owner Info */}
+                        <td className="py-3.5">
+                          <div className="space-y-0.5">
+                            <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs sm:text-sm">
+                              {s.owner_name || '—'}
+                            </div>
+                            <div className="inline-flex items-center gap-1 font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                              <Phone className="w-3 h-3 text-indigo-500" />
+                              <span>{s.owner_phone}</span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Main Location Summary */}
+                        <td className="py-3.5">
+                          <div className="space-y-0.5">
+                            <div className="inline-flex items-center gap-1.5 font-semibold text-slate-900 dark:text-slate-100 text-xs sm:text-sm">
+                              <Building className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                              <span>{s.province || s.location || '—'}</span>
+                            </div>
+                            {s.district && (
+                              <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                                <Navigation className="w-3 h-3 text-emerald-500 shrink-0" />
+                                <span>{s.district}</span>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Soundbox Count */}
+                        <td className="py-3.5">
+                          <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                            s.device_count > 0 
+                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' 
+                              : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                          }`}>
+                            {s.device_count} {t('soundbox', 'Devices')}
+                          </span>
+                        </td>
+
+                        {/* View Details Action Button */}
+                        <td className="py-3.5 text-right">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedStoreForDetails(s);
+                              setIsStoreDetailsOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 text-xs font-semibold transition border border-slate-200/80 dark:border-slate-700"
+                          >
+                            <Info className="w-3.5 h-3.5" />
+                            <span>{t('viewDetails', 'View Details')}</span>
+                          </button>
+                        </td>
+
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-400 text-sm">
+                        No stores found matching your search.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: SOUNDBOX HARDWARE (RESPONSIVE CARDS & TABLE) */}
       {adminTab === 'devices' && (
         <div className="space-y-3">
           
