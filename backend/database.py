@@ -205,17 +205,22 @@ async def init_db():
             );
 
             CREATE TABLE IF NOT EXISTS official_bank_bots (
-                id SERIAL PRIMARY KEY,
-                bank_name VARCHAR(50) NOT NULL,
-                bot_user_id VARCHAR(50) NOT NULL UNIQUE,
+                bot_id VARCHAR(50) PRIMARY KEY,
+                bot_name VARCHAR(100),
+                bank_name VARCHAR(50),
                 is_active BOOLEAN DEFAULT TRUE,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
+            ALTER TABLE official_bank_bots ADD COLUMN IF NOT EXISTS bot_id VARCHAR(50);
+            ALTER TABLE official_bank_bots ADD COLUMN IF NOT EXISTS bot_name VARCHAR(100);
+            ALTER TABLE official_bank_bots ADD COLUMN IF NOT EXISTS bank_name VARCHAR(50);
+            ALTER TABLE official_bank_bots ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
 
             CREATE TABLE IF NOT EXISTS security_alerts (
                 id BIGSERIAL PRIMARY KEY,
-                device_id INT REFERENCES devices(id) ON DELETE CASCADE,
-                merchant_id INT REFERENCES merchants(id) ON DELETE CASCADE,
+                device_id INT,
+                merchant_id INT,
                 alert_type VARCHAR(50) NOT NULL, -- 'DUPLICATE_TX', 'UNAUTHORIZED_SENDER', 'MALFORMED_PAYMENT'
                 severity VARCHAR(20) DEFAULT 'WARNING', -- 'WARNING', 'CRITICAL', 'INFO'
                 bank_name VARCHAR(50),
@@ -231,11 +236,11 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_security_alerts_merchant ON security_alerts(merchant_id);
             CREATE INDEX IF NOT EXISTS idx_security_alerts_created_at ON security_alerts(created_at DESC);
 
-            INSERT INTO official_bank_bots (bank_name, bot_user_id) 
+            INSERT INTO official_bank_bots (bot_id, bot_name, bank_name, is_active) 
             VALUES 
-                ('ABA Bank Bot', '123456789'),
-                ('ACLEDA Bank Bot', '987654321')
-            ON CONFLICT (bot_user_id) DO NOTHING;
+                ('123456789', 'ababank_bot', 'ABA Bank Bot', TRUE),
+                ('987654321', 'acleda_bot', 'ACLEDA Bank Bot', TRUE)
+            ON CONFLICT (bot_id) DO NOTHING;
         """)
 
 
