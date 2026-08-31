@@ -296,6 +296,19 @@ export default function UserDashboard() {
       return;
     }
 
+    // Enforce business rule: must unlink all devices before updating store
+    if (activeStore.devices && activeStore.devices.length > 0) {
+      const msg = `Cannot update store while ${activeStore.devices.length} Soundbox device(s) are linked. Please unlink all devices first.`;
+      setError(msg);
+      showToast({
+        type: 'error',
+        title: 'Unlink Devices Required',
+        message: msg,
+        duration: 6000
+      });
+      return;
+    }
+
     setSavingStore(true);
     setError('');
 
@@ -1875,6 +1888,31 @@ export default function UserDashboard() {
         maxWidth="max-w-2xl"
       >
         <form onSubmit={handleUpdateStore} className="space-y-4">
+          
+          {/* Warning Banner if devices are linked */}
+          {(activeStore?.devices?.length || 0) > 0 && (
+            <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 rounded-2xl space-y-2">
+              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold text-xs">
+                <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <span>Unlink Soundbox Devices Required Before Updating</span>
+              </div>
+              <p className="text-xs text-amber-700 dark:text-amber-400/90 leading-relaxed">
+                This store currently has <strong>{activeStore.devices.length} linked Soundbox speaker(s)</strong>. To ensure hardware broadcasting synchronization, please unlink all devices from this store before modifying store details or address.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditStoreOpen(false);
+                  changeTab('devices');
+                }}
+                className="mt-1 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>Go to Device Info to Unlink ({activeStore.devices.length})</span>
+              </button>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
               Store Name (ឈ្មោះហាង)
@@ -1883,7 +1921,8 @@ export default function UserDashboard() {
               type="text"
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
-              className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white"
+              disabled={(activeStore?.devices?.length || 0) > 0}
+              className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
               required
             />
           </div>
@@ -1922,10 +1961,14 @@ export default function UserDashboard() {
             </button>
             <button
               type="submit"
-              disabled={savingStore}
-              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-xs cursor-pointer"
+              disabled={savingStore || (activeStore?.devices?.length || 0) > 0}
+              className={`px-5 py-2.5 rounded-xl text-sm font-semibold shadow-xs transition flex items-center gap-1.5 ${
+                (activeStore?.devices?.length || 0) > 0
+                  ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 cursor-not-allowed'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+              }`}
             >
-              {savingStore ? t('saving', 'Saving...') : t('save', 'Save Changes')}
+              {savingStore ? t('saving', 'Saving...') : (activeStore?.devices?.length || 0) > 0 ? 'Unlink Devices First' : t('save', 'Save Changes')}
             </button>
           </div>
         </form>

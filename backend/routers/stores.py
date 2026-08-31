@@ -236,6 +236,18 @@ async def update_store(
                 detail="Store not found or you do not have permission to modify it."
             )
 
+        # Enforce business rule: Store must unlink all devices before updating store details
+        if current_user.get("role") != "ADMIN":
+            linked_devices_count = await conn.fetchval(
+                "SELECT COUNT(*) FROM devices WHERE merchant_id = $1",
+                store["id"]
+            )
+            if linked_devices_count and linked_devices_count > 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Cannot update store while {linked_devices_count} Soundbox device(s) are linked. Please unlink all devices first."
+                )
+
         new_name = payload.name.strip() if payload.name else store["name"]
         new_place = payload.place.strip() if payload.place else store["place"]
         new_location = payload.location.strip() if payload.location else store["location"]
