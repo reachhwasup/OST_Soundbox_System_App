@@ -111,7 +111,7 @@ async def list_devices(
                    COALESCE(d.device_sn, d.device_id, d.id::text) AS device_sn,
                    COALESCE(d.device_model, d.device_name, 'Y6B') AS device_model,
                    d.merchant_id,
-                   COALESCE(d.chat_id, d.telegram_chat_id, '-') AS till_id,
+                   COALESCE(d.till_id, d.chat_id, d.telegram_chat_id, '-') AS till_id,
                    COALESCE(d.telegram_chat_id, d.chat_id) AS telegram_chat_id,
                    COALESCE(d.status, CASE WHEN d.is_active = FALSE THEN 'Offline' ELSE 'Online' END, 'Offline') AS status,
                    COALESCE(d.battery, '100%') AS battery,
@@ -146,6 +146,7 @@ async def list_devices(
 
 class DeviceUpdateSchema(BaseModel):
     device_sn: Optional[str] = None
+    till_id: Optional[str] = None
     telegram_chat_id: Optional[str] = None
     device_model: Optional[str] = None
     status: Optional[str] = None
@@ -206,6 +207,11 @@ async def update_device(
         if payload.device_sn is not None:
             updates.append(f"device_sn = ${idx}")
             params.append(payload.device_sn.strip())
+            idx += 1
+
+        if payload.till_id is not None:
+            updates.append(f"till_id = ${idx}")
+            params.append(payload.till_id.strip() if payload.till_id.strip() else None)
             idx += 1
 
         if payload.telegram_chat_id is not None:
