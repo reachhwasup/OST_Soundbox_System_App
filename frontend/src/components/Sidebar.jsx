@@ -21,7 +21,9 @@ import {
   KeyRound,
   UserCheck,
   Users,
-  Activity
+  Activity,
+  Receipt,
+  ShieldAlert
 } from 'lucide-react';
 import ChangePasswordModal from './ChangePasswordModal';
 import EditProfileModal from './EditProfileModal';
@@ -277,18 +279,32 @@ export default function Sidebar({ activeTab, setActiveTab }) {
                         <span>{isKhmer ? 'ឧបករណ៍ Soundbox' : 'Soundbox Devices'}</span>
                       </button>
 
-                      {/* Sub-item: Audit & Logs */}
+                      {/* Sub-item: User & Payment Logs */}
                       <button
                         type="button"
-                        onClick={() => handleAdminSubTabClick('logs')}
+                        onClick={() => handleAdminSubTabClick('user_logs')}
                         className={`w-full flex items-center gap-2 px-2.5 py-1.5 sm:py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
-                          activeTab === 'admin' && currentSubTab === 'logs'
-                            ? 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-bold shadow-2xs'
+                          activeTab === 'admin' && (currentSubTab === 'user_logs' || currentSubTab === 'logs')
+                            ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 font-bold shadow-2xs'
                             : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-white'
                         }`}
                       >
-                        <Activity className="w-3.5 h-3.5 shrink-0 text-purple-500" />
-                        <span>{isKhmer ? 'កំណត់ត្រា & សុវត្ថិភាព' : 'Audit & Logs'}</span>
+                        <Receipt className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+                        <span>{isKhmer ? 'កំណត់ត្រាអតិថិជន (User Logs)' : 'User & Payment Logs'}</span>
+                      </button>
+
+                      {/* Sub-item: Admin & Security Logs */}
+                      <button
+                        type="button"
+                        onClick={() => handleAdminSubTabClick('admin_logs')}
+                        className={`w-full flex items-center gap-2 px-2.5 py-1.5 sm:py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
+                          activeTab === 'admin' && currentSubTab === 'admin_logs'
+                            ? 'bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 font-bold shadow-2xs'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        <ShieldAlert className="w-3.5 h-3.5 shrink-0 text-rose-500" />
+                        <span>{isKhmer ? 'កំណត់ត្រាប្រព័ន្ធ (Admin Logs)' : 'Admin & Security Logs'}</span>
                       </button>
 
                     </div>
