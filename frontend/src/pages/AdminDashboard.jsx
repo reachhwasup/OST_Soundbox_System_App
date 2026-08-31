@@ -235,7 +235,7 @@ export default function AdminDashboard() {
         api.get('/api/admin/stats'),
         api.get(`/api/admin/users?search=${searchParam}&role=${roleParam}&status=${statusParam}`),
         api.get(`/api/admin/stores?search=${searchParam}`),
-        api.get(`/api/devices/?search=${searchParam}`),
+        api.get('/api/devices/'),
         api.get(`/api/admin/logs?search=${searchParam}&log_type=${logTypeFilter}&limit=100`)
       ]);
 
