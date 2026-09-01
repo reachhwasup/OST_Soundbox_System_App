@@ -649,30 +649,21 @@ export default function AdminDashboard() {
         final_price: finalPrice,
         warranty_days: Number(sellWarrantyDays) || 90,
         warranty_start_date: sellWarrantyStartDate ? new Date(sellWarrantyStartDate).toISOString() : new Date().toISOString(),
-        status: 'ACTIVE'
+        status: 'PENDING'
       });
 
       setIsSellStockOpen(false);
       await fetchAllData();
 
-      // Switch to Manage Devices tab and open QR Pairing modal
+      // Switch to Manage Devices tab
       setAdminTab('devices');
-      setPairingDevice({
-        ...sellTargetDevice,
-        merchant_id: parseInt(sellStoreId),
-        store_name: targetStore ? targetStore.name : 'Customer Store',
-        final_price: finalPrice,
-        warranty_days: Number(sellWarrantyDays) || 90
-      });
-      setPairingTelegramId(sellTargetDevice.telegram_chat_id || '');
-      setPairingFeedback({ field: '', message: '', isError: false });
-      setPairingActiveCamera(null);
-      setIsPairingModalOpen(true);
 
       showToast({
         type: 'success',
-        title: 'Device Assigned',
-        message: `Soundbox assigned to ${targetStore?.name || 'store'}. Please scan Telegram QR to complete pairing.`,
+        title: isKhmer ? 'បានលក់ឧបករណ៍ដោយជោគជ័យ' : 'Device Sold & Assigned',
+        message: isKhmer 
+          ? `ឧបករណ៍បានចាត់ចែងជូន ${targetStore?.name || 'ហាង'} (ស្ថានភាព៖ រង់ចាំការចុះឈ្មោះ)` 
+          : `Soundbox assigned to ${targetStore?.name || 'store'}. Status: Waiting for Registration.`,
         duration: 5000
       });
     } catch (err) {
@@ -958,6 +949,8 @@ export default function AdminDashboard() {
           if (dSt !== 'active' && dSt !== 'online') return false;
         } else if (targetSt === 'offline') {
           if (dSt !== 'inactive' && dSt !== 'offline') return false;
+        } else if (targetSt === 'pending') {
+          if (dSt !== 'pending') return false;
         }
       }
       if (devFilterMerchant.trim()) {
@@ -2131,6 +2124,7 @@ export default function AdminDashboard() {
                 >
                   <option value="">{t('allStatuses', 'All Statuses')}</option>
                   <option value="Online">🟢 {t('online', 'Online')}</option>
+                  <option value="PENDING">🟣 {t('waitingForRegistration', 'Waiting for Registration')}</option>
                   <option value="Offline">⚪ {t('offline', 'Offline')}</option>
                 </select>
               </div>
@@ -2416,7 +2410,12 @@ export default function AdminDashboard() {
                           {/* Status */}
                           {visibleColumns.status && (
                             <td className="py-3.5 px-3 text-center">
-                              {String(d.status || '').toUpperCase() === 'IN_STOCK' || !d.merchant_id ? (
+                              {String(d.status || '').toUpperCase() === 'PENDING' ? (
+                                <span className="inline-flex items-center justify-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800 whitespace-nowrap">
+                                  <Clock className="w-3 h-3 text-purple-500 animate-pulse" />
+                                  <span>{t('waitingForRegistration', 'Waiting for Registration')}</span>
+                                </span>
+                              ) : String(d.status || '').toUpperCase() === 'IN_STOCK' || !d.merchant_id ? (
                                 <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
                                   In Stock
                                 </span>
@@ -5155,7 +5154,7 @@ export default function AdminDashboard() {
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>{t('confirmSaleAndScan', 'Confirm Sale & Proceed to QR Pairing →')}</span>
+                    <span>{t('confirmSaleAndDeploy', 'Confirm Sale & Deploy')}</span>
                   </>
                 )}
               </button>

@@ -58,6 +58,10 @@ async def init_db():
             EXCEPTION WHEN duplicate_object THEN null; END $$;
 
             DO $$ BEGIN
+                ALTER TYPE device_status ADD VALUE IF NOT EXISTS 'PENDING';
+            EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+            DO $$ BEGIN
                 ALTER TYPE device_status ADD VALUE IF NOT EXISTS 'RETIRED';
             EXCEPTION WHEN duplicate_object THEN null; END $$;
 

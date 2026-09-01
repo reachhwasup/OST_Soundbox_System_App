@@ -314,6 +314,8 @@ export const translations = {
     scanDeviceSn: "Scan Device SN QR",
     completePairing: "Complete Pairing & Activate Soundbox",
     pairedSuccessfully: "Soundbox paired and activated successfully!",
+    waitingForRegistration: "Waiting for Registration",
+    confirmSaleAndDeploy: "Confirm Sale & Deploy",
     
     // Language & Theme
     language: "Language",
@@ -643,6 +645,8 @@ export const translations = {
     scanDeviceSn: "ស្កេន Device SN QR",
     completePairing: "បញ្ចប់ការភ្ជាប់ & ដំណើរការ Soundbox",
     pairedSuccessfully: "Soundbox ត្រូវបានភ្ជាប់ និងដំណើរការដោយជោគជ័យ!",
+    waitingForRegistration: "រង់ចាំការចុះឈ្មោះ",
+    confirmSaleAndDeploy: "បញ្ជាក់ការលក់ & ដាក់ឱ្យប្រើ",
     
     // Language & Theme
     language: "ភាសា",
