@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
 import Modal from '../components/Modal';
+import FieldQRScanner from '../components/FieldQRScanner';
+import jsQR from 'jsqr';
 import { 
   Users, 
   Store, 
@@ -75,7 +77,11 @@ import {
   Shield,
   Tag,
   Percent,
-  Calendar
+  Calendar,
+  ShoppingBag,
+  QrCode,
+  Camera,
+  Upload
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -249,6 +255,25 @@ export default function AdminDashboard() {
   const [editDiscountAmount, setEditDiscountAmount] = useState(0);
   const [editWarrantyDays, setEditWarrantyDays] = useState(90);
   const [editWarrantyStartDate, setEditWarrantyStartDate] = useState('');
+
+  // Sell from Stock & Proceed to Pairing workflow states
+  const [isSellStockOpen, setIsSellStockOpen] = useState(false);
+  const [sellTargetDevice, setSellTargetDevice] = useState(null);
+  const [sellStoreId, setSellStoreId] = useState('');
+  const [sellDiscountType, setSellDiscountType] = useState('NONE');
+  const [sellDiscountPercent, setSellDiscountPercent] = useState(0);
+  const [sellDiscountAmount, setSellDiscountAmount] = useState(0);
+  const [sellWarrantyDays, setSellWarrantyDays] = useState(90);
+  const [sellWarrantyStartDate, setSellWarrantyStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [sellSubmitting, setSellSubmitting] = useState(false);
+
+  // Device Pairing & Telegram QR Scan modal states
+  const [isPairingModalOpen, setIsPairingModalOpen] = useState(false);
+  const [pairingDevice, setPairingDevice] = useState(null);
+  const [pairingTelegramId, setPairingTelegramId] = useState('');
+  const [pairingActiveCamera, setPairingActiveCamera] = useState(null); // 'TELEGRAM' | 'SN'
+  const [pairingFeedback, setPairingFeedback] = useState({ field: '', message: '', isError: false });
+  const [pairingSubmitting, setPairingSubmitting] = useState(false);
 
   // Form states for Create User
   const [newPhone, setNewPhone] = useState('');
@@ -576,6 +601,147 @@ export default function AdminDashboard() {
     const matchedStore = stores.find(s => s.name === d.store_name);
     setEditDeviceMerchantId(matchedStore ? matchedStore.id : '');
     setIsEditDeviceOpen(true);
+  };
+
+  // Open Sell from Stock Modal
+  const openSellStockModal = (device) => {
+    setSellTargetDevice(device);
+    setSellStoreId(stores[0] ? String(stores[0].id) : '');
+    setSellDiscountType('NONE');
+    setSellDiscountPercent(0);
+    setSellDiscountAmount(0);
+    setSellWarrantyDays(90);
+    setSellWarrantyStartDate(new Date().toISOString().split('T')[0]);
+    setIsSellStockOpen(true);
+  };
+
+  // Confirm Sale & Proceed to QR Pairing
+  const handleConfirmSellAndProceedToPairing = async (e) => {
+    e.preventDefault();
+    if (!sellTargetDevice || !sellStoreId) {
+      showToast({ type: 'error', title: 'Store Required', message: 'Please select a customer store.' });
+      return;
+    }
+    setSellSubmitting(true);
+
+    const basePrice = Number(sellTargetDevice.price) || (sellTargetDevice.device_type === 'Display Soundbox' ? 39.00 : 29.00);
+    let discAmt = 0;
+    let discPct = 0;
+    if (sellDiscountType === 'PERCENT') {
+      discPct = Number(sellDiscountPercent) || 0;
+      discAmt = (discPct / 100.0) * basePrice;
+    } else if (sellDiscountType === 'AMOUNT') {
+      discAmt = Number(sellDiscountAmount) || 0;
+      discPct = 0;
+    }
+    const finalPrice = Math.max(0, basePrice - discAmt);
+    const targetStore = stores.find(s => String(s.id) === String(sellStoreId));
+
+    try {
+      await api.put(`/api/devices/${sellTargetDevice.id}`, {
+        device_sn: sellTargetDevice.device_sn,
+        device_type: sellTargetDevice.device_type || 'Display Soundbox',
+        device_model: sellTargetDevice.device_model || sellTargetDevice.device_type || 'Display Soundbox',
+        merchant_id: parseInt(sellStoreId),
+        price: basePrice,
+        discount_amount: discAmt,
+        discount_percent: discPct,
+        final_price: finalPrice,
+        warranty_days: Number(sellWarrantyDays) || 90,
+        warranty_start_date: sellWarrantyStartDate ? new Date(sellWarrantyStartDate).toISOString() : new Date().toISOString(),
+        status: 'ACTIVE'
+      });
+
+      setIsSellStockOpen(false);
+      await fetchAllData();
+
+      // Switch to Manage Devices tab and open QR Pairing modal
+      setAdminTab('devices');
+      setPairingDevice({
+        ...sellTargetDevice,
+        merchant_id: parseInt(sellStoreId),
+        store_name: targetStore ? targetStore.name : 'Customer Store',
+        final_price: finalPrice,
+        warranty_days: Number(sellWarrantyDays) || 90
+      });
+      setPairingTelegramId(sellTargetDevice.telegram_chat_id || '');
+      setPairingFeedback({ field: '', message: '', isError: false });
+      setPairingActiveCamera(null);
+      setIsPairingModalOpen(true);
+
+      showToast({
+        type: 'success',
+        title: 'Device Assigned',
+        message: `Soundbox assigned to ${targetStore?.name || 'store'}. Please scan Telegram QR to complete pairing.`,
+        duration: 5000
+      });
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Failed to process device sale.';
+      showToast({ type: 'error', title: 'Sale Failed', message: msg });
+    } finally {
+      setSellSubmitting(false);
+    }
+  };
+
+  // Complete Pairing & Activate Soundbox
+  const handleCompletePairing = async (e) => {
+    e.preventDefault();
+    if (!pairingDevice) return;
+    setPairingSubmitting(true);
+
+    try {
+      await api.put(`/api/devices/${pairingDevice.id}`, {
+        telegram_chat_id: pairingTelegramId.trim() || null,
+        status: 'ACTIVE'
+      });
+
+      setIsPairingModalOpen(false);
+      setPairingActiveCamera(null);
+      await fetchAllData();
+
+      showToast({
+        type: 'success',
+        title: 'Soundbox Activated',
+        message: t('pairedSuccessfully', `Soundbox ${pairingDevice.device_sn} paired and activated successfully!`),
+        duration: 5000
+      });
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Failed to complete pairing.';
+      showToast({ type: 'error', title: 'Pairing Failed', message: msg });
+    } finally {
+      setPairingSubmitting(false);
+    }
+  };
+
+  // Image QR Decoder for Pairing Modal
+  const handleDecodePairingQrImage = (e, field) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const image = new Image();
+      image.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = image.width;
+        canvas.height = image.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(image, 0, 0);
+        const imageData = ctx.getImageData(0, 0, image.width, image.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+        if (code && code.data) {
+          if (field === 'TELEGRAM') {
+            setPairingTelegramId(code.data);
+            setPairingFeedback({ field: 'TELEGRAM', message: `Scanned: ${code.data}`, isError: false });
+          }
+        } else {
+          setPairingFeedback({ field, message: 'Could not detect QR code in image.', isError: true });
+        }
+      };
+      image.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
   };
 
   // Handle Update Device
@@ -2674,6 +2840,15 @@ export default function AdminDashboard() {
                         {visibleStockColumns.operation && (
                           <td className="py-3.5 px-4 text-center">
                             <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => openSellStockModal(d)}
+                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                              >
+                                <ShoppingBag className="w-3.5 h-3.5" />
+                                <span>{t('sellDevice', 'Sell / Deploy')}</span>
+                              </button>
+
                               <button
                                 type="button"
                                 onClick={() => openEditDeviceModal(d)}
@@ -4778,6 +4953,367 @@ export default function AdminDashboard() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Modal 1: Sell / Deploy Device from Stock */}
+      <Modal
+        isOpen={isSellStockOpen}
+        onClose={() => setIsSellStockOpen(false)}
+        title={t('sellDeviceTitle', 'Sell & Deploy Device to Customer')}
+      >
+        {sellTargetDevice && (
+          <form onSubmit={handleConfirmSellAndProceedToPairing} className="space-y-4">
+            
+            {/* Device Info Banner */}
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <div className="flex items-center gap-3 font-mono">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-300 flex items-center justify-center font-bold">
+                  <Smartphone className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="font-bold text-slate-900 dark:text-white text-sm">
+                    {sellTargetDevice.device_sn || sellTargetDevice.device_id}
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-sans mt-0.5">
+                    {sellTargetDevice.device_type === 'Display Soundbox' ? t('displaySoundboxOpt', '🖥️ Display Soundbox (Screen QR)') : t('standardSoundboxOpt', '🏷️ Standard Soundbox (Printed QR)')}
+                  </div>
+                </div>
+              </div>
+
+              <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                ${Number(sellTargetDevice.price || (sellTargetDevice.device_type === 'Display Soundbox' ? 39 : 29)).toFixed(2)}
+              </span>
+            </div>
+
+            {/* Target Store Selection */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                {t('assignStore', 'Select Customer Store')} <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={sellStoreId}
+                onChange={(e) => setSellStoreId(e.target.value)}
+                className="w-full px-3 py-2.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
+                required
+              >
+                <option value="">-- {t('assignStore', 'Select Store')} --</option>
+                {stores.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.owner_phone}) - #{s.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Discount Calculation Card */}
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>{t('discount', 'Discount Calculation')}</span>
+                </span>
+                <span className="text-[11px] font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                  {t('finalPrice', 'Final Price')}: ${(() => {
+                    const bp = Number(sellTargetDevice.price) || (sellTargetDevice.device_type === 'Display Soundbox' ? 39.0 : 29.0);
+                    let da = 0;
+                    if (sellDiscountType === 'PERCENT') da = ((Number(sellDiscountPercent) || 0) / 100.0) * bp;
+                    else if (sellDiscountType === 'AMOUNT') da = Number(sellDiscountAmount) || 0;
+                    return Math.max(0, bp - da).toFixed(2);
+                  })()}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSellDiscountType('NONE')}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+                    sellDiscountType === 'NONE'
+                      ? 'bg-white dark:bg-slate-700 border-blue-500 text-blue-600 dark:text-blue-300 shadow-2xs'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  {t('noDiscount', 'No Discount')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setSellDiscountType('PERCENT'); if (sellDiscountPercent === 0) setSellDiscountPercent(10); }}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition cursor-pointer flex items-center justify-center gap-1 ${
+                    sellDiscountType === 'PERCENT'
+                      ? 'bg-white dark:bg-slate-700 border-emerald-500 text-emerald-600 dark:text-emerald-300 shadow-2xs'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  <Percent className="w-3 h-3" />
+                  <span>{t('percentageDiscount', '% Off')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setSellDiscountType('AMOUNT'); if (sellDiscountAmount === 0) setSellDiscountAmount(5); }}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition cursor-pointer flex items-center justify-center gap-1 ${
+                    sellDiscountType === 'AMOUNT'
+                      ? 'bg-white dark:bg-slate-700 border-indigo-500 text-indigo-600 dark:text-indigo-300 shadow-2xs'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  <DollarSign className="w-3 h-3" />
+                  <span>{t('fixedDiscount', '$ Off')}</span>
+                </button>
+              </div>
+
+              {sellDiscountType === 'PERCENT' && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('discountPercent', 'Discount %')}:</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={sellDiscountPercent}
+                    onChange={(e) => setSellDiscountPercent(Number(e.target.value))}
+                    className="w-24 px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white"
+                  />
+                  <span className="text-xs text-slate-400 font-mono">
+                    (-${(((Number(sellDiscountPercent) || 0) / 100.0) * (Number(sellTargetDevice.price) || 29)).toFixed(2)})
+                  </span>
+                </div>
+              )}
+
+              {sellDiscountType === 'AMOUNT' && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('discountAmount', 'Discount Amount ($)')}:</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={sellDiscountAmount}
+                    onChange={(e) => setSellDiscountAmount(Number(e.target.value))}
+                    className="w-24 px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Warranty Period Configuration */}
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>{t('warrantyPeriod', 'Warranty Period & Countdown')}</span>
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
+                  {sellWarrantyDays} {t('daysRemaining', 'Days')}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('warrantyPeriod', 'Duration')}</label>
+                  <select
+                    value={sellWarrantyDays}
+                    onChange={(e) => setSellWarrantyDays(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-xs text-slate-900 dark:text-white cursor-pointer"
+                  >
+                    <option value={90}>{t('duration90Days', '90 Days (3 Months)')}</option>
+                    <option value={180}>{t('duration180Days', '180 Days (6 Months)')}</option>
+                    <option value={365}>{t('duration365Days', '365 Days (1 Year)')}</option>
+                    <option value={30}>{t('duration30Days', '30 Days (1 Month)')}</option>
+                    <option value={60}>{t('duration60Days', '60 Days (2 Months)')}</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('warrantyStart', 'Start Date')}</label>
+                  <input
+                    type="date"
+                    value={sellWarrantyStartDate}
+                    onChange={(e) => setSellWarrantyStartDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-xs text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsSellStockOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
+              >
+                {t('cancel', 'Cancel')}
+              </button>
+              <button
+                type="submit"
+                disabled={sellSubmitting}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {sellSubmitting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>{t('confirmSaleAndScan', 'Confirm Sale & Proceed to QR Pairing →')}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Modal 2: Device Pairing & Telegram QR Scan */}
+      <Modal
+        isOpen={isPairingModalOpen}
+        onClose={() => {
+          setIsPairingModalOpen(false);
+          setPairingActiveCamera(null);
+        }}
+        title={t('devicePairingModalTitle', 'Complete Device Pairing & Telegram QR Scan')}
+      >
+        {pairingDevice && (
+          <form onSubmit={handleCompletePairing} className="space-y-4">
+            
+            {/* Step Banner */}
+            <div className="p-3.5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40 rounded-2xl border border-blue-200 dark:border-blue-900/50 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+                  <Volume2 className="w-4 h-4 text-blue-600" />
+                  <span>{pairingDevice.device_sn}</span>
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                  {pairingDevice.store_name}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                {t('devicePairingDesc', 'Scan the customer Telegram Group QR code and verify Device SN to activate soundbox.')}
+              </p>
+            </div>
+
+            {/* Camera QR Scanner if active */}
+            {pairingActiveCamera && (
+              <div className="relative">
+                <FieldQRScanner
+                  targetName={pairingActiveCamera === 'TELEGRAM' ? 'Telegram Group' : 'Soundbox Serial'}
+                  onScanSuccess={(scannedText) => {
+                    if (pairingActiveCamera === 'TELEGRAM') {
+                      setPairingTelegramId(scannedText);
+                      setPairingFeedback({ field: 'TELEGRAM', message: `Scanned: ${scannedText}`, isError: false });
+                    }
+                    setPairingActiveCamera(null);
+                  }}
+                  onClose={() => setPairingActiveCamera(null)}
+                />
+              </div>
+            )}
+
+            {/* Telegram Group QR / Chat ID Card */}
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <QrCode className="w-4 h-4 text-blue-500" />
+                  <span>{t('scanTelegramQr', 'Telegram Group QR / Chat ID')}</span>
+                </label>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setPairingActiveCamera(pairingActiveCamera === 'TELEGRAM' ? null : 'TELEGRAM')}
+                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition shadow-2xs"
+                  >
+                    <Camera className="w-3 h-3" />
+                    <span>{pairingActiveCamera === 'TELEGRAM' ? 'Close Camera' : 'Scan Camera'}</span>
+                  </button>
+
+                  <label className="px-2.5 py-1 bg-white dark:bg-slate-700 hover:bg-slate-100 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition">
+                    <Upload className="w-3 h-3 text-slate-400" />
+                    <span>Upload QR</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleDecodePairingQrImage(e, 'TELEGRAM')}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <input
+                type="text"
+                value={pairingTelegramId}
+                onChange={(e) => setPairingTelegramId(e.target.value)}
+                placeholder="e.g. -1001234567890 or @StorePaymentBot"
+                className="w-full px-3 py-2 text-xs font-mono bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white"
+              />
+
+              {pairingFeedback.message && (
+                <div className={`text-[11px] ${pairingFeedback.isError ? 'text-rose-500' : 'text-emerald-500 font-semibold'}`}>
+                  {pairingFeedback.message}
+                </div>
+              )}
+            </div>
+
+            {/* Soundbox Test Chime Broadcast Button */}
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
+              <div className="text-xs text-slate-600 dark:text-slate-300">
+                <div className="font-semibold">Quick Audio Connection Test</div>
+                <div className="text-[10px] text-slate-400">Send instant chime to verify device online speaker</div>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await api.post(`/api/devices/${pairingDevice.id}/command`, {
+                      command_type: 'PLAY_TEST',
+                      volume: 80
+                    });
+                    showToast({ type: 'success', title: 'Chime Sent', message: 'Test ping dispatched to soundbox.' });
+                  } catch (err) {
+                    showToast({ type: 'error', title: 'Test Failed', message: 'Soundbox not yet connected to network.' });
+                  }
+                }}
+                className="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+              >
+                <Volume1 className="w-3.5 h-3.5 text-blue-500" />
+                <span>Play Chime</span>
+              </button>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPairingModalOpen(false);
+                  setPairingActiveCamera(null);
+                }}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
+              >
+                {t('cancel', 'Cancel')}
+              </button>
+              <button
+                type="submit"
+                disabled={pairingSubmitting}
+                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {pairingSubmitting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Activating...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>{t('completePairing', 'Complete Pairing & Activate Soundbox')}</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+          </form>
+        )}
       </Modal>
 
     </div>

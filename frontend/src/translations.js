@@ -303,6 +303,18 @@ export const translations = {
     duration60Days: "60 Days (2 Months)",
     customDays: "Custom Duration",
     
+    // Stock Sell & Device Pairing Flow
+    sellDevice: "Sell / Deploy",
+    sellDeviceTitle: "Sell & Deploy Device to Customer",
+    sellDeviceDesc: "Assign store, calculate discount price, set 90-day warranty, and pair Telegram QR.",
+    confirmSaleAndScan: "Confirm Sale & Proceed to QR Pairing →",
+    devicePairingModalTitle: "Complete Device Pairing & Telegram QR Scan",
+    devicePairingDesc: "Scan the customer Telegram Group QR code and verify Device SN to activate soundbox.",
+    scanTelegramQr: "Scan Telegram QR Code",
+    scanDeviceSn: "Scan Device SN QR",
+    completePairing: "Complete Pairing & Activate Soundbox",
+    pairedSuccessfully: "Soundbox paired and activated successfully!",
+    
     // Language & Theme
     language: "Language",
     english: "English",
@@ -619,6 +631,18 @@ export const translations = {
     duration30Days: "៣០ ថ្ងៃ (១ ខែ)",
     duration60Days: "៦០ ថ្ងៃ (២ ខែ)",
     customDays: "កំណត់ចំនួនថ្ងៃដោយខ្លួនឯង",
+    
+    // Stock Sell & Device Pairing Flow
+    sellDevice: "លក់ / ដាក់ឱ្យប្រើ",
+    sellDeviceTitle: "លក់ & ដាក់ឱ្យប្រើប្រាស់ឧបករណ៍ជូនអតិថិជន",
+    sellDeviceDesc: "ចាត់ចែងហាង គណនាការបញ្ចុះតម្លៃ កំណត់ការធានា ៩០ថ្ងៃ និងស្កេនភ្ជាប់ Telegram QR។",
+    confirmSaleAndScan: "បញ្ជាក់ការលក់ & បន្តទៅស្កេន QR →",
+    devicePairingModalTitle: "ការភ្ជាប់ឧបករណ៍ & ស្កេន Telegram QR",
+    devicePairingDesc: "ស្កេន Telegram Group QR របស់អតិថិជន និងផ្ទៀងផ្ទាត់លេខកូដ SN ដើម្បីដំណើរការ Soundbox។",
+    scanTelegramQr: "ស្កេន Telegram QR Code",
+    scanDeviceSn: "ស្កេន Device SN QR",
+    completePairing: "បញ្ចប់ការភ្ជាប់ & ដំណើរការ Soundbox",
+    pairedSuccessfully: "Soundbox ត្រូវបានភ្ជាប់ និងដំណើរការដោយជោគជ័យ!",
     
     // Language & Theme
     language: "ភាសា",
