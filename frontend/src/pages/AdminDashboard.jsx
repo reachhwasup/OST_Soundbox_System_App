@@ -1723,7 +1723,7 @@ export default function AdminDashboard() {
         <div className="space-y-4">
 
           {/* 0. Device Stock & Inventory KPI Summary Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
               <div className="text-[10px] sm:text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Warehouse className="w-3.5 h-3.5" />
@@ -1741,20 +1741,9 @@ export default function AdminDashboard() {
                 <span>Deployed (Active)</span>
               </div>
               <div className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
-                {devices.filter(d => d.merchant_id && String(d.status).toUpperCase() !== 'MAINTENANCE').length}
+                {devices.filter(d => d.merchant_id).length}
               </div>
               <div className="text-[10px] text-slate-400 mt-0.5">In Merchant Stores</div>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="text-[10px] sm:text-xs font-semibold text-rose-600 dark:text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Wrench className="w-3.5 h-3.5" />
-                <span>Maintenance / RMA</span>
-              </div>
-              <div className="text-xl sm:text-2xl font-bold text-rose-600 dark:text-rose-400 mt-1">
-                {devices.filter(d => String(d.status).toUpperCase() === 'MAINTENANCE').length}
-              </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">Hardware Repair</div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
@@ -1815,7 +1804,6 @@ export default function AdminDashboard() {
                   <option value="IN_STOCK">📦 In Stock (Warehouse)</option>
                   <option value="Online">🟢 Deployed (Online)</option>
                   <option value="Offline">⚪ Deployed (Offline)</option>
-                  <option value="MAINTENANCE">🛠️ Maintenance (Repair)</option>
                 </select>
               </div>
 
@@ -2048,10 +2036,6 @@ export default function AdminDashboard() {
                                 <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
                                   In Stock
                                 </span>
-                              ) : String(d.status || '').toUpperCase() === 'MAINTENANCE' ? (
-                                <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800">
-                                  Maintenance
-                                </span>
                               ) : isOnline ? (
                                 <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800">
                                   Online
@@ -2159,26 +2143,6 @@ export default function AdminDashboard() {
                                     className="p-1.5 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-lg transition cursor-pointer"
                                   >
                                     <Undo2 className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-
-                                {String(d.status).toUpperCase() !== 'MAINTENANCE' ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSendDeviceToMaintenance(d)}
-                                    title="Send to Maintenance / Repair"
-                                    className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-slate-200 dark:border-slate-700 rounded-lg transition cursor-pointer"
-                                  >
-                                    <Wrench className="w-3.5 h-3.5" />
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleReturnDeviceToStock(d)}
-                                    title="Mark Repaired (Return to Warehouse Stock)"
-                                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
-                                  >
-                                    Repaired
                                   </button>
                                 )}
                               </div>
@@ -2343,7 +2307,7 @@ export default function AdminDashboard() {
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   <Receipt className="w-5 h-5 text-emerald-600" />
-                  <span>{isKhmer ? 'កំណត់ត្រាប្រតិបត្តិការអតិថិជន (User Payment Logs)' : 'User & Customer Payment Transaction Logs'}</span>
+                  <span>{isKhmer ? 'កំណត់ត្រាប្រតិបត្តិការអតិថិជន' : 'User & Customer Payment Transaction Logs'}</span>
                 </h3>
                 <p className="text-xs text-slate-400">
                   Live audit trail of customer payments processed and broadcasted via ABA, ACLEDA, Canadia, Wing, and Bakong QR.
@@ -2620,7 +2584,7 @@ export default function AdminDashboard() {
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   <ShieldAlert className="w-5 h-5 text-rose-600" />
-                  <span>{isKhmer ? 'កំណត់ត្រាប្រព័ន្ធ & សុវត្ថិភាព (Admin & Security Audit Logs)' : 'Admin, Security & Remote Command Audit Logs'}</span>
+                  <span>{isKhmer ? 'កំណត់ត្រាប្រព័ន្ធ និងសុវត្ថិភាព' : 'Admin, Security & Remote Command Audit Logs'}</span>
                 </h3>
                 <p className="text-xs text-slate-400">
                   Audit trail for hardware operations, remote speaker commands, volume changes, store unlink events, and administrator actions.
@@ -3044,7 +3008,7 @@ export default function AdminDashboard() {
               >
                 <option value="ACTIVE">Active</option>
                 <option value="INACTIVE">Inactive</option>
-                <option value="MAINTENANCE">Maintenance</option>
+                <option value="IN_STOCK">In Stock</option>
               </select>
             </div>
           </div>

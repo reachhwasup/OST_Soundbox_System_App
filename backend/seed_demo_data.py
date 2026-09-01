@@ -102,13 +102,13 @@ async def seed_data():
         ("6152608110021", "6152608110021", "Y6_LCD", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q4", "Warehouse Shelf B-02 (Factory New)", now - timedelta(days=1)),
         ("6152608110030", "6152608110030", "S1", None, None, "IN_STOCK", "100%", "Good", "S1_V1.2", "esp32c2x_2M_OTA", "BATCH-2026-Q4", "Warehouse Shelf C-01 (Compact Model)", now - timedelta(hours=10)),
 
-        # --- C. Maintenance / RMA Units ---
-        ("6152608110090", "6152608110090", "Y6B", None, None, "MAINTENANCE", "35%", "Poor", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Speaker distortion. Replaced diaphragm.", now - timedelta(days=4)),
-        ("6152608110091", "6152608110091", "Y6B", None, None, "MAINTENANCE", "10%", "Weak", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Charging port loose. Soldered and testing.", now - timedelta(days=3)),
+        # --- C. Additional Warehouse Stock Units ---
+        ("6152608110090", "6152608110090", "Y6B", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Warehouse Shelf A-05", now - timedelta(days=4)),
+        ("6152608110091", "6152608110091", "Y6B", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Warehouse Shelf A-06", now - timedelta(days=3)),
     ]
 
     dev_db_map = {}
-    print("\n--- 3. Seeding Soundbox Devices (Deployed, Stock, & Maintenance) ---")
+    print("\n--- 3. Seeding Soundbox Devices (Deployed & Stock) ---")
     for d_id, sn, model, mid, chat_id, st_val, batt, sig, v4g, vwifi, b_no, notes, ltime in devices_data:
         existing_dev = await conn.fetchrow("SELECT id FROM devices WHERE device_sn = $1 OR device_id = $2", sn, d_id)
         is_active = (st_val == "ACTIVE")

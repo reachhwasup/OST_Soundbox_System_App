@@ -204,7 +204,6 @@ export default function UserDashboard() {
         const s = String(d.status || 'ACTIVE').toUpperCase();
         if (deviceStatusFilter === 'ACTIVE' && s !== 'ACTIVE' && s !== 'ONLINE') return false;
         if (deviceStatusFilter === 'OFFLINE' && s !== 'OFFLINE') return false;
-        if (deviceStatusFilter === 'MAINTENANCE' && s !== 'MAINTENANCE') return false;
         if (deviceStatusFilter === 'IN_STOCK' && s !== 'IN_STOCK') return false;
       }
       if (deviceSearchTerm.trim()) {
@@ -1151,7 +1150,6 @@ export default function UserDashboard() {
                     <option value="ACTIVE">{isKhmer ? '🟢 សកម្ម / អនឡាញ' : '🟢 Active / Online'}</option>
                     <option value="IN_STOCK">{isKhmer ? '📦 ក្នុងស្តុក' : '📦 In Stock'}</option>
                     <option value="OFFLINE">{isKhmer ? '⚪ ក្រៅបណ្តាញ' : '⚪ Offline'}</option>
-                    <option value="MAINTENANCE">{isKhmer ? '🛠️ ថែទាំ' : '🛠️ Maintenance'}</option>
                   </select>
                 </div>
 
