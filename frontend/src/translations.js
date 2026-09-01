@@ -325,8 +325,24 @@ export const translations = {
     pairedSuccessfully: "Soundbox paired and activated successfully!",
     waitingForRegistration: "Waiting for Registration",
     confirmSaleAndDeploy: "Confirm Sale & Deploy",
-    awaitingStoreLink: "Awaiting Store Link",
-    
+    // Store & Location Filter Keys
+    allProvinces: "All Provinces / Cities",
+    allDistricts: "All Districts / Khans",
+    allSoundboxes: "All Soundbox Statuses",
+    withSoundbox: "📱 With Soundbox (Assigned ≥1)",
+    multipleSoundboxes: "⚡ Multiple Soundboxes (≥2)",
+    noSoundbox: "⚠️ No Soundbox (Unlinked 0)",
+    allHardwareTypes: "All Hardware Types",
+    displaySoundbox: "🖥️ Display Soundbox (Screen QR)",
+    standardSoundbox: "🏷️ Standard Soundbox (Printed QR)",
+    storeRegDate: "Registration Date",
+    provinceCity: "Province / City",
+    districtKhan: "District / Khan",
+    soundboxHardware: "Soundbox Hardware",
+    activeStoresWithDevice: "Stores with Soundbox",
+    unlinkedStoresCount: "Unlinked Stores",
+    activeProvincesCount: "Provinces Covered",
+
     // Language & Theme
     language: "Language",
     english: "English",
@@ -668,6 +684,24 @@ export const translations = {
     confirmSaleAndDeploy: "បញ្ជាក់ការលក់ & ដាក់ឱ្យប្រើ",
     awaitingStoreLink: "មិនទាន់ភ្ជាប់ហាង (រង់ចាំការចុះឈ្មោះ)",
     
+    // Store & Location Filter Keys
+    allProvinces: "គ្រប់ខេត្ត / រាជធានី",
+    allDistricts: "គ្រប់ស្រុក / ខណ្ឌ",
+    allSoundboxes: "គ្រប់ស្ថានភាព Soundbox",
+    withSoundbox: "📱 មានភ្ជាប់ Soundbox (≥1)",
+    multipleSoundboxes: "⚡ ភ្ជាប់ Soundbox ច្រើន (≥2)",
+    noSoundbox: "⚠️ គ្មាន Soundbox (មិនទាន់ភ្ជាប់)",
+    allHardwareTypes: "គ្រប់ប្រភេទ Soundbox",
+    displaySoundbox: "🖥️ ប្រភេទអេក្រង់ QR (Display)",
+    standardSoundbox: "🏷️ ប្រភេទបិទតែម QR (Standard)",
+    storeRegDate: "កាលបរិច្ឆេទចុះឈ្មោះហាង",
+    provinceCity: "ខេត្ត / រាជធានី",
+    districtKhan: "ស្រុក / ខណ្ឌ",
+    soundboxHardware: "ឧបករណ៍ Soundbox",
+    activeStoresWithDevice: "ហាងមាន Soundbox",
+    unlinkedStoresCount: "ហាងមិនទាន់ភ្ជាប់ Soundbox",
+    activeProvincesCount: "ខេត្ត/ក្រុង កំពុងដំណើរការ",
+
     // Language & Theme
     language: "ភាសា",
     english: "English",

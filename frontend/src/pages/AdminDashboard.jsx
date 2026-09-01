@@ -135,7 +135,10 @@ export default function AdminDashboard() {
   // Store & Location Filter States
   const [storeSearch, setStoreSearch] = useState('');
   const [storeProvinceFilter, setStoreProvinceFilter] = useState('');
-  const [storeSoundboxFilter, setStoreSoundboxFilter] = useState(''); // '' | 'WITH_DEVICE' | 'NO_DEVICE'
+  const [storeDistrictFilter, setStoreDistrictFilter] = useState('');
+  const [storeSoundboxFilter, setStoreSoundboxFilter] = useState(''); // '' | 'WITH_DEVICE' | 'MULTI_DEVICE' | 'NO_DEVICE'
+  const [storeDeviceTypeFilter, setStoreDeviceTypeFilter] = useState('ALL'); // 'ALL' | 'Display' | 'Standard'
+  const [storeDateFilter, setStoreDateFilter] = useState('');
 
   // Cloud Speaker Device Manager Filter States
   const [devFilterId, setDevFilterId] = useState('');
@@ -767,6 +770,7 @@ export default function AdminDashboard() {
   }, [users, searchTerm, roleFilter, statusFilter]);
 
   // Available Provinces for Stores Filter
+  // Available Provinces for Stores Filter
   const availableProvinces = useMemo(() => {
     const set = new Set();
     stores.forEach(s => {
@@ -776,6 +780,20 @@ export default function AdminDashboard() {
     });
     return Array.from(set).filter(Boolean).sort();
   }, [stores]);
+
+  // Available Districts for Stores Filter (Context-aware based on selected province)
+  const availableDistricts = useMemo(() => {
+    const set = new Set();
+    stores.forEach(s => {
+      const p = (s.province || s.place || s.location || '').trim();
+      if (!storeProvinceFilter || p.toLowerCase().includes(storeProvinceFilter.toLowerCase())) {
+        if (s.district && s.district.trim()) {
+          set.add(s.district.trim());
+        }
+      }
+    });
+    return Array.from(set).filter(Boolean).sort();
+  }, [stores, storeProvinceFilter]);
 
   // Filtered Stores & Locations Logic
   const filteredStores = useMemo(() => {
@@ -803,21 +821,57 @@ export default function AdminDashboard() {
         if (!p.includes(storeProvinceFilter.toLowerCase())) return false;
       }
 
+      if (storeDistrictFilter) {
+        const d = (s.district || '').toLowerCase();
+        if (!d.includes(storeDistrictFilter.toLowerCase())) return false;
+      }
+
       if (storeSoundboxFilter === 'WITH_DEVICE') {
         if (!s.device_count || s.device_count <= 0) return false;
+      } else if (storeSoundboxFilter === 'MULTI_DEVICE') {
+        if (!s.device_count || s.device_count < 2) return false;
       } else if (storeSoundboxFilter === 'NO_DEVICE') {
         if (s.device_count && s.device_count > 0) return false;
       }
 
+      if (storeDeviceTypeFilter !== 'ALL') {
+        const hasMatchingType = (s.devices || []).some(dev => {
+          const dType = String(dev.device_type || dev.device_model || '');
+          if (storeDeviceTypeFilter === 'Display') return dType.includes('Display');
+          if (storeDeviceTypeFilter === 'Standard') return !dType.includes('Display');
+          return true;
+        });
+        if (!s.devices || s.devices.length === 0) {
+          const matchingGlobalDev = devices.some(dev => {
+            if (Number(dev.merchant_id) !== Number(s.id)) return false;
+            const dType = String(dev.device_type || dev.device_model || '');
+            if (storeDeviceTypeFilter === 'Display') return dType.includes('Display');
+            if (storeDeviceTypeFilter === 'Standard') return !dType.includes('Display');
+            return true;
+          });
+          if (!matchingGlobalDev) return false;
+        } else if (!hasMatchingType) {
+          return false;
+        }
+      }
+
+      if (storeDateFilter.trim()) {
+        const dateStr = String(s.created_at || '');
+        if (!dateStr.includes(storeDateFilter.trim())) return false;
+      }
+
       return true;
     });
-  }, [stores, storeSearch, storeProvinceFilter, storeSoundboxFilter]);
+  }, [stores, devices, storeSearch, storeProvinceFilter, storeDistrictFilter, storeSoundboxFilter, storeDeviceTypeFilter, storeDateFilter]);
 
   // Reset Store Filters
   const handleResetStoreFilters = () => {
     setStoreSearch('');
     setStoreProvinceFilter('');
+    setStoreDistrictFilter('');
     setStoreSoundboxFilter('');
+    setStoreDeviceTypeFilter('ALL');
+    setStoreDateFilter('');
   };
 
   // Export Stores CSV
@@ -826,7 +880,7 @@ export default function AdminDashboard() {
       showToast({ type: 'error', title: 'Export Failed', message: 'No stores matching current filters to export.' });
       return;
     }
-    const headers = ['Store ID', 'Store Name', 'Owner Name', 'Owner Phone', 'Province', 'District', 'Commune', 'Village', 'Street', 'Soundboxes'];
+    const headers = ['Store ID', 'Store Name', 'Owner Name', 'Owner Phone', 'Province', 'District', 'Commune', 'Village', 'Street', 'Soundboxes', 'Registration Date'];
     const rows = filteredStores.map(s => [
       s.id,
       `"${(s.name || '-').replace(/"/g, '""')}"`,
@@ -837,7 +891,8 @@ export default function AdminDashboard() {
       `"${(s.commune || '-').replace(/"/g, '""')}"`,
       `"${(s.village || '-').replace(/"/g, '""')}"`,
       `"${(s.street || '-').replace(/"/g, '""')}"`,
-      s.device_count || 0
+      s.device_count || 0,
+      `"${s.created_at || ''}"`
     ]);
     const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
@@ -1836,74 +1891,194 @@ export default function AdminDashboard() {
 
       {/* TAB 2: STORES & PLACES DIRECTORY (RESPONSIVE CARDS & TABLE) */}
       {adminTab === 'stores' && (
-        <div className="space-y-3">
+        <div className="space-y-4">
+
+          {/* Top Stores KPI Summary Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{t('totalStores', 'Total Stores')}</span>
+                <div className="p-1.5 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 rounded-lg">
+                  <Store className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                {stores.length}
+              </div>
+              <span className="text-[11px] text-slate-400">Registered merchant locations</span>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{t('activeStoresWithDevice', 'Stores with Soundbox')}</span>
+                <div className="p-1.5 bg-blue-50 dark:bg-blue-950/60 text-blue-600 rounded-lg">
+                  <Smartphone className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-blue-600 dark:text-blue-400 font-mono tracking-tight">
+                {stores.filter(s => (s.device_count || 0) > 0).length}
+              </div>
+              <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">Equipped with speaker</span>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{t('unlinkedStoresCount', 'Unlinked Stores')}</span>
+                <div className="p-1.5 bg-amber-50 dark:bg-amber-950/60 text-amber-600 rounded-lg">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-amber-600 dark:text-amber-400 font-mono tracking-tight">
+                {stores.filter(s => !s.device_count || s.device_count === 0).length}
+              </div>
+              <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">Ready for device pairing</span>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{t('activeProvincesCount', 'Provinces Covered')}</span>
+                <div className="p-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 rounded-lg">
+                  <MapPin className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-tight">
+                {availableProvinces.length}
+              </div>
+              <span className="text-[11px] text-slate-400">Nationwide cities & provinces</span>
+            </div>
+          </div>
 
           {/* Stores Search & Filter Toolbar */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200 dark:border-slate-800 p-3 sm:p-4">
-            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               
-              {/* Search Input */}
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 text-slate-400 absolute inset-y-0 left-3 my-auto pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder={t('searchStorePlaceholder', 'Search store name, owner, phone, street, location...')}
-                  value={storeSearch}
-                  onChange={(e) => setStoreSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-base sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
+              {/* 1. Store Search Input */}
+              <div className="lg:col-span-2">
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('searchStorePlaceholder', 'Search store, owner, phone, street...')}
+                </label>
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder={t('searchStorePlaceholder', 'Search store, owner, phone, street...')}
+                    value={storeSearch}
+                    onChange={(e) => setStoreSearch(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
+                  />
+                </div>
               </div>
 
-              {/* Filters */}
-              <div className="flex flex-wrap items-center gap-2 justify-end">
-                {/* Province Filter */}
+              {/* 2. Province / City */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('provinceCity', 'Province / City')}
+                </label>
                 <select
                   value={storeProvinceFilter}
-                  onChange={(e) => setStoreProvinceFilter(e.target.value)}
-                  className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer"
+                  onChange={(e) => {
+                    setStoreProvinceFilter(e.target.value);
+                    setStoreDistrictFilter('');
+                  }}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
                 >
                   <option value="">{t('allProvinces', 'All Provinces / Cities')}</option>
                   {availableProvinces.map(p => (
                     <option key={p} value={p}>{p}</option>
                   ))}
                 </select>
+              </div>
 
-                {/* Soundbox Filter */}
+              {/* 3. District / Khan */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('districtKhan', 'District / Khan')}
+                </label>
+                <select
+                  value={storeDistrictFilter}
+                  onChange={(e) => setStoreDistrictFilter(e.target.value)}
+                  disabled={availableDistricts.length === 0}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer disabled:opacity-50"
+                >
+                  <option value="">{t('allDistricts', 'All Districts / Khans')}</option>
+                  {availableDistricts.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 4. Soundbox Status */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('soundboxHardware', 'Soundbox Hardware')}
+                </label>
                 <select
                   value={storeSoundboxFilter}
                   onChange={(e) => setStoreSoundboxFilter(e.target.value)}
-                  className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
                 >
-                  <option value="">{t('allSoundboxStatus', 'All Soundboxes')}</option>
-                  <option value="WITH_DEVICE">{t('withSoundbox', 'With Soundbox (Assigned)')}</option>
-                  <option value="NO_DEVICE">{t('noSoundbox', 'No Soundbox (Unlinked)')}</option>
+                  <option value="">{t('allSoundboxes', 'All Soundbox Statuses')}</option>
+                  <option value="WITH_DEVICE">{t('withSoundbox', '📱 With Soundbox (Assigned ≥1)')}</option>
+                  <option value="MULTI_DEVICE">{t('multipleSoundboxes', '⚡ Multiple Soundboxes (≥2)')}</option>
+                  <option value="NO_DEVICE">{t('noSoundbox', '⚠️ No Soundbox (Unlinked 0)')}</option>
                 </select>
+              </div>
 
-                {/* Reset Button */}
-                {(storeSearch || storeProvinceFilter || storeSoundboxFilter) && (
+              {/* 5. Device Hardware Type */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('deviceType', 'Device Type')}
+                </label>
+                <select
+                  value={storeDeviceTypeFilter}
+                  onChange={(e) => setStoreDeviceTypeFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
+                >
+                  <option value="ALL">{t('allHardwareTypes', 'All Hardware Types')}</option>
+                  <option value="Display">{t('displaySoundbox', '🖥️ Display Soundbox (Screen QR)')}</option>
+                  <option value="Standard">{t('standardSoundbox', '🏷️ Standard Soundbox (Printed QR)')}</option>
+                </select>
+              </div>
+
+            </div>
+
+            {/* Bottom Row: Date Filter & Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                  {t('storeRegDate', 'Registration Date')}:
+                </label>
+                <input
+                  type="date"
+                  value={storeDateFilter}
+                  onChange={(e) => setStoreDateFilter(e.target.value)}
+                  className="px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                {(storeSearch || storeProvinceFilter || storeDistrictFilter || storeSoundboxFilter || storeDeviceTypeFilter !== 'ALL' || storeDateFilter) && (
                   <button
                     type="button"
                     onClick={handleResetStoreFilters}
-                    className="px-3 py-2.5 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 rounded-xl transition flex items-center gap-1 cursor-pointer"
+                    className="px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
                     title="Clear Filters"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>{t('reset', 'Reset')}</span>
+                    <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{t('reset', 'Reset Filters')}</span>
                   </button>
                 )}
 
-                {/* Export CSV Button */}
                 <button
                   type="button"
                   onClick={handleExportStoresCSV}
-                  className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
                   title="Export Filtered Stores to CSV"
                 >
-                  <Download className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>{t('exportCsv', 'Export')}</span>
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{t('exportCsv', 'Export CSV')}</span>
                 </button>
               </div>
-
             </div>
           </div>
           
