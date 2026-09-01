@@ -2428,7 +2428,7 @@ export default function AdminDashboard() {
                   className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-1.5 transition cursor-pointer"
                 >
                   <PackagePlus className="w-4 h-4" />
-                  <span>+ Add / Import Stock</span>
+                  <span>+ Add Stock Device</span>
                 </button>
               </div>
 
@@ -4265,280 +4265,133 @@ export default function AdminDashboard() {
         </div>
       </Modal>
 
-      {/* Modal: Warehouse Stock Intake & Device Import */}
+      {/* Modal: Warehouse Stock Intake */}
       <Modal
         isOpen={isStockModalOpen}
         onClose={() => !stockSubmitting && setIsStockModalOpen(false)}
-        title="Warehouse Stock Intake & Device Import"
+        title="Add Soundbox Device to Stock"
       >
-        <div className="space-y-4">
-          
-          {/* Intake Mode Switcher */}
-          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-            <button
-              type="button"
-              onClick={() => setStockModalTab('BULK')}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                stockModalTab === 'BULK'
-                  ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400'
-              }`}
-            >
-              <Boxes className="w-3.5 h-3.5" />
-              <span>Bulk Barcode / Multi-SN Import</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStockModalTab('SINGLE')}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                stockModalTab === 'SINGLE'
-                  ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400'
-              }`}
-            >
-              <PackagePlus className="w-3.5 h-3.5" />
-              <span>Single Device Intake</span>
-            </button>
+        <form onSubmit={handleSingleIntakeStock} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Soundbox Serial Number (SN) *
+            </label>
+            <input
+              type="text"
+              value={singleSnInput}
+              onChange={(e) => setSingleSnInput(e.target.value)}
+              placeholder="e.g. 6152608110050"
+              required
+              className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+            />
           </div>
 
-          {/* TAB 1: BULK IMPORT */}
-          {stockModalTab === 'BULK' && (
-            <form onSubmit={handleBulkImportStock} className="space-y-3.5">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Serial Numbers List (Scan or Paste)
-                  </label>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    {bulkSnInput.split(/[\n,;]+/).filter(s => s.trim()).length} SNs detected
-                  </span>
-                </div>
-                <textarea
-                  rows={5}
-                  value={bulkSnInput}
-                  onChange={(e) => setBulkSnInput(e.target.value)}
-                  placeholder="6152608110020&#10;6152608110021&#10;6152608110022&#10;or paste comma-separated serial numbers..."
-                  required
-                  className="w-full px-3 py-2.5 text-xs font-mono bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  You can scan serial numbers with a 1D/2D barcode gun directly into this field.
-                </p>
-              </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Device Model
+              </label>
+              <select
+                value={singleModel}
+                onChange={(e) => setSingleModel(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
+              >
+                <option value="Y6B">Y6B (LCD 4G+WiFi)</option>
+                <option value="Y6_LCD">Y6 LCD Standard</option>
+                <option value="S1">S1 Compact</option>
+              </select>
+            </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Device Model
-                  </label>
-                  <select
-                    value={bulkModel}
-                    onChange={(e) => setBulkModel(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
-                  >
-                    <option value="Y6B">Y6B (LCD 4G+WiFi)</option>
-                    <option value="Y6_LCD">Y6 LCD Standard</option>
-                    <option value="S1">S1 Compact</option>
-                  </select>
-                </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Unit Price ($ USD)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={singlePrice}
+                onChange={(e) => setSinglePrice(e.target.value)}
+                placeholder="29.00"
+                className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+              />
+            </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Unit Price ($ USD)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={bulkPrice}
-                    onChange={(e) => setBulkPrice(e.target.value)}
-                    placeholder="29.00"
-                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  />
-                </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Batch / PO Ref
+              </label>
+              <input
+                type="text"
+                value={singleBatchNo}
+                onChange={(e) => setSingleBatchNo(e.target.value)}
+                placeholder="e.g. BATCH-2026-09"
+                className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+              />
+            </div>
+          </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Batch / PO Ref
-                  </label>
-                  <input
-                    type="text"
-                    value={bulkBatchNo}
-                    onChange={(e) => setBulkBatchNo(e.target.value)}
-                    placeholder="e.g. BATCH-2026-09"
-                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  />
-                </div>
-              </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Assign Store (Optional)
+            </label>
+            <select
+              value={singleStoreId}
+              onChange={(e) => setSingleStoreId(e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
+            >
+              <option value="">📦 Keep in Warehouse Stock (Unassigned)</option>
+              {stores.map(s => (
+                <option key={s.id} value={s.id}>
+                  🏬 {s.name} ({s.owner_phone})
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Leave unassigned if the device is staying in warehouse stock.
+            </p>
+          </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Warehouse Notes (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={bulkNotes}
-                  onChange={(e) => setBulkNotes(e.target.value)}
-                  placeholder="e.g. Factory shipment #4, tested working"
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                />
-              </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Notes (Optional)
+            </label>
+            <input
+              type="text"
+              value={singleNotes}
+              onChange={(e) => setSingleNotes(e.target.value)}
+              placeholder="e.g. Warehouse Shelf A-01, sample unit"
+              className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+            />
+          </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setIsStockModalOpen(false)}
-                  disabled={stockSubmitting}
-                  className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={stockSubmitting}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  {stockSubmitting ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Importing Stock...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Boxes className="w-3.5 h-3.5" />
-                      <span>Import to Warehouse Stock</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* TAB 2: SINGLE DEVICE INTAKE */}
-          {stockModalTab === 'SINGLE' && (
-            <form onSubmit={handleSingleIntakeStock} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Soundbox Serial Number (SN) *
-                </label>
-                <input
-                  type="text"
-                  value={singleSnInput}
-                  onChange={(e) => setSingleSnInput(e.target.value)}
-                  placeholder="e.g. 6152608110050"
-                  required
-                  className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Device Model
-                  </label>
-                  <select
-                    value={singleModel}
-                    onChange={(e) => setSingleModel(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
-                  >
-                    <option value="Y6B">Y6B (LCD 4G+WiFi)</option>
-                    <option value="Y6_LCD">Y6 LCD Standard</option>
-                    <option value="S1">S1 Compact</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Unit Price ($ USD)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={singlePrice}
-                    onChange={(e) => setSinglePrice(e.target.value)}
-                    placeholder="29.00"
-                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Batch / PO Ref
-                  </label>
-                  <input
-                    type="text"
-                    value={singleBatchNo}
-                    onChange={(e) => setSingleBatchNo(e.target.value)}
-                    placeholder="e.g. BATCH-2026-09"
-                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Assign Store (Optional)
-                </label>
-                <select
-                  value={singleStoreId}
-                  onChange={(e) => setSingleStoreId(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
-                >
-                  <option value="">📦 Keep in Warehouse Stock (Unassigned)</option>
-                  {stores.map(s => (
-                    <option key={s.id} value={s.id}>
-                      🏬 {s.name} ({s.owner_phone})
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Leave unassigned if the device is staying in warehouse stock.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Notes (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={singleNotes}
-                  onChange={(e) => setSingleNotes(e.target.value)}
-                  placeholder="e.g. Sample unit, replacement device"
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setIsStockModalOpen(false)}
-                  disabled={stockSubmitting}
-                  className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={stockSubmitting}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  {stockSubmitting ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Saving...</span>
-                    </>
-                  ) : (
-                    <>
-                      <PackagePlus className="w-3.5 h-3.5" />
-                      <span>Save to Stock</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          )}
-
-        </div>
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={() => setIsStockModalOpen(false)}
+              disabled={stockSubmitting}
+              className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={stockSubmitting}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            >
+              {stockSubmitting ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <PackagePlus className="w-3.5 h-3.5" />
+                  <span>Add to Stock</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
       </Modal>
 
     </div>
