@@ -219,8 +219,8 @@ export default function AdminDashboard() {
     deviceId: true,
     deviceType: true,
     price: true,
-    intakeDate: false,
-    notes: false,
+    intakeDate: true,
+    notes: true,
     operation: true
   });
 
@@ -2745,18 +2745,6 @@ export default function AdminDashboard() {
                                 <Edit className="w-3 h-3 text-blue-600 dark:text-blue-400" />
                                 <span>{t('edit', 'Edit')}</span>
                               </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedDeviceDetail(d);
-                                  setIsDeviceDetailOpen(true);
-                                }}
-                                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                              >
-                                <Eye className="w-3 h-3 text-slate-400" />
-                                <span>{t('detail', 'Detail')}</span>
-                              </button>
                             </div>
                           </td>
                         )}
@@ -4324,16 +4312,8 @@ export default function AdminDashboard() {
             {/* Header Hero */}
             <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
               <div className="flex items-center gap-3 font-mono">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold ${
-                  String(selectedDeviceDetail.status).toUpperCase() === 'IN_STOCK'
-                    ? 'bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-300'
-                    : 'bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-300'
-                }`}>
-                  {String(selectedDeviceDetail.status).toUpperCase() === 'IN_STOCK' ? (
-                    <Package className="w-6 h-6" />
-                  ) : (
-                    <Volume2 className="w-6 h-6" />
-                  )}
+                <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-300 flex items-center justify-center font-bold">
+                  <Volume2 className="w-6 h-6" />
                 </div>
                 <div>
                   <div className="font-bold text-slate-900 dark:text-white text-base">
@@ -4350,170 +4330,126 @@ export default function AdminDashboard() {
               </div>
 
               <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${
-                String(selectedDeviceDetail.status).toUpperCase() === 'IN_STOCK'
-                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                  : String(selectedDeviceDetail.status).toUpperCase() === 'PENDING'
+                String(selectedDeviceDetail.status).toUpperCase() === 'PENDING'
                   ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
                   : String(selectedDeviceDetail.status || '').toLowerCase() === 'online' || String(selectedDeviceDetail.status || '').toUpperCase() === 'ACTIVE'
                   ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                   : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
               }`}>
-                {String(selectedDeviceDetail.status).toUpperCase() === 'IN_STOCK'
-                  ? '📦 IN_STOCK'
-                  : String(selectedDeviceDetail.status).toUpperCase() === 'PENDING'
+                {String(selectedDeviceDetail.status).toUpperCase() === 'PENDING'
                   ? '🟣 Waiting for Registration'
                   : selectedDeviceDetail.status || 'Offline'}
               </span>
             </div>
 
-            {/* Warehouse Stock Specific Details */}
-            {String(selectedDeviceDetail.status).toUpperCase() === 'IN_STOCK' ? (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-2.5 text-xs">
-                  <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('price', 'Base Retail Price')}</span>
-                    <div className="font-mono font-bold text-slate-900 dark:text-white text-base mt-0.5">
-                      ${Number(selectedDeviceDetail.price || (selectedDeviceDetail.device_type === 'Display Soundbox' ? 39 : 29)).toFixed(2)}
-                    </div>
-                  </div>
-
-                  <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">Inventory Status</span>
-                    <div className="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 mt-0.5">
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Ready for Sale</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/60 text-xs space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Warehouse Notes:</span>
-                    <span className="font-semibold text-slate-700 dark:text-slate-200">
-                      {selectedDeviceDetail.notes || 'Warehouse Ready (Tested)'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between border-t border-slate-200/60 dark:border-slate-700/60 pt-2">
-                    <span className="text-slate-400">Stock Registration Date:</span>
-                    <span className="font-mono text-slate-700 dark:text-slate-300">
-                      {selectedDeviceDetail.created_at ? new Date(selectedDeviceDetail.created_at).toLocaleString() : '—'}
-                    </span>
-                  </div>
+            {/* Hardware Telemetry Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('battery', 'Battery')}</span>
+                <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mt-0.5">
+                  <Battery className="w-4 h-4 text-emerald-500" />
+                  {selectedDeviceDetail.battery || '100%'}
                 </div>
               </div>
-            ) : (
-              /* Deployed / Sold / Active Device Details */
-              <div className="space-y-4">
-                {/* Hardware Telemetry Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
-                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('battery', 'Battery')}</span>
-                    <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mt-0.5">
-                      <Battery className="w-4 h-4 text-emerald-500" />
-                      {selectedDeviceDetail.battery || '100%'}
-                    </div>
-                  </div>
 
-                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('signal', 'Signal Quality')}</span>
-                    <div className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1.5 mt-0.5">
-                      <Signal className="w-4 h-4" />
-                      {selectedDeviceDetail.signal || 'Good'}
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('version4G', '4G Firmware')}</span>
-                    <div className="font-mono text-slate-700 dark:text-slate-300 font-bold mt-0.5 truncate" title={selectedDeviceDetail.version_4g}>
-                      {selectedDeviceDetail.version_4g || 'Y6_STD_1605_V1.0'}
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('versionWifi', 'WiFi Firmware')}</span>
-                    <div className="font-mono text-slate-700 dark:text-slate-300 font-bold mt-0.5 truncate" title={selectedDeviceDetail.version_wifi}>
-                      {selectedDeviceDetail.version_wifi || 'esp32c2x_2M_OTA'}
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('merchantStore', 'Linked Store')}</span>
-                    <div className="font-semibold text-slate-900 dark:text-white mt-0.5 truncate">
-                      {selectedDeviceDetail.store_name || (selectedDeviceDetail.status === 'PENDING' ? (isKhmer ? 'មិនទាន់ភ្ជាប់ហាង' : 'Awaiting Store Link') : 'Unassigned')}
-                    </div>
-                  </div>
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('signal', 'Signal Quality')}</span>
+                <div className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1.5 mt-0.5">
+                  <Signal className="w-4 h-4" />
+                  {selectedDeviceDetail.signal || 'Good'}
                 </div>
+              </div>
 
-                {/* Warranty 90-Day Live Countdown Hero Card */}
-                {(selectedDeviceDetail.merchant_id || selectedDeviceDetail.status === 'PENDING' || selectedDeviceDetail.warranty_days) && (() => {
-                  const wInfo = calculateWarrantyCountdown(selectedDeviceDetail);
-                  if (wInfo.status === 'NO_WARRANTY') return null;
-                  return (
-                    <div className="p-4 bg-gradient-to-br from-indigo-50/70 to-blue-50/50 dark:from-indigo-950/40 dark:to-slate-900/60 rounded-2xl border border-indigo-100 dark:border-indigo-900/50 space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <ShieldCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                          <div>
-                            <div className="text-xs font-bold text-slate-900 dark:text-white">
-                              {t('warrantyPeriod', '90-Day Warranty Protection')}
-                            </div>
-                            <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                              {selectedDeviceDetail.warranty_days || 90} {t('daysRemaining', 'Days Standard Coverage')}
-                            </div>
-                          </div>
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('version4G', '4G Firmware')}</span>
+                <div className="font-mono text-slate-700 dark:text-slate-300 font-bold mt-0.5 truncate" title={selectedDeviceDetail.version_4g}>
+                  {selectedDeviceDetail.version_4g || 'Y6_STD_1605_V1.0'}
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('versionWifi', 'WiFi Firmware')}</span>
+                <div className="font-mono text-slate-700 dark:text-slate-300 font-bold mt-0.5 truncate" title={selectedDeviceDetail.version_wifi}>
+                  {selectedDeviceDetail.version_wifi || 'esp32c2x_2M_OTA'}
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('merchantStore', 'Linked Store')}</span>
+                <div className="font-semibold text-slate-900 dark:text-white mt-0.5 truncate">
+                  {selectedDeviceDetail.store_name || (selectedDeviceDetail.status === 'PENDING' ? (isKhmer ? 'មិនទាន់ភ្ជាប់ហាង' : 'Awaiting Store Link') : 'Unassigned')}
+                </div>
+              </div>
+            </div>
+
+            {/* Warranty 90-Day Live Countdown Hero Card */}
+            {(selectedDeviceDetail.merchant_id || selectedDeviceDetail.status === 'PENDING' || selectedDeviceDetail.warranty_days) && (() => {
+              const wInfo = calculateWarrantyCountdown(selectedDeviceDetail);
+              if (wInfo.status === 'NO_WARRANTY') return null;
+              return (
+                <div className="p-4 bg-gradient-to-br from-indigo-50/70 to-blue-50/50 dark:from-indigo-950/40 dark:to-slate-900/60 rounded-2xl border border-indigo-100 dark:border-indigo-900/50 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white">
+                          {t('warrantyPeriod', '90-Day Warranty Protection')}
                         </div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                          {selectedDeviceDetail.warranty_days || 90} {t('daysRemaining', 'Days Standard Coverage')}
+                        </div>
+                      </div>
+                    </div>
 
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      wInfo.status === 'EXPIRED'
+                        ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                        : wInfo.status === 'EXPIRING_SOON'
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                    }`}>
+                      {wInfo.text}
+                    </span>
+                  </div>
+
+                  {/* Visual Progress bar */}
+                  <div className="space-y-1">
+                    <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-500 ${
                           wInfo.status === 'EXPIRED'
-                            ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                            ? 'bg-rose-500'
                             : wInfo.status === 'EXPIRING_SOON'
-                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                            : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                        }`}>
-                          {wInfo.text}
-                        </span>
-                      </div>
-
-                      {/* Visual Progress bar */}
-                      <div className="space-y-1">
-                        <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full transition-all duration-500 ${
-                              wInfo.status === 'EXPIRED'
-                                ? 'bg-rose-500'
-                                : wInfo.status === 'EXPIRING_SOON'
-                                ? 'bg-amber-500'
-                                : 'bg-emerald-500'
-                            }`}
-                            style={{ width: `${wInfo.progress}%` }}
-                          ></div>
-                        </div>
-                        <div className="flex justify-between text-[10px] font-mono text-slate-400">
-                          <span>{t('warrantyStart', 'Start')}: {wInfo.startDate ? wInfo.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
-                          <span>{t('warrantyEnd', 'Expires')}: {wInfo.endDate ? wInfo.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
-                        </div>
-                      </div>
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${wInfo.progress}%` }}
+                      ></div>
                     </div>
-                  );
-                })()}
-
-                {/* Timestamps */}
-                <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/60 text-xs space-y-1.5">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Last Telemetry Heartbeat:</span>
-                    <span className="font-mono text-slate-700 dark:text-slate-300">
-                      {selectedDeviceDetail.last_time || (selectedDeviceDetail.last_heartbeat ? new Date(selectedDeviceDetail.last_heartbeat).toLocaleString() : '—')}
-                    </span>
-                  </div>
-                  <div className="flex justify-between border-t border-slate-200/60 dark:border-slate-700/60 pt-1.5">
-                    <span className="text-slate-400">Created / Registered At:</span>
-                    <span className="font-mono text-slate-700 dark:text-slate-300">
-                      {selectedDeviceDetail.created_at ? new Date(selectedDeviceDetail.created_at).toLocaleString() : '—'}
-                    </span>
+                    <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                      <span>{t('warrantyStart', 'Start')}: {wInfo.startDate ? wInfo.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
+                      <span>{t('warrantyEnd', 'Expires')}: {wInfo.endDate ? wInfo.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
+                    </div>
                   </div>
                 </div>
+              );
+            })()}
+
+            {/* Timestamps */}
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/60 text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Last Telemetry Heartbeat:</span>
+                <span className="font-mono text-slate-700 dark:text-slate-300">
+                  {selectedDeviceDetail.last_time || (selectedDeviceDetail.last_heartbeat ? new Date(selectedDeviceDetail.last_heartbeat).toLocaleString() : '—')}
+                </span>
               </div>
-            )}
+              <div className="flex justify-between border-t border-slate-200/60 dark:border-slate-700/60 pt-1.5">
+                <span className="text-slate-400">Created / Registered At:</span>
+                <span className="font-mono text-slate-700 dark:text-slate-300">
+                  {selectedDeviceDetail.created_at ? new Date(selectedDeviceDetail.created_at).toLocaleString() : '—'}
+                </span>
+              </div>
+            </div>
 
             {/* Close Button */}
             <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
@@ -4775,8 +4711,8 @@ export default function AdminDashboard() {
                 deviceId: true,
                 deviceType: true,
                 price: true,
-                intakeDate: false,
-                notes: false,
+                intakeDate: true,
+                notes: true,
                 operation: true
               })}
               className="text-xs text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
