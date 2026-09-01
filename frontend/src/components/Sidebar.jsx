@@ -13,7 +13,9 @@ import {
   Receipt,
   ShieldAlert,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  Smartphone,
+  Warehouse
 } from 'lucide-react';
 import OstLogo from './OstLogo';
 
