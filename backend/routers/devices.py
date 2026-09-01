@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
+from datetime import datetime, timedelta, timezone
 
 from backend.database import get_db_pool
 from backend.security import get_current_user
@@ -538,24 +539,42 @@ async def update_device(
             params.append(f_val)
             idx += 1
 
+        # Warranty days and dates handling
         if payload.warranty_days is not None:
             updates.append(f"warranty_days = ${idx}")
             params.append(int(payload.warranty_days))
             idx += 1
 
+        w_days_val = int(payload.warranty_days) if payload.warranty_days is not None else 90
+
         if payload.warranty_start_date is not None:
-            updates.append(f"warranty_start_date = ${idx}::timestamptz")
-            params.append(payload.warranty_start_date)
+            try:
+                clean_str = payload.warranty_start_date.replace("Z", "+00:00")
+                start_dt = datetime.fromisoformat(clean_str)
+            except Exception:
+                start_dt = datetime.now(timezone.utc)
+            updates.append(f"warranty_start_date = ${idx}")
+            params.append(start_dt)
             idx += 1
 
-        if payload.warranty_end_date is not None:
-            updates.append(f"warranty_end_date = ${idx}::timestamptz")
-            params.append(payload.warranty_end_date)
+            if payload.warranty_end_date is not None:
+                try:
+                    clean_end = payload.warranty_end_date.replace("Z", "+00:00")
+                    end_dt = datetime.fromisoformat(clean_end)
+                except Exception:
+                    end_dt = start_dt + timedelta(days=w_days_val)
+            else:
+                end_dt = start_dt + timedelta(days=w_days_val)
+            updates.append(f"warranty_end_date = ${idx}")
+            params.append(end_dt)
             idx += 1
-        elif payload.warranty_days is not None or payload.merchant_id is not None:
-            w_d = payload.warranty_days if payload.warranty_days is not None else 90
-            updates.append(f"warranty_start_date = COALESCE(warranty_start_date, CURRENT_TIMESTAMP)")
-            updates.append(f"warranty_end_date = COALESCE(warranty_start_date, CURRENT_TIMESTAMP) + ({w_d} || ' days')::INTERVAL")
+        elif payload.merchant_id is not None or payload.warranty_days is not None:
+            now_dt = datetime.now(timezone.utc)
+            end_dt = now_dt + timedelta(days=w_days_val)
+            updates.append("warranty_start_date = COALESCE(warranty_start_date, CURRENT_TIMESTAMP)")
+            updates.append(f"warranty_end_date = COALESCE(warranty_start_date, CURRENT_TIMESTAMP) + (${idx}::INT * INTERVAL '1 day')")
+            params.append(w_days_val)
+            idx += 1
 
         if payload.status is not None:
             updates.append(f"status = ${idx}::device_status")
