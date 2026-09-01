@@ -313,8 +313,8 @@ export const translations = {
     customDays: "Custom Duration",
     
     // Stock Sell & Device Pairing Flow
-    sellDevice: "Sell / Deploy",
-    sellDeviceTitle: "Sell & Deploy Device to Customer",
+    sellDevice: "Sell",
+    sellDeviceTitle: "Sell Device to Customer",
     sellDeviceDesc: "Assign store, calculate discount price, set 90-day warranty, and pair Telegram QR.",
     confirmSaleAndScan: "Confirm Sale & Proceed to QR Pairing →",
     devicePairingModalTitle: "Complete Device Pairing & Telegram QR Scan",
@@ -324,7 +324,7 @@ export const translations = {
     completePairing: "Complete Pairing & Activate Soundbox",
     pairedSuccessfully: "Soundbox paired and activated successfully!",
     waitingForRegistration: "Waiting for Registration",
-    confirmSaleAndDeploy: "Confirm Sale & Deploy",
+    confirmSaleAndDeploy: "Confirm Sale",
     // Store & Location Filter Keys
     allProvinces: "All Provinces / Cities",
     allDistricts: "All Districts / Khans",
@@ -682,8 +682,8 @@ export const translations = {
     customDays: "កំណត់ចំនួនថ្ងៃដោយខ្លួនឯង",
     
     // Stock Sell & Device Pairing Flow
-    sellDevice: "លក់ / ដាក់ឱ្យប្រើ",
-    sellDeviceTitle: "លក់ & ដាក់ឱ្យប្រើប្រាស់ឧបករណ៍ជូនអតិថិជន",
+    sellDevice: "លក់",
+    sellDeviceTitle: "លក់ឧបករណ៍ជូនអតិថិជន",
     sellDeviceDesc: "ចាត់ចែងហាង គណនាការបញ្ចុះតម្លៃ កំណត់ការធានា ៩០ថ្ងៃ និងស្កេនភ្ជាប់ Telegram QR។",
     confirmSaleAndScan: "បញ្ជាក់ការលក់ & បន្តទៅស្កេន QR →",
     devicePairingModalTitle: "ការភ្ជាប់ឧបករណ៍ & ស្កេន Telegram QR",
@@ -693,7 +693,7 @@ export const translations = {
     completePairing: "បញ្ចប់ការភ្ជាប់ & ដំណើរការ Soundbox",
     pairedSuccessfully: "Soundbox ត្រូវបានភ្ជាប់ និងដំណើរការដោយជោគជ័យ!",
     waitingForRegistration: "រង់ចាំការចុះឈ្មោះ",
-    confirmSaleAndDeploy: "បញ្ជាក់ការលក់ & ដាក់ឱ្យប្រើ",
+    confirmSaleAndDeploy: "បញ្ជាក់ការលក់",
     awaitingStoreLink: "មិនទាន់ភ្ជាប់ហាង (រង់ចាំការចុះឈ្មោះ)",
     
     // Store & Location Filter Keys

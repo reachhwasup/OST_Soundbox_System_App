@@ -3194,7 +3194,7 @@ export default function AdminDashboard() {
                                 className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
                               >
                                 <ShoppingBag className="w-3.5 h-3.5" />
-                                <span>{t('sellDevice', 'Sell / Deploy')}</span>
+                                <span>{t('sellDevice', 'Sell')}</span>
                               </button>
 
                               <button
@@ -5436,11 +5436,11 @@ export default function AdminDashboard() {
         </form>
       </Modal>
 
-      {/* Modal 1: Sell / Deploy Device from Stock */}
+      {/* Modal 1: Sell Device from Stock */}
       <Modal
         isOpen={isSellStockOpen}
         onClose={() => setIsSellStockOpen(false)}
-        title={t('sellDeviceTitle', 'Sell & Deploy Device to Customer')}
+        title={t('sellDeviceTitle', 'Sell Device to Customer')}
       >
         {sellTargetDevice && (
           <form onSubmit={handleConfirmSellAndProceedToPairing} className="space-y-4">
@@ -5616,7 +5616,7 @@ export default function AdminDashboard() {
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>{t('confirmSaleAndDeploy', 'Confirm Sale & Deploy')}</span>
+                    <span>{t('confirmSaleAndDeploy', 'Confirm Sale')}</span>
                   </>
                 )}
               </button>
