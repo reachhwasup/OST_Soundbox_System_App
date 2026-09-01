@@ -1189,8 +1189,8 @@ export default function UserDashboard() {
                                     <Smartphone className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                                     <span>{device.device_sn}</span>
                                   </div>
-                                  <span className="text-[10px] text-slate-400 font-medium">
-                                    {device.device_type || 'Soundbox'} • {device.device_model || 'Y6B'}
+                                  <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-medium">
+                                    {device.device_type || 'Standard Soundbox'}
                                   </span>
                                 </div>
                               </td>

@@ -84,27 +84,27 @@ async def seed_data():
     now = datetime.now(timezone.utc)
     devices_data = [
         # --- A. Deployed Soundboxes in Stores ---
-        ("6152608110001", "6152608110001", "Soundbox", "Y6B", merchant_ids[0], "-1001234567890", "ACTIVE", "100%", "Excellent", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Installed at counter 1", 29.00, now - timedelta(minutes=2)),
-        ("6152608110002", "6152608110002", "Soundbox", "Y6B", merchant_ids[1], "-1001987654321", "ACTIVE", "95%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Installed at main register", 29.00, now - timedelta(minutes=8)),
-        ("6152608110003", "6152608110003", "Soundbox", "Y6B", merchant_ids[2], "-1001555444333", "ACTIVE", "88%", "Excellent", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Cashier station 2", 29.00, now - timedelta(minutes=15)),
-        ("6152608110004", "6152608110004", "Soundbox", "Y6B", merchant_ids[3], "-1001777888999", "ACTIVE", "72%", "Moderate", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q2", "Bakery front counter", 29.00, now - timedelta(hours=1)),
-        ("6152608110005", "6152608110005", "Soundbox", "Y6B", merchant_ids[4], "-1001112223334", "ACTIVE", "100%", "Excellent", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q2", "24/7 store counter", 29.00, now - timedelta(minutes=1)),
-        ("6152608110006", "6152608110006", "QR Speaker", "Y6B", merchant_ids[6], "-1001999000111", "ACTIVE", "82%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q2", "Souvenir checkout desk", 29.00, now - timedelta(hours=3)),
-        ("6152608110007", "6152608110007", "QR Speaker", "Y6B", merchant_ids[7], "-1001888333222", "ACTIVE", "91%", "Excellent", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q2", "Electronics front store", 29.00, now - timedelta(minutes=12)),
-        ("6152608110008", "6152608110008", "Soundbox", "Y6B", merchant_ids[8], "-1001444555666", "ACTIVE", "64%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q2", "Coffee bar counter", 29.00, now - timedelta(hours=5)),
+        ("6152608110001", "6152608110001", "Display Soundbox", "Display Soundbox", merchant_ids[0], "-1001234567890", "ACTIVE", "100%", "Excellent", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Installed at counter 1 (Screen QR)", 39.00, now - timedelta(minutes=2)),
+        ("6152608110002", "6152608110002", "Standard Soundbox", "Standard Soundbox", merchant_ids[1], "-1001987654321", "ACTIVE", "95%", "Good", "Y6_STD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Installed at main register (Printed QR)", 29.00, now - timedelta(minutes=8)),
+        ("6152608110003", "6152608110003", "Display Soundbox", "Display Soundbox", merchant_ids[2], "-1001555444333", "ACTIVE", "88%", "Excellent", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Cashier station 2 (Screen QR)", 39.00, now - timedelta(minutes=15)),
+        ("6152608110004", "6152608110004", "Standard Soundbox", "Standard Soundbox", merchant_ids[3], "-1001777888999", "ACTIVE", "72%", "Moderate", "Y6_STD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q2", "Bakery front counter (Printed QR)", 29.00, now - timedelta(hours=1)),
+        ("6152608110005", "6152608110005", "Display Soundbox", "Display Soundbox", merchant_ids[4], "-1001112223334", "ACTIVE", "100%", "Excellent", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q2", "24/7 store counter (Screen QR)", 39.00, now - timedelta(minutes=1)),
+        ("6152608110006", "6152608110006", "Standard Soundbox", "Standard Soundbox", merchant_ids[6], "-1001999000111", "ACTIVE", "82%", "Good", "Y6_STD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q2", "Souvenir checkout desk (Printed QR)", 29.00, now - timedelta(hours=3)),
+        ("6152608110007", "6152608110007", "Display Soundbox", "Display Soundbox", merchant_ids[7], "-1001888333222", "ACTIVE", "91%", "Excellent", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q2", "Electronics front store (Screen QR)", 39.00, now - timedelta(minutes=12)),
+        ("6152608110008", "6152608110008", "Standard Soundbox", "Standard Soundbox", merchant_ids[8], "-1001444555666", "ACTIVE", "64%", "Good", "Y6_STD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q2", "Coffee bar counter (Printed QR)", 29.00, now - timedelta(hours=5)),
 
         # --- B. Warehouse In-Stock Units (Unassigned & Ready for Deployment) ---
-        ("6152608110010", "6152608110010", "Soundbox", "Y6B", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q3", "Warehouse Shelf A-01 (Tested)", 29.00, now - timedelta(days=2)),
-        ("6152608110011", "6152608110011", "Soundbox", "Y6B", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q3", "Warehouse Shelf A-02 (Tested)", 29.00, now - timedelta(days=2)),
-        ("6152608110012", "6152608110012", "Soundbox", "Y6B", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q3", "Warehouse Shelf A-03 (Tested)", 29.00, now - timedelta(days=2)),
-        ("6152608110013", "6152608110013", "Soundbox", "Y6B", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q3", "Warehouse Shelf A-04 (Tested)", 29.00, now - timedelta(days=2)),
-        ("6152608110020", "6152608110020", "Display Soundbox", "Y6_LCD", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q4", "Warehouse Shelf B-01 (Factory New)", 39.00, now - timedelta(days=1)),
-        ("6152608110021", "6152608110021", "Display Soundbox", "Y6_LCD", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q4", "Warehouse Shelf B-02 (Factory New)", 39.00, now - timedelta(days=1)),
-        ("6152608110030", "6152608110030", "Mini Soundbox", "S1", None, None, "IN_STOCK", "100%", "Good", "S1_V1.2", "esp32c2x_2M_OTA", "BATCH-2026-Q4", "Warehouse Shelf C-01 (Compact Model)", 25.00, now - timedelta(hours=10)),
+        ("6152608110010", "6152608110010", "Standard Soundbox", "Standard Soundbox", None, None, "IN_STOCK", "100%", "Good", "Y6_STD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q3", "Warehouse Shelf A-01 (Printed QR)", 29.00, now - timedelta(days=2)),
+        ("6152608110011", "6152608110011", "Standard Soundbox", "Standard Soundbox", None, None, "IN_STOCK", "100%", "Good", "Y6_STD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q3", "Warehouse Shelf A-02 (Printed QR)", 29.00, now - timedelta(days=2)),
+        ("6152608110012", "6152608110012", "Standard Soundbox", "Standard Soundbox", None, None, "IN_STOCK", "100%", "Good", "Y6_STD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q3", "Warehouse Shelf A-03 (Printed QR)", 29.00, now - timedelta(days=2)),
+        ("6152608110013", "6152608110013", "Standard Soundbox", "Standard Soundbox", None, None, "IN_STOCK", "100%", "Good", "Y6_STD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q3", "Warehouse Shelf A-04 (Printed QR)", 29.00, now - timedelta(days=2)),
+        ("6152608110020", "6152608110020", "Display Soundbox", "Display Soundbox", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q4", "Warehouse Shelf B-01 (Screen QR New)", 39.00, now - timedelta(days=1)),
+        ("6152608110021", "6152608110021", "Display Soundbox", "Display Soundbox", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q4", "Warehouse Shelf B-02 (Screen QR New)", 39.00, now - timedelta(days=1)),
+        ("6152608110030", "6152608110030", "Display Soundbox", "Display Soundbox", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q4", "Warehouse Shelf C-01 (Screen QR Compact)", 39.00, now - timedelta(hours=10)),
 
         # --- C. Additional Warehouse Stock Units ---
-        ("6152608110090", "6152608110090", "Soundbox", "Y6B", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Warehouse Shelf A-05", 29.00, now - timedelta(days=4)),
-        ("6152608110091", "6152608110091", "Soundbox", "Y6B", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Warehouse Shelf A-06", 29.00, now - timedelta(days=3)),
+        ("6152608110090", "6152608110090", "Standard Soundbox", "Standard Soundbox", None, None, "IN_STOCK", "100%", "Good", "Y6_STD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Warehouse Shelf A-05 (Printed QR)", 29.00, now - timedelta(days=4)),
+        ("6152608110091", "6152608110091", "Standard Soundbox", "Standard Soundbox", None, None, "IN_STOCK", "100%", "Good", "Y6_STD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Warehouse Shelf A-06 (Printed QR)", 29.00, now - timedelta(days=3)),
     ]
 
     dev_db_map = {}
