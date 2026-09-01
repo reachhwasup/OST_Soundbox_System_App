@@ -2331,6 +2331,15 @@ export default function AdminDashboard() {
 
                                 <button
                                   type="button"
+                                  onClick={() => openEditDeviceModal(d)}
+                                  className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                                >
+                                  <Edit className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                                  <span>{t('edit', 'Edit')}</span>
+                                </button>
+
+                                <button
+                                  type="button"
                                   onClick={() => {
                                     setSelectedDeviceDetail(d);
                                     setIsDeviceDetailOpen(true);
