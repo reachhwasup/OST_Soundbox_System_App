@@ -1811,34 +1811,34 @@ export default function AdminDashboard() {
             <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
               <div className="text-[10px] sm:text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
                 <CheckCircle className="w-3.5 h-3.5" />
-                <span>Deployed Soundboxes</span>
+                <span>{t('deployedSoundboxes', 'Deployed Soundboxes')}</span>
               </div>
               <div className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
                 {devices.filter(d => d.merchant_id).length}
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">Active in Merchant Stores</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">{t('activeInMerchantStores', 'Active in Merchant Stores')}</div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
               <div className="text-[10px] sm:text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Radio className="w-3.5 h-3.5" />
-                <span>Online & Connected</span>
+                <span>{t('onlineConnected', 'Online & Connected')}</span>
               </div>
               <div className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
                 {devices.filter(d => d.merchant_id && (String(d.status).toUpperCase() === 'ONLINE' || String(d.status).toUpperCase() === 'ACTIVE')).length}
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">Live Telemetry Available</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">{t('liveTelemetryAvailable', 'Live Telemetry Available')}</div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
               <div className="text-[10px] sm:text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Volume2 className="w-3.5 h-3.5" />
-                <span>Offline Units</span>
+                <span>{t('offlineUnits', 'Offline Units')}</span>
               </div>
               <div className="text-xl sm:text-2xl font-bold text-slate-700 dark:text-slate-300 mt-1">
                 {devices.filter(d => d.merchant_id && String(d.status).toUpperCase() === 'OFFLINE').length}
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">Disconnected / Standby</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">{t('disconnectedStandby', 'Disconnected / Standby')}</div>
             </div>
           </div>
           
@@ -1855,7 +1855,7 @@ export default function AdminDashboard() {
                   type="text"
                   value={devFilterId}
                   onChange={(e) => { setDevFilterId(e.target.value); setDevPage(1); }}
-                  placeholder="Please enter Device ID"
+                  placeholder={t('pleaseEnterDeviceId', 'Please enter Device ID')}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
                 />
               </div>
@@ -1869,7 +1869,7 @@ export default function AdminDashboard() {
                   type="text"
                   value={devFilterType}
                   onChange={(e) => { setDevFilterType(e.target.value); setDevPage(1); }}
-                  placeholder="Please enter model (e.g. Y6B)"
+                  placeholder={t('pleaseEnterModel', 'Please enter model (e.g. Y6B)')}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
                 />
               </div>
@@ -1885,8 +1885,8 @@ export default function AdminDashboard() {
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
                 >
                   <option value="">{t('allStatuses', 'All Statuses')}</option>
-                  <option value="Online">🟢 Online</option>
-                  <option value="Offline">⚪ Offline</option>
+                  <option value="Online">🟢 {t('online', 'Online')}</option>
+                  <option value="Offline">⚪ {t('offline', 'Offline')}</option>
                 </select>
               </div>
 
@@ -1899,7 +1899,7 @@ export default function AdminDashboard() {
                   type="text"
                   value={devFilterMerchant}
                   onChange={(e) => { setDevFilterMerchant(e.target.value); setDevPage(1); }}
-                  placeholder="Please enter Merchant ID / Name"
+                  placeholder={t('pleaseEnterMerchantIdName', 'Please enter Merchant ID / Name')}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
                 />
               </div>
@@ -1913,7 +1913,7 @@ export default function AdminDashboard() {
                   type="text"
                   value={devFilter4G}
                   onChange={(e) => { setDevFilter4G(e.target.value); setDevPage(1); }}
-                  placeholder="Please enter 4G Version"
+                  placeholder={t('pleaseEnter4gVersion', 'Please enter 4G Version')}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
                 />
               </div>
@@ -1927,7 +1927,7 @@ export default function AdminDashboard() {
                   type="text"
                   value={devFilterWifi}
                   onChange={(e) => { setDevFilterWifi(e.target.value); setDevPage(1); }}
-                  placeholder="Please enter WiFi Version"
+                  placeholder={t('pleaseEnterWifiVersion', 'Please enter WiFi Version')}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
                 />
               </div>
@@ -2198,7 +2198,7 @@ export default function AdminDashboard() {
                                     className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer flex items-center gap-1"
                                   >
                                     <Radio className="w-3 h-3" />
-                                    <span>Command</span>
+                                    <span>{t('command', 'Command')}</span>
                                   </button>
                                 )}
 
@@ -2210,7 +2210,7 @@ export default function AdminDashboard() {
                                   }}
                                   className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer"
                                 >
-                                  Detail
+                                  {t('detail', 'Detail')}
                                 </button>
 
                                 <button
@@ -2223,14 +2223,14 @@ export default function AdminDashboard() {
                                   }}
                                   className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap"
                                 >
-                                  {d.merchant_id ? 'Edit Store' : 'Assign Store'}
+                                  {d.merchant_id ? t('editStore', 'Edit Store') : t('assignStore', 'Assign Store')}
                                 </button>
 
                                 {d.merchant_id && (
                                   <button
                                     type="button"
                                     onClick={() => handleReturnDeviceToStock(d)}
-                                    title="Unlink and return to warehouse stock"
+                                    title={t('returnToStock', 'Unlink and return to warehouse stock')}
                                     className="p-1.5 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-lg transition cursor-pointer"
                                   >
                                     <Undo2 className="w-3.5 h-3.5" />
@@ -2246,7 +2246,7 @@ export default function AdminDashboard() {
                   ) : (
                     <tr>
                       <td colSpan={12} className="py-12 text-center text-slate-400 text-sm">
-                        No soundbox devices match the specified filters.
+                        {t('noDevicesFound', 'No soundbox devices match the specified filters.')}
                       </td>
                     </tr>
                   )}
