@@ -142,11 +142,10 @@ export default function AdminDashboard() {
 
   // Cloud Speaker Device Manager Filter States
   const [devFilterId, setDevFilterId] = useState('');
-  const [devFilterType, setDevFilterType] = useState('');
-  const [devFilterStatus, setDevFilterStatus] = useState(''); // '' | 'Online' | 'Offline'
+  const [devFilterType, setDevFilterType] = useState('ALL');
+  const [devFilterStatus, setDevFilterStatus] = useState(''); // '' | 'Online' | 'PENDING' | 'Offline'
   const [devFilterMerchant, setDevFilterMerchant] = useState('');
-  const [devFilter4G, setDevFilter4G] = useState('');
-  const [devFilterWifi, setDevFilterWifi] = useState('');
+  const [devFilterWarranty, setDevFilterWarranty] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'EXPIRING_SOON' | 'EXPIRED'
   const [devFilterDate, setDevFilterDate] = useState('');
 
   // Cloud Speaker Device Table Pagination & Selection States
@@ -864,9 +863,10 @@ export default function AdminDashboard() {
         const idMatch = String(d.device_id || d.device_sn || d.id || '').toLowerCase().includes(devFilterId.trim().toLowerCase());
         if (!idMatch) return false;
       }
-      if (devFilterType.trim()) {
-        const typeMatch = String(d.device_model || '').toLowerCase().includes(devFilterType.trim().toLowerCase());
-        if (!typeMatch) return false;
+      if (devFilterType && devFilterType !== 'ALL') {
+        const dType = String(d.device_type || d.device_model || '');
+        if (devFilterType === 'Display' && !dType.includes('Display')) return false;
+        if (devFilterType === 'Standard' && (dType.includes('Display') || dType === 'Display Soundbox')) return false;
       }
       if (devFilterStatus) {
         const targetSt = devFilterStatus.toLowerCase();
@@ -883,21 +883,19 @@ export default function AdminDashboard() {
         const merchMatch = String(d.merchant_id || d.store_name || d.owner_name || '').toLowerCase().includes(devFilterMerchant.trim().toLowerCase());
         if (!merchMatch) return false;
       }
-      if (devFilter4G.trim()) {
-        const gMatch = String(d.version_4g || '').toLowerCase().includes(devFilter4G.trim().toLowerCase());
-        if (!gMatch) return false;
-      }
-      if (devFilterWifi.trim()) {
-        const wMatch = String(d.version_wifi || '').toLowerCase().includes(devFilterWifi.trim().toLowerCase());
-        if (!wMatch) return false;
+      if (devFilterWarranty && devFilterWarranty !== 'ALL') {
+        const wInfo = calculateWarrantyCountdown(d);
+        if (devFilterWarranty === 'ACTIVE' && (wInfo.status !== 'ACTIVE' && wInfo.status !== 'EXPIRING_SOON')) return false;
+        if (devFilterWarranty === 'EXPIRING_SOON' && wInfo.status !== 'EXPIRING_SOON') return false;
+        if (devFilterWarranty === 'EXPIRED' && wInfo.status !== 'EXPIRED') return false;
       }
       if (devFilterDate.trim()) {
-        const dateStr = String(d.last_time || d.created_at || '');
+        const dateStr = String(d.created_at || d.sold_at || d.last_time || '');
         if (!dateStr.includes(devFilterDate.trim())) return false;
       }
       return true;
     });
-  }, [devices, devFilterId, devFilterType, devFilterStatus, devFilterMerchant, devFilter4G, devFilterWifi, devFilterDate]);
+  }, [devices, devFilterId, devFilterType, devFilterStatus, devFilterMerchant, devFilterWarranty, devFilterDate]);
 
   // Warehouse Stock Devices Filtering Logic
   const filteredStockDevices = useMemo(() => {
@@ -1083,11 +1081,10 @@ export default function AdminDashboard() {
   // Reset Cloud Speaker Filters
   const handleResetDeviceFilters = () => {
     setDevFilterId('');
-    setDevFilterType('');
+    setDevFilterType('ALL');
     setDevFilterStatus('');
     setDevFilterMerchant('');
-    setDevFilter4G('');
-    setDevFilterWifi('');
+    setDevFilterWarranty('ALL');
     setDevFilterDate('');
     setDevPage(1);
     setDevSelectedIds([]);
@@ -2006,36 +2003,38 @@ export default function AdminDashboard() {
             </div>
           </div>
           
-          {/* 1. Cloud Speaker Search & Filter Card */}
+          {/* 1. Cloud Speaker Search & Filter Bar */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-5 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
               
-              {/* Device ID */}
+              {/* Device ID / SN */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('deviceId', 'Device ID')}
+                  {t('deviceId', 'Device ID / SN')}
                 </label>
                 <input
                   type="text"
                   value={devFilterId}
                   onChange={(e) => { setDevFilterId(e.target.value); setDevPage(1); }}
-                  placeholder={t('pleaseEnterDeviceId', 'Please enter Device ID')}
+                  placeholder={t('pleaseEnterDeviceId', 'Please enter Device ID / SN')}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
                 />
               </div>
 
-              {/* Device Type / Model */}
+              {/* Device Type */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('deviceType', 'Device Type')}
                 </label>
-                <input
-                  type="text"
+                <select
                   value={devFilterType}
                   onChange={(e) => { setDevFilterType(e.target.value); setDevPage(1); }}
-                  placeholder={t('pleaseEnterModel', 'Please enter model (e.g. Y6B)')}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
-                />
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+                >
+                  <option value="ALL">{t('allTypes', 'All Device Types')}</option>
+                  <option value="Display">{t('displayScreenQr', '🖥️ Display (Screen QR)')}</option>
+                  <option value="Standard">{t('standardPrintedQr', '🏷️ Standard (Printed QR)')}</option>
+                </select>
               </div>
 
               {/* Status */}
@@ -2055,52 +2054,41 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-              {/* Merchant ID */}
+              {/* Assigned Store / Merchant */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('merchantId', 'Merchant ID')}
+                  {t('merchantStore', 'Assigned Store / Merchant')}
                 </label>
                 <input
                   type="text"
                   value={devFilterMerchant}
                   onChange={(e) => { setDevFilterMerchant(e.target.value); setDevPage(1); }}
-                  placeholder={t('pleaseEnterMerchantIdName', 'Please enter Merchant ID / Name')}
+                  placeholder={t('pleaseEnterMerchantIdName', 'Enter Store Name / Merchant ID')}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
                 />
               </div>
 
-              {/* 4G Version */}
+              {/* Warranty Coverage Status */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('version4G', '4G Version')}
+                  {t('warrantyStatus', 'Warranty Status')}
                 </label>
-                <input
-                  type="text"
-                  value={devFilter4G}
-                  onChange={(e) => { setDevFilter4G(e.target.value); setDevPage(1); }}
-                  placeholder={t('pleaseEnter4gVersion', 'Please enter 4G Version')}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
-                />
+                <select
+                  value={devFilterWarranty}
+                  onChange={(e) => { setDevFilterWarranty(e.target.value); setDevPage(1); }}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+                >
+                  <option value="ALL">{t('allWarranty', 'All Warranty Statuses')}</option>
+                  <option value="ACTIVE">🟢 {t('activeCoverage', 'Active Coverage')}</option>
+                  <option value="EXPIRING_SOON">🟡 {t('expiringSoon', 'Expiring Soon (≤15 days)')}</option>
+                  <option value="EXPIRED">🔴 {t('expired', 'Expired')}</option>
+                </select>
               </div>
 
-              {/* WiFi Version */}
+              {/* Registration / Deployment Date */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('versionWifi', 'WiFi Version')}
-                </label>
-                <input
-                  type="text"
-                  value={devFilterWifi}
-                  onChange={(e) => { setDevFilterWifi(e.target.value); setDevPage(1); }}
-                  placeholder={t('pleaseEnterWifiVersion', 'Please enter WiFi Version')}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
-                />
-              </div>
-
-              {/* Activation Time */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('activationTime', 'Activation Time')}
+                  {t('deploymentDate', 'Deployment / Sold Date')}
                 </label>
                 <input
                   type="date"
@@ -2110,8 +2098,8 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              {/* Action Buttons on right */}
-              <div className="flex items-end gap-2">
+              {/* Action Buttons */}
+              <div className="flex items-end gap-2 sm:col-span-2 md:col-span-1 lg:col-span-2">
                 <button
                   type="button"
                   onClick={() => setDevPage(1)}
