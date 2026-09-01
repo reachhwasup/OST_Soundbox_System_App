@@ -1416,31 +1416,8 @@ export default function UserDashboard() {
                               </td>
 
                               {/* Column 7: Operations */}
-                              <td className="py-3.5 px-4">
-                                <div className="flex items-center justify-center gap-1">
-                                  {/* Test Voice */}
-                                  <button
-                                    type="button"
-                                    onClick={() => handleTriggerTestVoice(device)}
-                                    disabled={isTesting}
-                                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                                    title="Dispatches $1 voice announcement to speaker"
-                                  >
-                                    <BellRing className={`w-3 h-3 ${isTesting ? 'animate-spin' : ''}`} />
-                                    <span>Test</span>
-                                  </button>
-
-                                  {/* Volume */}
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenVolumeModal(device)}
-                                    className="px-2 py-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
-                                    title="Adjust speaker volume level"
-                                  >
-                                    <Volume2 className="w-3 h-3" />
-                                    <span>Vol</span>
-                                  </button>
-
+                              <td className="py-3.5 px-4 text-center">
+                                <div className="flex items-center justify-center gap-1.5">
                                   {/* Reboot */}
                                   <button
                                     type="button"
