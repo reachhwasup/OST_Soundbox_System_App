@@ -84,53 +84,53 @@ async def seed_data():
     now = datetime.now(timezone.utc)
     devices_data = [
         # --- A. Deployed Soundboxes in Stores ---
-        ("6152608110001", "6152608110001", "Y6B", merchant_ids[0], "-1001234567890", "ACTIVE", "100%", "Excellent", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Installed at counter 1", 29.00, now - timedelta(minutes=2)),
-        ("6152608110002", "6152608110002", "Y6B", merchant_ids[1], "-1001987654321", "ACTIVE", "95%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Installed at main register", 29.00, now - timedelta(minutes=8)),
-        ("6152608110003", "6152608110003", "Y6B", merchant_ids[2], "-1001555444333", "ACTIVE", "88%", "Excellent", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Cashier station 2", 29.00, now - timedelta(minutes=15)),
-        ("6152608110004", "6152608110004", "Y6B", merchant_ids[3], "-1001777888999", "ACTIVE", "72%", "Moderate", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q2", "Bakery front counter", 29.00, now - timedelta(hours=1)),
-        ("6152608110005", "6152608110005", "Y6B", merchant_ids[4], "-1001112223334", "ACTIVE", "100%", "Excellent", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q2", "24/7 store counter", 29.00, now - timedelta(minutes=1)),
-        ("6152608110006", "6152608110006", "Y6B", merchant_ids[6], "-1001999000111", "ACTIVE", "82%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q2", "Souvenir checkout desk", 29.00, now - timedelta(hours=3)),
-        ("6152608110007", "6152608110007", "Y6B", merchant_ids[7], "-1001888333222", "ACTIVE", "91%", "Excellent", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q2", "Electronics front store", 29.00, now - timedelta(minutes=12)),
-        ("6152608110008", "6152608110008", "Y6B", merchant_ids[8], "-1001444555666", "ACTIVE", "64%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q2", "Coffee bar counter", 29.00, now - timedelta(hours=5)),
+        ("6152608110001", "6152608110001", "Soundbox", "Y6B", merchant_ids[0], "-1001234567890", "ACTIVE", "100%", "Excellent", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Installed at counter 1", 29.00, now - timedelta(minutes=2)),
+        ("6152608110002", "6152608110002", "Soundbox", "Y6B", merchant_ids[1], "-1001987654321", "ACTIVE", "95%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Installed at main register", 29.00, now - timedelta(minutes=8)),
+        ("6152608110003", "6152608110003", "Soundbox", "Y6B", merchant_ids[2], "-1001555444333", "ACTIVE", "88%", "Excellent", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Cashier station 2", 29.00, now - timedelta(minutes=15)),
+        ("6152608110004", "6152608110004", "Soundbox", "Y6B", merchant_ids[3], "-1001777888999", "ACTIVE", "72%", "Moderate", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q2", "Bakery front counter", 29.00, now - timedelta(hours=1)),
+        ("6152608110005", "6152608110005", "Soundbox", "Y6B", merchant_ids[4], "-1001112223334", "ACTIVE", "100%", "Excellent", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q2", "24/7 store counter", 29.00, now - timedelta(minutes=1)),
+        ("6152608110006", "6152608110006", "QR Speaker", "Y6B", merchant_ids[6], "-1001999000111", "ACTIVE", "82%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q2", "Souvenir checkout desk", 29.00, now - timedelta(hours=3)),
+        ("6152608110007", "6152608110007", "QR Speaker", "Y6B", merchant_ids[7], "-1001888333222", "ACTIVE", "91%", "Excellent", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q2", "Electronics front store", 29.00, now - timedelta(minutes=12)),
+        ("6152608110008", "6152608110008", "Soundbox", "Y6B", merchant_ids[8], "-1001444555666", "ACTIVE", "64%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q2", "Coffee bar counter", 29.00, now - timedelta(hours=5)),
 
         # --- B. Warehouse In-Stock Units (Unassigned & Ready for Deployment) ---
-        ("6152608110010", "6152608110010", "Y6B", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q3", "Warehouse Shelf A-01 (Tested)", 29.00, now - timedelta(days=2)),
-        ("6152608110011", "6152608110011", "Y6B", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q3", "Warehouse Shelf A-02 (Tested)", 29.00, now - timedelta(days=2)),
-        ("6152608110012", "6152608110012", "Y6B", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q3", "Warehouse Shelf A-03 (Tested)", 29.00, now - timedelta(days=2)),
-        ("6152608110013", "6152608110013", "Y6B", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q3", "Warehouse Shelf A-04 (Tested)", 29.00, now - timedelta(days=2)),
-        ("6152608110020", "6152608110020", "Y6_LCD", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q4", "Warehouse Shelf B-01 (Factory New)", 39.00, now - timedelta(days=1)),
-        ("6152608110021", "6152608110021", "Y6_LCD", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q4", "Warehouse Shelf B-02 (Factory New)", 39.00, now - timedelta(days=1)),
-        ("6152608110030", "6152608110030", "S1", None, None, "IN_STOCK", "100%", "Good", "S1_V1.2", "esp32c2x_2M_OTA", "BATCH-2026-Q4", "Warehouse Shelf C-01 (Compact Model)", 25.00, now - timedelta(hours=10)),
+        ("6152608110010", "6152608110010", "Soundbox", "Y6B", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q3", "Warehouse Shelf A-01 (Tested)", 29.00, now - timedelta(days=2)),
+        ("6152608110011", "6152608110011", "Soundbox", "Y6B", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q3", "Warehouse Shelf A-02 (Tested)", 29.00, now - timedelta(days=2)),
+        ("6152608110012", "6152608110012", "Soundbox", "Y6B", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q3", "Warehouse Shelf A-03 (Tested)", 29.00, now - timedelta(days=2)),
+        ("6152608110013", "6152608110013", "Soundbox", "Y6B", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q3", "Warehouse Shelf A-04 (Tested)", 29.00, now - timedelta(days=2)),
+        ("6152608110020", "6152608110020", "Display Soundbox", "Y6_LCD", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q4", "Warehouse Shelf B-01 (Factory New)", 39.00, now - timedelta(days=1)),
+        ("6152608110021", "6152608110021", "Display Soundbox", "Y6_LCD", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q4", "Warehouse Shelf B-02 (Factory New)", 39.00, now - timedelta(days=1)),
+        ("6152608110030", "6152608110030", "Mini Soundbox", "S1", None, None, "IN_STOCK", "100%", "Good", "S1_V1.2", "esp32c2x_2M_OTA", "BATCH-2026-Q4", "Warehouse Shelf C-01 (Compact Model)", 25.00, now - timedelta(hours=10)),
 
         # --- C. Additional Warehouse Stock Units ---
-        ("6152608110090", "6152608110090", "Y6B", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Warehouse Shelf A-05", 29.00, now - timedelta(days=4)),
-        ("6152608110091", "6152608110091", "Y6B", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Warehouse Shelf A-06", 29.00, now - timedelta(days=3)),
+        ("6152608110090", "6152608110090", "Soundbox", "Y6B", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Warehouse Shelf A-05", 29.00, now - timedelta(days=4)),
+        ("6152608110091", "6152608110091", "Soundbox", "Y6B", None, None, "IN_STOCK", "100%", "Good", "Y6_LCD_1605_V1.0", "esp32c2x_2M_OTA", "BATCH-2026-Q1", "Warehouse Shelf A-06", 29.00, now - timedelta(days=3)),
     ]
 
     dev_db_map = {}
     print("\n--- 3. Seeding Soundbox Devices (Deployed & Stock) ---")
-    for d_id, sn, model, mid, chat_id, st_val, batt, sig, v4g, vwifi, b_no, notes, price_val, ltime in devices_data:
+    for d_id, sn, dtype, model, mid, chat_id, st_val, batt, sig, v4g, vwifi, b_no, notes, price_val, ltime in devices_data:
         existing_dev = await conn.fetchrow("SELECT id FROM devices WHERE device_sn = $1 OR device_id = $2", sn, d_id)
         is_active = (st_val == "ACTIVE")
         if existing_dev:
             d_pk = existing_dev["id"]
             await conn.execute("""
                 UPDATE devices 
-                SET device_id = $2, device_sn = $3, device_model = $4, merchant_id = $5,
-                    telegram_chat_id = $6, chat_id = $6, status = $7::device_status, is_active = $8,
-                    battery = $9, signal = $10, version_4g = $11, version_wifi = $12,
-                    batch_no = $13, notes = $14, price = $15,
-                    last_online = $16, last_heartbeat = $16, updated_at = CURRENT_TIMESTAMP
+                SET device_id = $2, device_sn = $3, device_type = $4, device_model = $5, merchant_id = $6,
+                    telegram_chat_id = $7, chat_id = $7, status = $8::device_status, is_active = $9,
+                    battery = $10, signal = $11, version_4g = $12, version_wifi = $13,
+                    batch_no = $14, notes = $15, price = $16,
+                    last_online = $17, last_heartbeat = $17, updated_at = CURRENT_TIMESTAMP
                 WHERE id = $1
-            """, d_pk, d_id, sn, model, mid, chat_id, st_val, is_active, batt, sig, v4g, vwifi, b_no, notes, price_val, ltime)
+            """, d_pk, d_id, sn, dtype, model, mid, chat_id, st_val, is_active, batt, sig, v4g, vwifi, b_no, notes, price_val, ltime)
         else:
             dev_row = await conn.fetchrow("""
-                INSERT INTO devices (device_id, device_sn, device_model, merchant_id, telegram_chat_id, chat_id,
+                INSERT INTO devices (device_id, device_sn, device_type, device_model, merchant_id, telegram_chat_id, chat_id,
                                     status, is_active, battery, signal, version_4g, version_wifi, batch_no, notes, price,
                                     last_online, last_heartbeat)
-                VALUES ($1, $2, $3, $4, $5, $5, $6::device_status, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15)
+                VALUES ($1, $2, $3, $4, $5, $6, $6, $7::device_status, $8, $9, $10, $11, $12, $13, $14, $15, $16, $16)
                 RETURNING id
-            """, d_id, sn, model, mid, chat_id, st_val, is_active, batt, sig, v4g, vwifi, b_no, notes, price_val, ltime)
+            """, d_id, sn, dtype, model, mid, chat_id, st_val, is_active, batt, sig, v4g, vwifi, b_no, notes, price_val, ltime)
             d_pk = dev_row["id"]
         dev_db_map[sn] = d_pk
         print(f"  ✓ Device {sn} ({model}) [{st_val}] -> DB ID: {d_pk}")

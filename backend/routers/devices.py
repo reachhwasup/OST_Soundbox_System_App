@@ -12,6 +12,7 @@ class DeviceRegisterSchema(BaseModel):
     merchant_id: int
     device_sn: str = Field(..., description="Serial Number of Soundbox Y6B")
     telegram_chat_id: Optional[str] = None
+    device_type: str = "Soundbox"
     device_model: str = "Y6B"
     price: Optional[float] = 29.00
 
@@ -52,9 +53,9 @@ async def register_device(
             # Reassign / link to this merchant and activate
             await conn.execute("""
                 UPDATE devices 
-                SET merchant_id = $1, telegram_chat_id = $2, device_model = $3, price = COALESCE($4, price, 29.00), status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
-                WHERE id = $5
-            """, payload.merchant_id, chat_id, payload.device_model or "Y6B", payload.price, existing_device["id"])
+                SET merchant_id = $1, telegram_chat_id = $2, device_type = $3, device_model = $4, price = COALESCE($5, price, 29.00), status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
+                WHERE id = $6
+            """, payload.merchant_id, chat_id, payload.device_type or "Soundbox", payload.device_model or "Y6B", payload.price, existing_device["id"])
 
             return {
                 "status": "success",
@@ -64,10 +65,10 @@ async def register_device(
         else:
             # Insert new device linked to merchant
             new_id = await conn.fetchval("""
-                INSERT INTO devices (merchant_id, device_sn, device_model, telegram_chat_id, price, status)
-                VALUES ($1, $2, $3, $4, $5, 'ACTIVE')
+                INSERT INTO devices (merchant_id, device_sn, device_type, device_model, telegram_chat_id, price, status)
+                VALUES ($1, $2, $3, $4, $5, $6, 'ACTIVE')
                 RETURNING id
-            """, payload.merchant_id, device_sn, payload.device_model or "Y6B", chat_id, payload.price or 29.00)
+            """, payload.merchant_id, device_sn, payload.device_type or "Soundbox", payload.device_model or "Y6B", chat_id, payload.price or 29.00)
 
             return {
                 "status": "success",
@@ -110,6 +111,7 @@ async def list_devices(
             SELECT d.id, 
                    COALESCE(d.device_id, d.device_sn, d.id::text) AS device_id,
                    COALESCE(d.device_sn, d.device_id, d.id::text) AS device_sn,
+                   COALESCE(d.device_type, 'Soundbox') AS device_type,
                    COALESCE(d.device_model, d.device_name, 'Y6B') AS device_model,
                    d.merchant_id,
                    COALESCE(d.batch_no, 'BATCH-STD') AS batch_no,
@@ -200,6 +202,7 @@ async def bulk_import_devices(
 
 class DeviceIntakeSchema(BaseModel):
     device_sn: str
+    device_type: str = "Soundbox"
     device_model: str = "Y6B"
     batch_no: Optional[str] = None
     notes: Optional[str] = None
@@ -233,10 +236,10 @@ async def intake_single_device(
         is_active = True if payload.merchant_id else False
 
         new_id = await conn.fetchval("""
-            INSERT INTO devices (device_id, device_sn, device_model, merchant_id, batch_no, notes, price, status, is_active, battery, signal)
-            VALUES ($1, $1, $2, $3, $4, $5, $6, $7::device_status, $8, '100%', 'Good')
+            INSERT INTO devices (device_id, device_sn, device_type, device_model, merchant_id, batch_no, notes, price, status, is_active, battery, signal)
+            VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8::device_status, $9, '100%', 'Good')
             RETURNING id
-        """, sn, payload.device_model or "Y6B", payload.merchant_id, payload.batch_no or "BATCH-SINGLE", payload.notes, payload.price or 29.00, initial_status, is_active)
+        """, sn, payload.device_type or "Soundbox", payload.device_model or "Y6B", payload.merchant_id, payload.batch_no or "BATCH-SINGLE", payload.notes, payload.price or 29.00, initial_status, is_active)
 
         return {
             "status": "success",
@@ -381,6 +384,7 @@ async def batch_send_commands(
 class DeviceUpdateSchema(BaseModel):
     device_sn: Optional[str] = None
     telegram_chat_id: Optional[str] = None
+    device_type: Optional[str] = None
     device_model: Optional[str] = None
     status: Optional[str] = None
     merchant_id: Optional[int] = None
@@ -432,6 +436,11 @@ async def update_device(
         if payload.telegram_chat_id is not None:
             updates.append(f"telegram_chat_id = ${idx}")
             params.append(payload.telegram_chat_id.strip() if payload.telegram_chat_id.strip() else None)
+            idx += 1
+
+        if payload.device_type is not None:
+            updates.append(f"device_type = ${idx}")
+            params.append(payload.device_type.strip())
             idx += 1
 
         if payload.device_model is not None:

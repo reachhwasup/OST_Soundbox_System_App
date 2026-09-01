@@ -154,6 +154,7 @@ async def init_db():
             -- Ensure all hardware telemetry & legacy PRD columns exist safely
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS merchant_id INT REFERENCES merchants(id) ON DELETE SET NULL;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_sn VARCHAR(100);
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_type VARCHAR(50) DEFAULT 'Soundbox';
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_model VARCHAR(50) DEFAULT 'Y6B';
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(100);
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS status device_status DEFAULT 'ACTIVE';

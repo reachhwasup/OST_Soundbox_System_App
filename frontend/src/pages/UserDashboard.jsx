@@ -1190,7 +1190,7 @@ export default function UserDashboard() {
                                     <span>{device.device_sn}</span>
                                   </div>
                                   <span className="text-[10px] text-slate-400 font-medium">
-                                    {device.device_model || 'Y6B 4G Speaker'}
+                                    {device.device_type || 'Soundbox'} • {device.device_model || 'Y6B'}
                                   </span>
                                 </div>
                               </td>

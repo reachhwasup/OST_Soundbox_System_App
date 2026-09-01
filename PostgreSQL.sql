@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS devices (
     chat_id VARCHAR(100),
     device_name VARCHAR(255),
     device_sn VARCHAR(100),
+    device_type VARCHAR(50) DEFAULT 'Soundbox',
     device_model VARCHAR(50) DEFAULT 'Y6B',
     telegram_chat_id VARCHAR(100),
     is_active BOOLEAN DEFAULT TRUE,

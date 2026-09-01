@@ -167,14 +167,14 @@ export default function AdminDashboard() {
   const [bulkSnInput, setBulkSnInput] = useState('');
   const [bulkModel, setBulkModel] = useState('Y6B');
   const [bulkBatchNo, setBulkBatchNo] = useState(`BATCH-${new Date().toISOString().slice(0,7)}`);
-  const [bulkNotes, setBulkNotes] = useState('');
-  const [bulkPrice, setBulkPrice] = useState('29.00');
   const [singleSnInput, setSingleSnInput] = useState('');
+  const [singleType, setSingleType] = useState('Soundbox');
   const [singleModel, setSingleModel] = useState('Y6B');
   const [singleStoreId, setSingleStoreId] = useState('');
   const [singleBatchNo, setSingleBatchNo] = useState(`BATCH-${new Date().toISOString().slice(0,7)}`);
   const [singleNotes, setSingleNotes] = useState('');
   const [singlePrice, setSinglePrice] = useState('29.00');
+  const [stockTypeFilter, setStockTypeFilter] = useState('ALL');
   const [stockSubmitting, setStockSubmitting] = useState(false);
 
   const [isDeviceDetailOpen, setIsDeviceDetailOpen] = useState(false);
@@ -193,6 +193,7 @@ export default function AdminDashboard() {
   const [visibleColumns, setVisibleColumns] = useState({
     deviceId: true,
     deviceType: true,
+    deviceModel: true,
     merchantId: true,
     price: true,
     status: true,
@@ -225,6 +226,7 @@ export default function AdminDashboard() {
   const [isDeleteDeviceOpen, setIsDeleteDeviceOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [editDeviceSn, setEditDeviceSn] = useState('');
+  const [editDeviceType, setEditDeviceType] = useState('Soundbox');
   const [editDeviceModel, setEditDeviceModel] = useState('Y6B');
   const [editDeviceTelegram, setEditDeviceTelegram] = useState('');
   const [editDeviceMerchantId, setEditDeviceMerchantId] = useState('');
@@ -497,9 +499,11 @@ export default function AdminDashboard() {
   const openEditDeviceModal = (d) => {
     setSelectedDevice(d);
     setEditDeviceSn(d.device_sn || '');
+    setEditDeviceType(d.device_type || 'Soundbox');
     setEditDeviceModel(d.device_model || 'Y6B');
     setEditDeviceTelegram(d.telegram_chat_id || '');
     setEditDeviceStatus(d.status || 'ACTIVE');
+    setEditDevicePrice(d.price ? String(d.price) : '29.00');
     const matchedStore = stores.find(s => s.name === d.store_name);
     setEditDeviceMerchantId(matchedStore ? matchedStore.id : '');
     setIsEditDeviceOpen(true);
@@ -514,9 +518,11 @@ export default function AdminDashboard() {
     try {
       await api.put(`/api/devices/${selectedDevice.id}`, {
         device_sn: editDeviceSn.trim(),
+        device_type: editDeviceType.trim() || 'Soundbox',
         device_model: editDeviceModel.trim() || 'Y6B',
         telegram_chat_id: editDeviceTelegram.trim() || null,
         status: editDeviceStatus,
+        price: Number(editDevicePrice) || 29.00,
         merchant_id: editDeviceMerchantId ? parseInt(editDeviceMerchantId) : null
       });
       setIsEditDeviceOpen(false);
@@ -737,6 +743,10 @@ export default function AdminDashboard() {
         }
       }
 
+      if (stockTypeFilter !== 'ALL' && String(d.device_type || 'Soundbox').toLowerCase() !== stockTypeFilter.toLowerCase()) {
+        return false;
+      }
+
       if (stockModelFilter !== 'ALL' && String(d.device_model || '').toLowerCase() !== stockModelFilter.toLowerCase()) {
         return false;
       }
@@ -747,7 +757,7 @@ export default function AdminDashboard() {
 
       return true;
     });
-  }, [devices, stockSearchTerm, stockModelFilter, stockBatchFilter]);
+  }, [devices, stockSearchTerm, stockTypeFilter, stockModelFilter, stockBatchFilter]);
 
   // Stock Export CSV
   const handleExportStockCSV = () => {
@@ -843,7 +853,8 @@ export default function AdminDashboard() {
     try {
       const res = await api.post('/api/devices/intake', {
         device_sn: singleSnInput.trim(),
-        device_model: singleModel,
+        device_type: singleType || "Soundbox",
+        device_model: singleModel || "Y6B",
         batch_no: singleBatchNo,
         notes: singleNotes,
         price: Number(singlePrice) || 29.00,
@@ -2026,6 +2037,7 @@ export default function AdminDashboard() {
                     </th>
                     {visibleColumns.deviceId && <th className="py-3 px-3 font-semibold">{t('deviceId', 'Device ID')}</th>}
                     {visibleColumns.deviceType && <th className="py-3 px-3 font-semibold">{t('deviceType', 'Device Type')}</th>}
+                    {visibleColumns.deviceModel && <th className="py-3 px-3 font-semibold">{t('deviceModel', 'Model')}</th>}
                     {visibleColumns.merchantId && <th className="py-3 px-3 font-semibold">{t('merchantStore', 'Assigned Store')}</th>}
                     {visibleColumns.price && <th className="py-3 px-3 font-semibold text-center">{t('price', 'Price')}</th>}
                     {visibleColumns.status && <th className="py-3 px-3 font-semibold text-center">{t('status', 'Status')}</th>}
@@ -2075,7 +2087,16 @@ export default function AdminDashboard() {
 
                           {/* Device Type */}
                           {visibleColumns.deviceType && (
-                            <td className="py-3.5 px-3 text-slate-700 dark:text-slate-300 font-medium">
+                            <td className="py-3.5 px-3">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800">
+                                {d.device_type || 'Soundbox'}
+                              </span>
+                            </td>
+                          )}
+
+                          {/* Device Model */}
+                          {visibleColumns.deviceModel && (
+                            <td className="py-3.5 px-3 font-mono font-semibold text-slate-800 dark:text-slate-200">
                               {d.device_model || 'Y6B'}
                             </td>
                           )}
@@ -2367,7 +2388,7 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
               
               {/* Search by SN / Batch / Notes */}
-              <div className="sm:col-span-2">
+              <div className="sm:col-span-1">
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   Search Stock
                 </label>
@@ -2377,10 +2398,28 @@ export default function AdminDashboard() {
                     type="text"
                     value={stockSearchTerm}
                     onChange={(e) => { setStockSearchTerm(e.target.value); setStockPage(1); }}
-                    placeholder="Search by SN, Model, Batch No, or Location..."
+                    placeholder="Search SN, Location..."
                     className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-amber-500 focus:outline-none transition"
                   />
                 </div>
+              </div>
+
+              {/* Device Type Filter */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  Device Type
+                </label>
+                <select
+                  value={stockTypeFilter}
+                  onChange={(e) => { setStockTypeFilter(e.target.value); setStockPage(1); }}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none transition cursor-pointer"
+                >
+                  <option value="ALL">All Device Types</option>
+                  <option value="Soundbox">Soundbox</option>
+                  <option value="QR Speaker">QR Speaker</option>
+                  <option value="Display Soundbox">Display Soundbox</option>
+                  <option value="Mini Soundbox">Mini Soundbox</option>
+                </select>
               </div>
 
               {/* Model Filter */}
@@ -2391,12 +2430,12 @@ export default function AdminDashboard() {
                 <select
                   value={stockModelFilter}
                   onChange={(e) => { setStockModelFilter(e.target.value); setStockPage(1); }}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none transition"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none transition cursor-pointer"
                 >
                   <option value="ALL">All Hardware Models</option>
-                  <option value="Y6B">Y6B 4G Speaker</option>
-                  <option value="Y6_LCD">Y6 LCD Speaker</option>
-                  <option value="S1">S1 Compact Soundbox</option>
+                  <option value="Y6B">Y6B (LCD Display)</option>
+                  <option value="Y6_LCD">Y6 LCD Standard</option>
+                  <option value="S1">S1 Compact</option>
                 </select>
               </div>
 
@@ -2466,6 +2505,8 @@ export default function AdminDashboard() {
                 <thead>
                   <tr className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 font-bold uppercase tracking-wider">
                     <th className="py-3 px-4">Soundbox (SN)</th>
+                    <th className="py-3 px-3">Device Type</th>
+                    <th className="py-3 px-3">Model</th>
                     <th className="py-3 px-3">Batch No</th>
                     <th className="py-3 px-3 text-center">Unit Price</th>
                     <th className="py-3 px-3 text-center">Status</th>
@@ -2482,20 +2523,29 @@ export default function AdminDashboard() {
                         key={d.id} 
                         className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition group"
                       >
-                        {/* Column 1: SN & Model */}
+                        {/* Column 1: SN */}
                         <td className="py-3.5 px-4 font-medium text-slate-900 dark:text-white">
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center shrink-0">
                               <Smartphone className="w-4 h-4" />
                             </div>
-                            <div>
-                              <div className="font-mono font-bold text-xs">{d.device_sn || d.device_id}</div>
-                              <div className="text-[10px] text-slate-400">{d.device_model || 'Y6B 4G Speaker'}</div>
-                            </div>
+                            <div className="font-mono font-bold text-xs">{d.device_sn || d.device_id}</div>
                           </div>
                         </td>
 
-                        {/* Column 2: Batch No */}
+                        {/* Column 2: Device Type */}
+                        <td className="py-3.5 px-3">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800">
+                            {d.device_type || 'Soundbox'}
+                          </span>
+                        </td>
+
+                        {/* Column 3: Model */}
+                        <td className="py-3.5 px-3 font-mono font-semibold text-slate-800 dark:text-slate-200">
+                          {d.device_model || 'Y6B'}
+                        </td>
+
+                        {/* Column 4: Batch No */}
                         <td className="py-3.5 px-3 font-mono text-[11px] text-slate-700 dark:text-slate-300">
                           <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                             {d.batch_no || 'BATCH-2026-Q3'}
@@ -3374,27 +3424,38 @@ export default function AdminDashboard() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">Device Type</label>
+              <select
+                value={editDeviceType}
+                onChange={(e) => setEditDeviceType(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
+              >
+                <option value="Soundbox">Soundbox</option>
+                <option value="QR Speaker">QR Speaker</option>
+                <option value="Display Soundbox">Display Soundbox</option>
+                <option value="Mini Soundbox">Mini Soundbox</option>
+              </select>
+            </div>
             <div>
               <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">Model</label>
               <input
                 type="text"
                 value={editDeviceModel}
                 onChange={(e) => setEditDeviceModel(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">Status</label>
-              <select
-                value={editDeviceStatus}
-                onChange={(e) => setEditDeviceStatus(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
-              >
-                <option value="ACTIVE">Active</option>
-                <option value="INACTIVE">Inactive</option>
-                <option value="IN_STOCK">In Stock</option>
-              </select>
+              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">Unit Price ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={editDevicePrice}
+                onChange={(e) => setEditDevicePrice(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono"
+              />
             </div>
           </div>
 
@@ -4286,10 +4347,26 @@ export default function AdminDashboard() {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Device Model
+                Device Type
+              </label>
+              <select
+                value={singleType}
+                onChange={(e) => setSingleType(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
+              >
+                <option value="Soundbox">Soundbox</option>
+                <option value="QR Speaker">QR Speaker</option>
+                <option value="Display Soundbox">Display Soundbox</option>
+                <option value="Mini Soundbox">Mini Soundbox</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Hardware Model
               </label>
               <select
                 value={singleModel}
