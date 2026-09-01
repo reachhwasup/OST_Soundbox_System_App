@@ -766,7 +766,7 @@ export default function AdminDashboard() {
       showToast({ type: 'warning', title: 'No Data', message: 'No warehouse stock records to export.' });
       return;
     }
-    const headers = ['Device SN', 'Device Type', 'Unit Price ($)', 'Notes', '4G Version', 'WiFi Version', 'Created At'];
+    const headers = ['Device SN', 'Device Type', 'Unit Price ($)', 'Notes', '4G Version', 'WiFi Version', 'Registration Date'];
     const rows = filteredStockDevices.map(d => [
       `"${d.device_sn || ''}"`,
       `"${d.device_type || 'Display Soundbox'}"`,
@@ -2479,7 +2479,7 @@ export default function AdminDashboard() {
                     {visibleStockColumns.signal && <th className="py-3 px-3 font-semibold text-center min-w-[95px]">{t('signal', 'Signal')}</th>}
                     {visibleStockColumns.version4g && <th className="py-3 px-3 font-semibold min-w-[150px]">{t('version4G', '4G Version')}</th>}
                     {visibleStockColumns.versionWifi && <th className="py-3 px-3 font-semibold min-w-[150px]">{t('versionWifi', 'WiFi Version')}</th>}
-                    {visibleStockColumns.intakeDate && <th className="py-3 px-3 font-semibold min-w-[120px]">Intake Date</th>}
+                    {visibleStockColumns.intakeDate && <th className="py-3 px-3 font-semibold min-w-[130px]">Registration Date</th>}
                     {visibleStockColumns.notes && <th className="py-3 px-3 font-semibold min-w-[200px]">Warehouse Notes</th>}
                     {visibleStockColumns.operation && <th className="py-3 px-4 font-semibold text-center min-w-[180px]">{t('operation', 'Operation')}</th>}
                   </tr>
@@ -2559,7 +2559,7 @@ export default function AdminDashboard() {
                           </td>
                         )}
 
-                        {/* Intake Date */}
+                        {/* Registration Date */}
                         {visibleStockColumns.intakeDate && (
                           <td className="py-3.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-400 whitespace-nowrap">
                             {d.created_at ? new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Aug 30, 2026'}
@@ -4337,7 +4337,7 @@ export default function AdminDashboard() {
               signal: 'Signal',
               version4g: '4G Version',
               versionWifi: 'WiFi Version',
-              intakeDate: 'Intake Date',
+              intakeDate: 'Registration Date',
               notes: 'Warehouse Notes',
               operation: 'Operations'
             }).map(([key, label]) => (
