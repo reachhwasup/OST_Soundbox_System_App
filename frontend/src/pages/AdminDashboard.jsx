@@ -1116,21 +1116,21 @@ export default function AdminDashboard() {
               {t('admin', 'Admin Portal')}
             </span>
             <span className="text-[11px] sm:text-xs text-slate-400">
-              {adminTab === 'users' ? 'User Accounts & Roles' :
-               adminTab === 'stores' ? 'Store & Merchant Branches' :
-               adminTab === 'devices' ? 'Deployed Soundbox Fleet & Telemetry' :
-               adminTab === 'inventory' ? 'Warehouse Stock & Inventory' :
-               adminTab === 'user_logs' || adminTab === 'logs' ? 'Customer QR Payments & Broadcasts' :
-               'System Security & Command Audit Trail'}
+              {adminTab === 'users' ? t('userAccountsRoles', 'User Accounts & Roles') :
+               adminTab === 'stores' ? t('storeMerchantBranches', 'Store & Merchant Branches') :
+               adminTab === 'devices' ? t('deployedSoundboxFleet', 'Deployed Soundbox Fleet & Telemetry') :
+               adminTab === 'inventory' ? t('warehouseStockBreadcrumb', 'Warehouse Stock & Inventory') :
+               adminTab === 'user_logs' || adminTab === 'logs' ? t('customerQrPayments', 'Customer QR Payments & Broadcasts') :
+               t('systemSecurityAudit', 'System Security & Command Audit Trail')}
             </span>
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1">
-            {adminTab === 'users' ? 'User & Merchant Accounts' :
-             adminTab === 'stores' ? 'Stores & Merchant Locations' :
-             adminTab === 'devices' ? 'Manage Devices (Deployed Soundboxes)' :
-             adminTab === 'inventory' ? 'Stock & Inventory (Warehouse)' :
-             adminTab === 'user_logs' || adminTab === 'logs' ? 'User & Payment Logs' :
-             'Admin & Security Audit Logs'}
+            {adminTab === 'users' ? t('userMerchantAccounts', 'User & Merchant Accounts') :
+             adminTab === 'stores' ? t('storesMerchantLocations', 'Stores & Merchant Locations') :
+             adminTab === 'devices' ? t('manageDevicesTitle', 'Manage Devices (Deployed Soundboxes)') :
+             adminTab === 'inventory' ? t('stockInventory', 'Stock & Inventory (Warehouse)') :
+             adminTab === 'user_logs' || adminTab === 'logs' ? t('userPaymentLogsTitle', 'User & Payment Logs') :
+             t('adminSecurityLogsTitle', 'Admin & Security Audit Logs')}
           </h1>
         </div>
 
@@ -2336,45 +2336,45 @@ export default function AdminDashboard() {
             <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
               <div className="text-[10px] sm:text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Warehouse className="w-3.5 h-3.5" />
-                <span>Warehouse Stock</span>
+                <span>{t('warehouseStock', 'Warehouse Stock')}</span>
               </div>
               <div className="text-xl sm:text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">
                 {devices.filter(d => !d.merchant_id || String(d.status).toUpperCase() === 'IN_STOCK').length}
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">Unassigned & Ready</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">{t('unassignedAndReady', 'Unassigned & Ready')}</div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
               <div className="text-[10px] sm:text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                 <DollarSign className="w-3.5 h-3.5" />
-                <span>Stock Asset Value</span>
+                <span>{t('stockAssetValue', 'Stock Asset Value')}</span>
               </div>
               <div className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
                 ${devices.filter(d => !d.merchant_id || String(d.status).toUpperCase() === 'IN_STOCK').reduce((sum, d) => sum + (Number(d.price) || 29), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">Valuation ($29–$39/unit)</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">{t('stockValuationSub', 'Valuation ($29–$39/unit)')}</div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
               <div className="text-[10px] sm:text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Boxes className="w-3.5 h-3.5" />
-                <span>Available Units</span>
+                <span>{t('availableUnits', 'Available Units')}</span>
               </div>
               <div className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
                 {devices.filter(d => !d.merchant_id || String(d.status).toUpperCase() === 'IN_STOCK').length}
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">Ready for Deployment</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">{t('readyForDeployment', 'Ready for Deployment')}</div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
               <div className="text-[10px] sm:text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Volume2 className="w-3.5 h-3.5" />
-                <span>Total Fleet Units</span>
+                <span>{t('totalFleetUnits', 'Total Fleet Units')}</span>
               </div>
               <div className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">
                 {devices.length}
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">All Soundboxes</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">{t('allSoundboxes', 'All Soundboxes')}</div>
             </div>
           </div>
 
@@ -2385,7 +2385,7 @@ export default function AdminDashboard() {
               {/* Search by SN / Notes */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  Search Stock
+                  {t('searchStock', 'Search Stock')}
                 </label>
                 <div className="relative">
                   <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -2393,7 +2393,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={stockSearchTerm}
                     onChange={(e) => { setStockSearchTerm(e.target.value); setStockPage(1); }}
-                    placeholder="Search Serial Number, Location, or Notes..."
+                    placeholder={t('searchStockPlaceholder', 'Search Serial Number, Location, or Notes...')}
                     className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-amber-500 focus:outline-none transition"
                   />
                 </div>
@@ -2402,16 +2402,16 @@ export default function AdminDashboard() {
               {/* Device Type Filter */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  Device Type
+                  {t('deviceType', 'Device Type')}
                 </label>
                 <select
                   value={stockTypeFilter}
                   onChange={(e) => { setStockTypeFilter(e.target.value); setStockPage(1); }}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none transition cursor-pointer"
                 >
-                  <option value="ALL">All Device Types</option>
-                  <option value="Display Soundbox">🖥️ Display Soundbox (Screen QR)</option>
-                  <option value="Standard Soundbox">🏷️ Standard Soundbox (Printed QR)</option>
+                  <option value="ALL">{t('allDeviceTypes', 'All Device Types')}</option>
+                  <option value="Display Soundbox">{t('displaySoundboxOpt', '🖥️ Display Soundbox (Screen QR)')}</option>
+                  <option value="Standard Soundbox">{t('standardSoundboxOpt', '🏷️ Standard Soundbox (Printed QR)')}</option>
                 </select>
               </div>
 
@@ -2426,7 +2426,7 @@ export default function AdminDashboard() {
                   className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-1.5 transition cursor-pointer"
                 >
                   <PackagePlus className="w-4 h-4" />
-                  <span>+ Add Stock Device</span>
+                  <span>{t('addStockDevice', '+ Add Stock Device')}</span>
                 </button>
               </div>
 
@@ -2441,7 +2441,7 @@ export default function AdminDashboard() {
                   className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
                 >
                   <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Reset</span>
+                  <span>{t('reset', 'Reset')}</span>
                 </button>
 
                 <button
@@ -2450,7 +2450,7 @@ export default function AdminDashboard() {
                   className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
                 >
                   <Download className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Export CSV</span>
+                  <span>{t('exportCsv', 'Export CSV')}</span>
                 </button>
 
                 <button
@@ -2459,7 +2459,7 @@ export default function AdminDashboard() {
                   className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
                 >
                   <Columns className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Columns</span>
+                  <span>{t('columns', 'Columns')}</span>
                 </button>
               </div>
             </div>
@@ -2474,8 +2474,8 @@ export default function AdminDashboard() {
                     {visibleStockColumns.deviceId && <th className="py-3 px-4 font-semibold min-w-[160px]">{t('deviceId', 'Device ID')}</th>}
                     {visibleStockColumns.deviceType && <th className="py-3 px-3 font-semibold min-w-[190px]">{t('deviceType', 'Device Type')}</th>}
                     {visibleStockColumns.price && <th className="py-3 px-3 font-semibold text-center min-w-[95px]">{t('price', 'Price')}</th>}
-                    {visibleStockColumns.intakeDate && <th className="py-3 px-3 font-semibold min-w-[130px]">Registration Date</th>}
-                    {visibleStockColumns.notes && <th className="py-3 px-3 font-semibold min-w-[200px]">Warehouse Notes</th>}
+                    {visibleStockColumns.intakeDate && <th className="py-3 px-3 font-semibold min-w-[130px]">{t('registrationDate', 'Registration Date')}</th>}
+                    {visibleStockColumns.notes && <th className="py-3 px-3 font-semibold min-w-[200px]">{t('warehouseNotes', 'Warehouse Notes')}</th>}
                     {visibleStockColumns.operation && <th className="py-3 px-4 font-semibold text-center min-w-[100px]">{t('operation', 'Operation')}</th>}
                   </tr>
                 </thead>
@@ -2507,8 +2507,8 @@ export default function AdminDashboard() {
                                 : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
                             }`}>
                               {(d.device_type === 'Display Soundbox' || String(d.device_type || '').toLowerCase().includes('display') || String(d.device_type || '').toLowerCase().includes('screen'))
-                                ? '🖥️ Display (Screen QR)'
-                                : '🏷️ Standard (Printed QR)'}
+                                ? t('displayScreenQr', '🖥️ Display (Screen QR)')
+                                : t('standardPrintedQr', '🏷️ Standard (Printed QR)')}
                             </span>
                           </td>
                         )}
@@ -2530,7 +2530,7 @@ export default function AdminDashboard() {
                         {/* Warehouse Notes */}
                         {visibleStockColumns.notes && (
                           <td className="py-3.5 px-3 text-slate-600 dark:text-slate-400 max-w-[220px] truncate" title={d.notes}>
-                            {d.notes || 'Warehouse Ready (Tested)'}
+                            {d.notes || t('warehouseReadyTested', 'Warehouse Ready (Tested)')}
                           </td>
                         )}
 
@@ -2544,7 +2544,7 @@ export default function AdminDashboard() {
                                 className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
                               >
                                 <Edit className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-                                <span>Edit</span>
+                                <span>{t('edit', 'Edit')}</span>
                               </button>
 
                               <button
@@ -2556,7 +2556,7 @@ export default function AdminDashboard() {
                                 className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
                               >
                                 <Eye className="w-3 h-3 text-slate-400" />
-                                <span>Detail</span>
+                                <span>{t('detail', 'Detail')}</span>
                               </button>
                             </div>
                           </td>
