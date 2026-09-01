@@ -4374,29 +4374,37 @@ export default function AdminDashboard() {
               </div>
 
               <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('finalPrice', 'Final Price Paid')}</span>
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('finalPrice', 'Selling Price')}</span>
                 <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 mt-0.5">
                   <DollarSign className="w-4 h-4" />
-                  ${Number(selectedDeviceDetail.final_price || selectedDeviceDetail.price || 29).toFixed(2)}
+                  <span>${Number(selectedDeviceDetail.final_price || selectedDeviceDetail.price || 29).toFixed(2)}</span>
                   {(Number(selectedDeviceDetail.discount_amount) > 0 || Number(selectedDeviceDetail.discount_percent) > 0) && (
-                    <span className="text-[10px] text-slate-400 line-through">
+                    <span className="text-[10px] text-slate-400 line-through font-normal">
                       ${Number(selectedDeviceDetail.price || 29).toFixed(2)}
                     </span>
                   )}
                 </div>
+                {(Number(selectedDeviceDetail.discount_amount) > 0 || Number(selectedDeviceDetail.discount_percent) > 0) && (
+                  <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
+                    {Number(selectedDeviceDetail.discount_percent) > 0 
+                      ? `${selectedDeviceDetail.discount_percent}% OFF (-$${Number(selectedDeviceDetail.discount_amount).toFixed(2)})`
+                      : `-$${Number(selectedDeviceDetail.discount_amount).toFixed(2)} OFF`}
+                  </div>
+                )}
               </div>
 
               <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
                 <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('merchantStore', 'Linked Store')}</span>
                 <div className="font-semibold text-slate-900 dark:text-white mt-0.5 truncate">
-                  {selectedDeviceDetail.store_name || 'Unassigned'}
+                  {selectedDeviceDetail.store_name || (selectedDeviceDetail.status === 'PENDING' ? (isKhmer ? 'មិនទាន់ភ្ជាប់ហាង' : 'Awaiting Store Link') : 'Unassigned')}
                 </div>
               </div>
             </div>
 
             {/* Warranty 90-Day Live Countdown Hero Card */}
-            {selectedDeviceDetail.merchant_id && (() => {
+            {(selectedDeviceDetail.merchant_id || selectedDeviceDetail.status === 'PENDING' || selectedDeviceDetail.warranty_days) && (() => {
               const wInfo = calculateWarrantyCountdown(selectedDeviceDetail);
+              if (wInfo.status === 'NO_WARRANTY') return null;
               return (
                 <div className="p-4 bg-gradient-to-br from-indigo-50/70 to-blue-50/50 dark:from-indigo-950/40 dark:to-slate-900/60 rounded-2xl border border-indigo-100 dark:border-indigo-900/50 space-y-2.5">
                   <div className="flex items-center justify-between">
