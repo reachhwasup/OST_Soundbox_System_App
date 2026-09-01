@@ -256,7 +256,7 @@ export default function AdminDashboard() {
   const [editWarrantyDays, setEditWarrantyDays] = useState(90);
   const [editWarrantyStartDate, setEditWarrantyStartDate] = useState('');
 
-  // Sell from Stock & Proceed to Pairing workflow states
+  // Sell from Stock & Deploy workflow states
   const [isSellStockOpen, setIsSellStockOpen] = useState(false);
   const [sellTargetDevice, setSellTargetDevice] = useState(null);
   const [sellStoreId, setSellStoreId] = useState('');
@@ -266,14 +266,6 @@ export default function AdminDashboard() {
   const [sellWarrantyDays, setSellWarrantyDays] = useState(90);
   const [sellWarrantyStartDate, setSellWarrantyStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [sellSubmitting, setSellSubmitting] = useState(false);
-
-  // Device Pairing & Telegram QR Scan modal states
-  const [isPairingModalOpen, setIsPairingModalOpen] = useState(false);
-  const [pairingDevice, setPairingDevice] = useState(null);
-  const [pairingTelegramId, setPairingTelegramId] = useState('');
-  const [pairingActiveCamera, setPairingActiveCamera] = useState(null); // 'TELEGRAM' | 'SN'
-  const [pairingFeedback, setPairingFeedback] = useState({ field: '', message: '', isError: false });
-  const [pairingSubmitting, setPairingSubmitting] = useState(false);
 
   // Form states for Create User
   const [newPhone, setNewPhone] = useState('');
@@ -672,67 +664,6 @@ export default function AdminDashboard() {
     } finally {
       setSellSubmitting(false);
     }
-  };
-
-  // Complete Pairing & Activate Soundbox
-  const handleCompletePairing = async (e) => {
-    e.preventDefault();
-    if (!pairingDevice) return;
-    setPairingSubmitting(true);
-
-    try {
-      await api.put(`/api/devices/${pairingDevice.id}`, {
-        telegram_chat_id: pairingTelegramId.trim() || null,
-        status: 'ACTIVE'
-      });
-
-      setIsPairingModalOpen(false);
-      setPairingActiveCamera(null);
-      await fetchAllData();
-
-      showToast({
-        type: 'success',
-        title: 'Soundbox Activated',
-        message: t('pairedSuccessfully', `Soundbox ${pairingDevice.device_sn} paired and activated successfully!`),
-        duration: 5000
-      });
-    } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to complete pairing.';
-      showToast({ type: 'error', title: 'Pairing Failed', message: msg });
-    } finally {
-      setPairingSubmitting(false);
-    }
-  };
-
-  // Image QR Decoder for Pairing Modal
-  const handleDecodePairingQrImage = (e, field) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const image = new Image();
-      image.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = image.width;
-        canvas.height = image.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(image, 0, 0);
-        const imageData = ctx.getImageData(0, 0, image.width, image.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-        if (code && code.data) {
-          if (field === 'TELEGRAM') {
-            setPairingTelegramId(code.data);
-            setPairingFeedback({ field: 'TELEGRAM', message: `Scanned: ${code.data}`, isError: false });
-          }
-        } else {
-          setPairingFeedback({ field, message: 'Could not detect QR code in image.', isError: true });
-        }
-      };
-      image.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
   };
 
   // Handle Update Device
@@ -5159,158 +5090,6 @@ export default function AdminDashboard() {
                 )}
               </button>
             </div>
-          </form>
-        )}
-      </Modal>
-
-      {/* Modal 2: Device Pairing & Telegram QR Scan */}
-      <Modal
-        isOpen={isPairingModalOpen}
-        onClose={() => {
-          setIsPairingModalOpen(false);
-          setPairingActiveCamera(null);
-        }}
-        title={t('devicePairingModalTitle', 'Complete Device Pairing & Telegram QR Scan')}
-      >
-        {pairingDevice && (
-          <form onSubmit={handleCompletePairing} className="space-y-4">
-            
-            {/* Step Banner */}
-            <div className="p-3.5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40 rounded-2xl border border-blue-200 dark:border-blue-900/50 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
-                  <Volume2 className="w-4 h-4 text-blue-600" />
-                  <span>{pairingDevice.device_sn}</span>
-                </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                  {pairingDevice.store_name}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                {t('devicePairingDesc', 'Scan the customer Telegram Group QR code and verify Device SN to activate soundbox.')}
-              </p>
-            </div>
-
-            {/* Camera QR Scanner if active */}
-            {pairingActiveCamera && (
-              <div className="relative">
-                <FieldQRScanner
-                  targetName={pairingActiveCamera === 'TELEGRAM' ? 'Telegram Group' : 'Soundbox Serial'}
-                  onScanSuccess={(scannedText) => {
-                    if (pairingActiveCamera === 'TELEGRAM') {
-                      setPairingTelegramId(scannedText);
-                      setPairingFeedback({ field: 'TELEGRAM', message: `Scanned: ${scannedText}`, isError: false });
-                    }
-                    setPairingActiveCamera(null);
-                  }}
-                  onClose={() => setPairingActiveCamera(null)}
-                />
-              </div>
-            )}
-
-            {/* Telegram Group QR / Chat ID Card */}
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                  <QrCode className="w-4 h-4 text-blue-500" />
-                  <span>{t('scanTelegramQr', 'Telegram Group QR / Chat ID')}</span>
-                </label>
-
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setPairingActiveCamera(pairingActiveCamera === 'TELEGRAM' ? null : 'TELEGRAM')}
-                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition shadow-2xs"
-                  >
-                    <Camera className="w-3 h-3" />
-                    <span>{pairingActiveCamera === 'TELEGRAM' ? 'Close Camera' : 'Scan Camera'}</span>
-                  </button>
-
-                  <label className="px-2.5 py-1 bg-white dark:bg-slate-700 hover:bg-slate-100 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition">
-                    <Upload className="w-3 h-3 text-slate-400" />
-                    <span>Upload QR</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleDecodePairingQrImage(e, 'TELEGRAM')}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-              </div>
-
-              <input
-                type="text"
-                value={pairingTelegramId}
-                onChange={(e) => setPairingTelegramId(e.target.value)}
-                placeholder="e.g. -1001234567890 or @StorePaymentBot"
-                className="w-full px-3 py-2 text-xs font-mono bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white"
-              />
-
-              {pairingFeedback.message && (
-                <div className={`text-[11px] ${pairingFeedback.isError ? 'text-rose-500' : 'text-emerald-500 font-semibold'}`}>
-                  {pairingFeedback.message}
-                </div>
-              )}
-            </div>
-
-            {/* Soundbox Test Chime Broadcast Button */}
-            <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
-              <div className="text-xs text-slate-600 dark:text-slate-300">
-                <div className="font-semibold">Quick Audio Connection Test</div>
-                <div className="text-[10px] text-slate-400">Send instant chime to verify device online speaker</div>
-              </div>
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await api.post(`/api/devices/${pairingDevice.id}/command`, {
-                      command_type: 'PLAY_TEST',
-                      volume: 80
-                    });
-                    showToast({ type: 'success', title: 'Chime Sent', message: 'Test ping dispatched to soundbox.' });
-                  } catch (err) {
-                    showToast({ type: 'error', title: 'Test Failed', message: 'Soundbox not yet connected to network.' });
-                  }
-                }}
-                className="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
-              >
-                <Volume1 className="w-3.5 h-3.5 text-blue-500" />
-                <span>Play Chime</span>
-              </button>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsPairingModalOpen(false);
-                  setPairingActiveCamera(null);
-                }}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
-              >
-                {t('cancel', 'Cancel')}
-              </button>
-              <button
-                type="submit"
-                disabled={pairingSubmitting}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              >
-                {pairingSubmitting ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Activating...</span>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>{t('completePairing', 'Complete Pairing & Activate Soundbox')}</span>
-                  </>
-                )}
-              </button>
-            </div>
-
           </form>
         )}
       </Modal>
