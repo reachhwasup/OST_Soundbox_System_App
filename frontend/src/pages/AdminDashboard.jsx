@@ -188,7 +188,7 @@ export default function AdminDashboard() {
   const [batchCommandType, setBatchCommandType] = useState('TEST_SOUND');
   const [batchCommandVolume, setBatchCommandVolume] = useState(70);
 
-  // Column Visibility Customizer
+  // Column Visibility Customizer for Manage Devices
   const [isColumnsModalOpen, setIsColumnsModalOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState({
     deviceId: true,
@@ -202,6 +202,23 @@ export default function AdminDashboard() {
     version4g: true,
     versionWifi: true,
     lastTime: true,
+    operation: true
+  });
+
+  // Column Visibility Customizer for Manage Stock
+  const [isStockColumnsModalOpen, setIsStockColumnsModalOpen] = useState(false);
+  const [visibleStockColumns, setVisibleStockColumns] = useState({
+    deviceId: true,
+    deviceType: true,
+    deviceModel: true,
+    batchNo: true,
+    price: true,
+    battery: true,
+    signal: true,
+    version4g: true,
+    versionWifi: true,
+    intakeDate: true,
+    notes: true,
     operation: true
   });
 
@@ -2495,6 +2512,15 @@ export default function AdminDashboard() {
                   <Download className="w-3.5 h-3.5 text-slate-400" />
                   <span>Export CSV</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsStockColumnsModalOpen(true)}
+                  className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                >
+                  <Columns className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Columns</span>
+                </button>
               </div>
             </div>
           </div>
@@ -2504,16 +2530,19 @@ export default function AdminDashboard() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 font-bold uppercase tracking-wider">
-                    <th className="py-3 px-4">Soundbox (SN)</th>
-                    <th className="py-3 px-3">Device Type</th>
-                    <th className="py-3 px-3">Model</th>
-                    <th className="py-3 px-3">Batch No</th>
-                    <th className="py-3 px-3 text-center">Unit Price</th>
-                    <th className="py-3 px-3">Intake Date</th>
-                    <th className="py-3 px-3">Hardware / Firmware</th>
-                    <th className="py-3 px-3">Warehouse Location & Notes</th>
-                    <th className="py-3 px-4 text-center">Operations</th>
+                  <tr className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 text-xs font-semibold select-none">
+                    {visibleStockColumns.deviceId && <th className="py-3 px-4 font-semibold">{t('deviceId', 'Device ID')}</th>}
+                    {visibleStockColumns.deviceType && <th className="py-3 px-3 font-semibold">{t('deviceType', 'Device Type')}</th>}
+                    {visibleStockColumns.deviceModel && <th className="py-3 px-3 font-semibold">{t('deviceModel', 'Model')}</th>}
+                    {visibleStockColumns.batchNo && <th className="py-3 px-3 font-semibold">Batch No</th>}
+                    {visibleStockColumns.price && <th className="py-3 px-3 font-semibold text-center">{t('price', 'Price')}</th>}
+                    {visibleStockColumns.battery && <th className="py-3 px-3 font-semibold text-center">{t('battery', 'Battery')}</th>}
+                    {visibleStockColumns.signal && <th className="py-3 px-3 font-semibold text-center">{t('signal', 'Signal')}</th>}
+                    {visibleStockColumns.version4g && <th className="py-3 px-3 font-semibold">{t('version4G', '4G Version')}</th>}
+                    {visibleStockColumns.versionWifi && <th className="py-3 px-3 font-semibold">{t('versionWifi', 'WiFi Version')}</th>}
+                    {visibleStockColumns.intakeDate && <th className="py-3 px-3 font-semibold">Intake Date</th>}
+                    {visibleStockColumns.notes && <th className="py-3 px-3 font-semibold">Warehouse Notes</th>}
+                    {visibleStockColumns.operation && <th className="py-3 px-4 font-semibold text-center">{t('operation', 'Operation')}</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
@@ -2523,89 +2552,133 @@ export default function AdminDashboard() {
                         key={d.id} 
                         className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition group"
                       >
-                        {/* Column 1: SN */}
-                        <td className="py-3.5 px-4 font-medium text-slate-900 dark:text-white">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center shrink-0">
-                              <Smartphone className="w-4 h-4" />
+                        {/* Device ID (SN) */}
+                        {visibleStockColumns.deviceId && (
+                          <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center shrink-0">
+                                <Smartphone className="w-3.5 h-3.5" />
+                              </div>
+                              <span>{d.device_sn || d.device_id}</span>
                             </div>
-                            <div className="font-mono font-bold text-xs">{d.device_sn || d.device_id}</div>
-                          </div>
-                        </td>
+                          </td>
+                        )}
 
-                        {/* Column 2: Device Type */}
-                        <td className="py-3.5 px-3">
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800">
-                            {d.device_type || 'Soundbox'}
-                          </span>
-                        </td>
+                        {/* Device Type */}
+                        {visibleStockColumns.deviceType && (
+                          <td className="py-3.5 px-3">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800">
+                              {d.device_type || 'Soundbox'}
+                            </span>
+                          </td>
+                        )}
 
-                        {/* Column 3: Model */}
-                        <td className="py-3.5 px-3 font-mono font-semibold text-slate-800 dark:text-slate-200">
-                          {d.device_model || 'Y6B'}
-                        </td>
+                        {/* Model */}
+                        {visibleStockColumns.deviceModel && (
+                          <td className="py-3.5 px-3 font-mono font-semibold text-slate-800 dark:text-slate-200">
+                            {d.device_model || 'Y6B'}
+                          </td>
+                        )}
 
-                        {/* Column 4: Batch No */}
-                        <td className="py-3.5 px-3 font-mono text-[11px] text-slate-700 dark:text-slate-300">
-                          <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                            {d.batch_no || 'BATCH-2026-Q3'}
-                          </span>
-                        </td>
+                        {/* Batch No */}
+                        {visibleStockColumns.batchNo && (
+                          <td className="py-3.5 px-3 font-mono text-[11px] text-slate-700 dark:text-slate-300">
+                            <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-medium">
+                              {d.batch_no || 'BATCH-2026-Q3'}
+                            </span>
+                          </td>
+                        )}
 
-                        {/* Column 5: Unit Price */}
-                        <td className="py-3.5 px-3 text-center font-mono font-bold text-slate-800 dark:text-slate-200">
-                          ${Number(d.price || 29).toFixed(2)}
-                        </td>
+                        {/* Unit Price */}
+                        {visibleStockColumns.price && (
+                          <td className="py-3.5 px-3 text-center font-mono font-bold text-slate-800 dark:text-slate-200">
+                            ${Number(d.price || 29).toFixed(2)}
+                          </td>
+                        )}
 
-                        {/* Column 6: Intake Date */}
-                        <td className="py-3.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                          {d.created_at ? new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Aug 30, 2026'}
-                        </td>
+                        {/* Battery */}
+                        {visibleStockColumns.battery && (
+                          <td className="py-3.5 px-3 text-center">
+                            <span className="inline-flex items-center gap-1 font-mono font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full text-[11px]">
+                              <BatteryCharging className="w-3 h-3" />
+                              {d.battery || '100%'}
+                            </span>
+                          </td>
+                        )}
 
-                        {/* Column 5: Hardware Versions */}
-                        <td className="py-3.5 px-3 font-mono text-[10px] text-slate-500 max-w-[150px] truncate">
-                          <div>4G: {d.version_4g || 'Y6_LCD_1605_V1.0'}</div>
-                          <div>WiFi: {d.version_wifi || 'esp32c2x_2M_OTA'}</div>
-                        </td>
+                        {/* Signal */}
+                        {visibleStockColumns.signal && (
+                          <td className="py-3.5 px-3 text-center">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-full">
+                              <Wifi className="w-3 h-3" />
+                              {d.signal || 'Good'}
+                            </span>
+                          </td>
+                        )}
 
-                        {/* Column 6: Notes / Shelf */}
-                        <td className="py-3.5 px-3 text-slate-600 dark:text-slate-400 max-w-[200px] truncate" title={d.notes}>
-                          {d.notes || 'Warehouse Ready (Tested)'}
-                        </td>
+                        {/* 4G Version */}
+                        {visibleStockColumns.version4g && (
+                          <td className="py-3.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                            {d.version_4g || 'Y6_LCD_1605_V1.0'}
+                          </td>
+                        )}
 
-                        {/* Column 7: Operations */}
-                        <td className="py-3.5 px-4 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedDeviceForMerchant(d);
-                                setTargetMerchantStoreId('');
-                                setIsEditMerchantOpen(true);
-                              }}
-                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer flex items-center gap-1"
-                            >
-                              <Store className="w-3 h-3" />
-                              <span>Assign Store</span>
-                            </button>
+                        {/* WiFi Version */}
+                        {visibleStockColumns.versionWifi && (
+                          <td className="py-3.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                            {d.version_wifi || 'esp32c2x_2M_OTA'}
+                          </td>
+                        )}
 
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedDeviceDetail(d);
-                                setIsDeviceDetailOpen(true);
-                              }}
-                              className="px-2.5 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer"
-                            >
-                              Detail
-                            </button>
-                          </div>
-                        </td>
+                        {/* Intake Date */}
+                        {visibleStockColumns.intakeDate && (
+                          <td className="py-3.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                            {d.created_at ? new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Aug 30, 2026'}
+                          </td>
+                        )}
+
+                        {/* Warehouse Notes */}
+                        {visibleStockColumns.notes && (
+                          <td className="py-3.5 px-3 text-slate-600 dark:text-slate-400 max-w-[200px] truncate" title={d.notes}>
+                            {d.notes || 'Warehouse Ready (Tested)'}
+                          </td>
+                        )}
+
+                        {/* Operations */}
+                        {visibleStockColumns.operation && (
+                          <td className="py-3.5 px-4 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedDeviceForMerchant(d);
+                                  setTargetMerchantStoreId('');
+                                  setIsEditMerchantOpen(true);
+                                }}
+                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer flex items-center gap-1"
+                              >
+                                <Store className="w-3 h-3" />
+                                <span>Assign Store</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedDeviceDetail(d);
+                                  setIsDeviceDetailOpen(true);
+                                }}
+                                className="px-2.5 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer"
+                              >
+                                Detail
+                              </button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-400 text-sm">
+                      <td colSpan={12} className="py-12 text-center text-slate-400 text-sm">
                         No warehouse stock items match the specified filters.
                       </td>
                     </tr>
@@ -4265,7 +4338,9 @@ export default function AdminDashboard() {
             {Object.entries({
               deviceId: 'Device ID',
               deviceType: 'Device Type',
-              merchantId: 'Merchant ID',
+              deviceModel: 'Model',
+              merchantId: 'Assigned Store',
+              price: 'Price ($)',
               status: 'Status',
               battery: 'Battery',
               signal: 'Signal',
@@ -4295,7 +4370,9 @@ export default function AdminDashboard() {
               onClick={() => setVisibleColumns({
                 deviceId: true,
                 deviceType: true,
+                deviceModel: true,
                 merchantId: true,
+                price: true,
                 status: true,
                 battery: true,
                 signal: true,
@@ -4312,6 +4389,79 @@ export default function AdminDashboard() {
               type="button"
               onClick={() => setIsColumnsModalOpen(false)}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs transition cursor-pointer"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal: Warehouse Stock - Columns Customizer */}
+      <Modal
+        isOpen={isStockColumnsModalOpen}
+        onClose={() => setIsStockColumnsModalOpen(false)}
+        title="Customize Stock Table Columns"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-500">
+            Select the columns you wish to display in the Warehouse Stock table:
+          </p>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            {Object.entries({
+              deviceId: 'Device ID (SN)',
+              deviceType: 'Device Type',
+              deviceModel: 'Model',
+              batchNo: 'Batch No',
+              price: 'Unit Price ($)',
+              battery: 'Battery',
+              signal: 'Signal',
+              version4g: '4G Version',
+              versionWifi: 'WiFi Version',
+              intakeDate: 'Intake Date',
+              notes: 'Warehouse Notes',
+              operation: 'Operations'
+            }).map(([key, label]) => (
+              <label 
+                key={key} 
+                className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-xs cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={visibleStockColumns[key]}
+                  onChange={(e) => setVisibleStockColumns(prev => ({ ...prev, [key]: e.target.checked }))}
+                  className="accent-amber-600 rounded"
+                />
+                <span className="font-medium text-slate-800 dark:text-slate-200">{label}</span>
+              </label>
+            ))}
+          </div>
+
+          <div className="flex justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={() => setVisibleStockColumns({
+                deviceId: true,
+                deviceType: true,
+                deviceModel: true,
+                batchNo: true,
+                price: true,
+                battery: true,
+                signal: true,
+                version4g: true,
+                versionWifi: true,
+                intakeDate: true,
+                notes: true,
+                operation: true
+              })}
+              className="text-xs text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
+            >
+              Reset to Default
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsStockColumnsModalOpen(false)}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-xl shadow-xs transition cursor-pointer"
             >
               Done
             </button>
