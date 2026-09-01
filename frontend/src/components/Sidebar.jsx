@@ -176,7 +176,6 @@ export default function Sidebar({
             {/* Admin Console View Navigation */}
             {isAdmin && (
               <div className="space-y-1">
-                
                 {/* Item 1: Users & Merchants */}
                 <button
                   type="button"
@@ -184,11 +183,11 @@ export default function Sidebar({
                   title={isKhmer ? 'អ្នកប្រើប្រាស់ & អាជីវករ' : 'Users & Merchants'}
                   className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
                     isCollapsed 
-                      ? `h-12 justify-center ${currentSubTab === 'users' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
-                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'users' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                      ? `h-12 justify-center ${currentSubTab === 'users' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
+                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'users' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
                   }`}
                 >
-                  <Users className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-indigo-400'}`} />
+                  <Users className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-emerald-400'}`} />
                   {!isCollapsed && (
                     <span className="truncate">{isKhmer ? 'អ្នកប្រើប្រាស់ & អាជីវករ' : 'Users & Merchants'}</span>
                   )}
@@ -201,11 +200,11 @@ export default function Sidebar({
                   title={isKhmer ? 'ហាង និងទីតាំង' : 'Stores & Locations'}
                   className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
                     isCollapsed 
-                      ? `h-12 justify-center ${currentSubTab === 'stores' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
-                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'stores' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                      ? `h-12 justify-center ${currentSubTab === 'stores' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
+                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'stores' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
                   }`}
                 >
-                  <Store className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-blue-400'}`} />
+                  <Store className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-emerald-400'}`} />
                   {!isCollapsed && (
                     <span className="truncate">{isKhmer ? 'ហាង និងទីតាំង' : 'Stores & Locations'}</span>
                   )}
@@ -218,11 +217,11 @@ export default function Sidebar({
                   title={isKhmer ? 'គ្រប់គ្រងឧបករណ៍ Soundbox' : 'Manage Devices'}
                   className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
                     isCollapsed 
-                      ? `h-12 justify-center ${currentSubTab === 'devices' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
-                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'devices' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                      ? `h-12 justify-center ${currentSubTab === 'devices' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
+                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'devices' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
                   }`}
                 >
-                  <Smartphone className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-amber-400'}`} />
+                  <Smartphone className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-emerald-400'}`} />
                   {!isCollapsed && (
                     <span className="truncate">{isKhmer ? 'គ្រប់គ្រងឧបករណ៍ Soundbox' : 'Manage Devices'}</span>
                   )}
@@ -235,11 +234,11 @@ export default function Sidebar({
                   title={isKhmer ? 'ស្តុកឧបករណ៍ Soundbox' : 'Stock & Inventory'}
                   className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
                     isCollapsed 
-                      ? `h-12 justify-center ${currentSubTab === 'inventory' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
-                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'inventory' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                      ? `h-12 justify-center ${currentSubTab === 'inventory' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
+                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'inventory' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
                   }`}
                 >
-                  <Warehouse className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-amber-400'}`} />
+                  <Warehouse className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-emerald-400'}`} />
                   {!isCollapsed && (
                     <span className="truncate">{isKhmer ? 'ស្តុកឧបករណ៍ Soundbox' : 'Stock & Inventory'}</span>
                   )}
@@ -269,11 +268,11 @@ export default function Sidebar({
                   title={isKhmer ? 'សកម្មភាពអ្នកគ្រប់គ្រង' : 'Admin Activity'}
                   className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
                     isCollapsed 
-                      ? `h-12 justify-center ${currentSubTab === 'admin_activity' || currentSubTab === 'admin_logs' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
-                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'admin_activity' || currentSubTab === 'admin_logs' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                      ? `h-12 justify-center ${currentSubTab === 'admin_activity' || currentSubTab === 'admin_logs' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
+                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'admin_activity' || currentSubTab === 'admin_logs' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
                   }`}
                 >
-                  <ShieldAlert className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-rose-400'}`} />
+                  <ShieldAlert className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-emerald-400'}`} />
                   {!isCollapsed && (
                     <span className="truncate">{isKhmer ? 'សកម្មភាពអ្នកគ្រប់គ្រង' : 'Admin Activity'}</span>
                   )}
@@ -309,11 +308,11 @@ export default function Sidebar({
                   title={isKhmer ? 'ព័ត៌មានឧបករណ៍' : 'Device Info & Soundbox'}
                   className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
                     isCollapsed 
-                      ? `h-12 justify-center ${currentMerchantTab === 'devices' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
-                      : `px-3 py-2.5 gap-2.5 ${currentMerchantTab === 'devices' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                      ? `h-12 justify-center ${currentMerchantTab === 'devices' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
+                      : `px-3 py-2.5 gap-2.5 ${currentMerchantTab === 'devices' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
                   }`}
                 >
-                  <Volume2 className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-indigo-400'}`} />
+                  <Volume2 className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-emerald-400'}`} />
                   {!isCollapsed && (
                     <span className="truncate">{isKhmer ? 'ព័ត៌មានឧបករណ៍' : 'Device Info & Soundbox'}</span>
                   )}
@@ -326,11 +325,11 @@ export default function Sidebar({
                   title={isKhmer ? 'ប្រវត្តិប្រតិបត្តិការ' : 'Transaction History'}
                   className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
                     isCollapsed 
-                      ? `h-12 justify-center ${currentMerchantTab === 'transactions' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
-                      : `px-3 py-2.5 gap-2.5 ${currentMerchantTab === 'transactions' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                      ? `h-12 justify-center ${currentMerchantTab === 'transactions' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
+                      : `px-3 py-2.5 gap-2.5 ${currentMerchantTab === 'transactions' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
                   }`}
                 >
-                  <Receipt className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-blue-400'}`} />
+                  <Receipt className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-emerald-400'}`} />
                   {!isCollapsed && (
                     <span className="truncate">{isKhmer ? 'ប្រវត្តិប្រតិបត្តិការ' : 'Transaction History'}</span>
                   )}

@@ -1458,7 +1458,7 @@ export default function AdminDashboard() {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 flex items-center justify-center">
         <div className="text-center">
-          <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin mx-auto mb-3" />
+          <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin mx-auto mb-3" />
           <p className="text-sm text-slate-500">{t('loading', 'Loading administrative portal...')}</p>
         </div>
       </div>
@@ -1472,7 +1472,7 @@ export default function AdminDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
               {t('admin', 'Admin Portal')}
             </span>
             <span className="text-[11px] sm:text-xs text-slate-400">
@@ -1539,15 +1539,15 @@ export default function AdminDashboard() {
         <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200 dark:border-slate-800 p-3 sm:p-4">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
             
-            {/* Search Input */}
-            <div className="relative w-full sm:w-80 md:w-96">
+            {/* Search */}
+            <div className="relative flex-1">
               <Search className="w-4 h-4 text-slate-400 absolute inset-y-0 left-3 my-auto pointer-events-none" />
               <input
                 type="text"
-                placeholder={t('searchPlaceholder', 'Search by phone, name, store, or SN...')}
+                placeholder={t('searchPlaceholder', 'Search by name, phone number, store or location...')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-base sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-base sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
 
@@ -1594,11 +1594,11 @@ export default function AdminDashboard() {
                 </button>
               )}
 
+              {/* Action Button: Add User */}
               {adminTab === 'users' && (
                 <button
-                  type="button"
                   onClick={() => setIsAddUserOpen(true)}
-                  className="w-full sm:w-auto px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold rounded-xl transition flex items-center justify-center gap-1.5 shadow-2xs whitespace-nowrap cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold rounded-xl transition flex items-center justify-center gap-1.5 shadow-2xs whitespace-nowrap cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   {t('addNewUser', 'Add User')}
@@ -2336,7 +2336,7 @@ export default function AdminDashboard() {
                   value={devFilterId}
                   onChange={(e) => { setDevFilterId(e.target.value); setDevPage(1); }}
                   placeholder={t('pleaseEnterDeviceId', 'Please enter Device ID / SN')}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
                 />
               </div>
 
@@ -2348,7 +2348,7 @@ export default function AdminDashboard() {
                 <select
                   value={devFilterType}
                   onChange={(e) => { setDevFilterType(e.target.value); setDevPage(1); }}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
                 >
                   <option value="ALL">{t('allTypes', 'All Device Types')}</option>
                   <option value="Display">{t('displayScreenQr', '🖥️ Display (Screen QR)')}</option>
@@ -2364,7 +2364,7 @@ export default function AdminDashboard() {
                 <select
                   value={devFilterStatus}
                   onChange={(e) => { setDevFilterStatus(e.target.value); setDevPage(1); }}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
                 >
                   <option value="">{t('allStatuses', 'All Statuses')}</option>
                   <option value="Online">🟢 {t('online', 'Online')}</option>
@@ -2376,14 +2376,14 @@ export default function AdminDashboard() {
               {/* Assigned Store / Merchant */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('merchantStore', 'Assigned Store / Merchant')}
+                  {t('merchantStore', 'Assigned Store')}
                 </label>
                 <input
                   type="text"
                   value={devFilterMerchant}
                   onChange={(e) => { setDevFilterMerchant(e.target.value); setDevPage(1); }}
-                  placeholder={t('pleaseEnterMerchantIdName', 'Enter Store Name / Merchant ID')}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+                  placeholder={t('searchStorePlaceholder', 'Search assigned store or merchant...')}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
                 />
               </div>
 
@@ -2395,12 +2395,12 @@ export default function AdminDashboard() {
                 <select
                   value={devFilterWarranty}
                   onChange={(e) => { setDevFilterWarranty(e.target.value); setDevPage(1); }}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
                 >
                   <option value="ALL">{t('allWarranty', 'All Warranty Statuses')}</option>
-                  <option value="ACTIVE">🟢 {t('activeCoverage', 'Active Coverage')}</option>
-                  <option value="EXPIRING_SOON">🟡 {t('expiringSoon', 'Expiring Soon (≤15 days)')}</option>
-                  <option value="EXPIRED">🔴 {t('expired', 'Expired')}</option>
+                  <option value="ACTIVE">{t('activeCoverage', '🟢 Active Coverage')}</option>
+                  <option value="EXPIRING_SOON">{t('expiringSoon', '🟡 Expiring Soon (≤15d)')}</option>
+                  <option value="EXPIRED">{t('expired', '🔴 Expired')}</option>
                 </select>
               </div>
 
@@ -2413,7 +2413,7 @@ export default function AdminDashboard() {
                   type="date"
                   value={devFilterDate}
                   onChange={(e) => { setDevFilterDate(e.target.value); setDevPage(1); }}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
                 />
               </div>
 
@@ -2422,7 +2422,7 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setDevPage(1)}
-                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
                 >
                   <Search className="w-3.5 h-3.5" />
                   <span>{t('search', 'Search')}</span>
@@ -2891,7 +2891,7 @@ export default function AdminDashboard() {
                     value={stockSearchTerm}
                     onChange={(e) => { setStockSearchTerm(e.target.value); setStockPage(1); }}
                     placeholder={t('searchStockPlaceholder', 'Search Serial Number, Location, or Notes...')}
-                    className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-amber-500 focus:outline-none transition"
+                    className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
                   />
                 </div>
               </div>
@@ -2904,7 +2904,7 @@ export default function AdminDashboard() {
                 <select
                   value={stockTypeFilter}
                   onChange={(e) => { setStockTypeFilter(e.target.value); setStockPage(1); }}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none transition cursor-pointer"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
                 >
                   <option value="ALL">{t('allDeviceTypes', 'All Device Types')}</option>
                   <option value="Display Soundbox">{t('displaySoundboxOpt', '🖥️ Display Soundbox (Screen QR)')}</option>
@@ -2920,7 +2920,7 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setIsStockModalOpen(true)}
-                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-1.5 transition cursor-pointer"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-1.5 transition cursor-pointer"
                 >
                   <PackagePlus className="w-4 h-4" />
                   <span>{t('addStockDevice', '+ Add Stock Device')}</span>
@@ -3571,7 +3571,7 @@ export default function AdminDashboard() {
                 value={newPhone}
                 onChange={(e) => setNewPhone(e.target.value)}
                 placeholder={t('phonePlaceholder', 'e.g. 012345678')}
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono focus:ring-2 focus:ring-indigo-500"
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono focus:ring-2 focus:ring-emerald-500"
                 required
               />
               <Phone className="w-4 h-4 text-slate-400 absolute inset-y-0 left-3 my-auto pointer-events-none" />
@@ -3638,7 +3638,7 @@ export default function AdminDashboard() {
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-sm"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm"
             >
               {submitting ? t('saving', 'Creating...') : t('save', 'Create Account')}
             </button>
@@ -3659,7 +3659,7 @@ export default function AdminDashboard() {
                 type="tel"
                 value={editPhone}
                 onChange={(e) => setEditPhone(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono focus:ring-2 focus:ring-indigo-500"
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono focus:ring-2 focus:ring-emerald-500"
                 required
               />
               <Phone className="w-4 h-4 text-slate-400 absolute inset-y-0 left-3 my-auto pointer-events-none" />
@@ -3671,7 +3671,7 @@ export default function AdminDashboard() {
               type="text"
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -3681,7 +3681,7 @@ export default function AdminDashboard() {
                 value={editRole}
                 onChange={(e) => setEditRole(e.target.value)}
                 disabled={selectedUser?.id === currentAdmin?.id}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white disabled:opacity-50"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white disabled:opacity-50 focus:ring-2 focus:ring-emerald-500"
               >
                 <option value="USER">{t('merchant', 'User / Merchant')}</option>
                 <option value="ADMIN">{t('admin', 'Administrator')}</option>
@@ -3693,7 +3693,7 @@ export default function AdminDashboard() {
                 value={editStatus}
                 onChange={(e) => setEditStatus(e.target.value)}
                 disabled={selectedUser?.id === currentAdmin?.id}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white disabled:opacity-50"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white disabled:opacity-50 focus:ring-2 focus:ring-emerald-500"
               >
                 <option value="ACTIVE">{t('active', 'Active')}</option>
                 <option value="SUSPENDED">{t('inactive', 'Suspended')}</option>
@@ -3712,7 +3712,7 @@ export default function AdminDashboard() {
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-sm"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm"
             >
               {submitting ? 'Saving...' : 'Save Changes'}
             </button>
@@ -3748,9 +3748,9 @@ export default function AdminDashboard() {
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-lg shadow-sm"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm"
             >
-              {submitting ? 'Updating...' : 'Set Password'}
+              {submitting ? 'Updating...' : 'Reset Password'}
             </button>
           </div>
         </form>
