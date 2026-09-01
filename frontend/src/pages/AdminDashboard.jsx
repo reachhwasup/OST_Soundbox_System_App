@@ -3362,7 +3362,11 @@ export default function AdminDashboard() {
       </Modal>
 
       {/* Modal: Edit Soundbox Hardware */}
-      <Modal isOpen={isEditDeviceOpen} onClose={() => setIsEditDeviceOpen(false)} title={`Edit Soundbox: ${selectedDevice?.device_sn || ''}`}>
+      <Modal 
+        isOpen={isEditDeviceOpen} 
+        onClose={() => setIsEditDeviceOpen(false)} 
+        title={activeTab === 'stock' || !selectedDevice?.merchant_id ? `Edit Stock Device: ${selectedDevice?.device_sn || ''}` : `Edit Soundbox: ${selectedDevice?.device_sn || ''}`}
+      >
         <form onSubmit={handleUpdateDevice} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
@@ -3407,19 +3411,6 @@ export default function AdminDashboard() {
 
           <div>
             <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
-              Telegram Group / Chat ID
-            </label>
-            <input
-              type="text"
-              value={editDeviceTelegram}
-              onChange={(e) => setEditDeviceTelegram(e.target.value)}
-              placeholder="e.g. -1001234567890"
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
               Warehouse Notes
             </label>
             <input
@@ -3431,23 +3422,40 @@ export default function AdminDashboard() {
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
-              Assign to Store
-            </label>
-            <select
-              value={editDeviceMerchantId}
-              onChange={(e) => setEditDeviceMerchantId(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
-            >
-              <option value="">-- Unassigned (No Store) --</option>
-              {stores.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.owner_phone})
-                </option>
-              ))}
-            </select>
-          </div>
+          {activeTab !== 'stock' && selectedDevice?.merchant_id && (
+            <>
+              <div>
+                <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
+                  Telegram Group / Chat ID
+                </label>
+                <input
+                  type="text"
+                  value={editDeviceTelegram}
+                  onChange={(e) => setEditDeviceTelegram(e.target.value)}
+                  placeholder="e.g. -1001234567890"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
+                  Assign to Store
+                </label>
+                <select
+                  value={editDeviceMerchantId}
+                  onChange={(e) => setEditDeviceMerchantId(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
+                >
+                  <option value="">-- Unassigned (No Store) --</option>
+                  {stores.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.owner_phone})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
 
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
             <button
