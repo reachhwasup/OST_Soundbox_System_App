@@ -170,7 +170,6 @@ export default function AdminDashboard() {
   const [singleSnInput, setSingleSnInput] = useState('');
   const [singleType, setSingleType] = useState('Display Soundbox');
   const [singleStoreId, setSingleStoreId] = useState('');
-  const [singleBatchNo, setSingleBatchNo] = useState(`BATCH-${new Date().toISOString().slice(0,7)}`);
   const [singleNotes, setSingleNotes] = useState('');
   const [singlePrice, setSinglePrice] = useState('39.00');
   const [stockTypeFilter, setStockTypeFilter] = useState('ALL');
@@ -208,7 +207,6 @@ export default function AdminDashboard() {
   const [visibleStockColumns, setVisibleStockColumns] = useState({
     deviceId: true,
     deviceType: true,
-    batchNo: true,
     price: true,
     battery: true,
     signal: true,
@@ -748,9 +746,8 @@ export default function AdminDashboard() {
         const q = stockSearchTerm.toLowerCase().trim();
         const sn = String(d.device_sn || d.device_id || '').toLowerCase();
         const dtype = String(d.device_type || '').toLowerCase();
-        const batch = String(d.batch_no || '').toLowerCase();
         const notes = String(d.notes || '').toLowerCase();
-        if (!sn.includes(q) && !dtype.includes(q) && !batch.includes(q) && !notes.includes(q)) {
+        if (!sn.includes(q) && !dtype.includes(q) && !notes.includes(q)) {
           return false;
         }
       }
@@ -759,13 +756,9 @@ export default function AdminDashboard() {
         return false;
       }
 
-      if (stockBatchFilter !== 'ALL' && String(d.batch_no || '') !== stockBatchFilter) {
-        return false;
-      }
-
       return true;
     });
-  }, [devices, stockSearchTerm, stockTypeFilter, stockBatchFilter]);
+  }, [devices, stockSearchTerm, stockTypeFilter]);
 
   // Stock Export CSV
   const handleExportStockCSV = () => {
@@ -773,12 +766,10 @@ export default function AdminDashboard() {
       showToast({ type: 'warning', title: 'No Data', message: 'No warehouse stock records to export.' });
       return;
     }
-    const headers = ['Device SN', 'Device Type', 'Model', 'Batch No', 'Unit Price ($)', 'Notes', '4G Version', 'WiFi Version', 'Created At'];
+    const headers = ['Device SN', 'Device Type', 'Unit Price ($)', 'Notes', '4G Version', 'WiFi Version', 'Created At'];
     const rows = filteredStockDevices.map(d => [
       `"${d.device_sn || ''}"`,
-      `"${d.device_type || 'Soundbox'}"`,
-      `"${d.device_model || ''}"`,
-      `"${d.batch_no || ''}"`,
+      `"${d.device_type || 'Display Soundbox'}"`,
       Number(d.price || 29).toFixed(2),
       `"${(d.notes || '').replace(/"/g, '""')}"`,
       `"${d.version_4g || ''}"`,
@@ -863,8 +854,6 @@ export default function AdminDashboard() {
       const res = await api.post('/api/devices/intake', {
         device_sn: singleSnInput.trim(),
         device_type: singleType || "Display Soundbox",
-        device_model: singleType || "Display Soundbox",
-        batch_no: singleBatchNo,
         notes: singleNotes,
         price: Number(singlePrice) || (singleType === 'Display Soundbox' ? 39.00 : 29.00),
         merchant_id: singleStoreId ? Number(singleStoreId) : null
@@ -2369,13 +2358,13 @@ export default function AdminDashboard() {
 
             <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
               <div className="text-[10px] sm:text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
-                <PackagePlus className="w-3.5 h-3.5" />
-                <span>Intake Batches</span>
+                <Boxes className="w-3.5 h-3.5" />
+                <span>Available Units</span>
               </div>
               <div className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
-                {Array.from(new Set(devices.filter(d => (!d.merchant_id || String(d.status).toUpperCase() === 'IN_STOCK') && d.batch_no).map(d => d.batch_no))).length || 1}
+                {devices.filter(d => !d.merchant_id || String(d.status).toUpperCase() === 'IN_STOCK').length}
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">Active Shipments</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Ready for Deployment</div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
@@ -2392,9 +2381,9 @@ export default function AdminDashboard() {
 
           {/* 1. Warehouse Stock Search & Filter Toolbar */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               
-              {/* Search by SN / Batch / Notes */}
+              {/* Search by SN / Notes */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   Search Stock
@@ -2405,7 +2394,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={stockSearchTerm}
                     onChange={(e) => { setStockSearchTerm(e.target.value); setStockPage(1); }}
-                    placeholder="Search SN, Batch, Location..."
+                    placeholder="Search Serial Number, Location, or Notes..."
                     className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-amber-500 focus:outline-none transition"
                   />
                 </div>
@@ -2424,24 +2413,6 @@ export default function AdminDashboard() {
                   <option value="ALL">All Device Types</option>
                   <option value="Display Soundbox">🖥️ Display Soundbox (Screen QR)</option>
                   <option value="Standard Soundbox">🏷️ Standard Soundbox (Printed QR)</option>
-                </select>
-              </div>
-
-              {/* Batch Filter */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  Batch Number
-                </label>
-                <select
-                  value={stockBatchFilter}
-                  onChange={(e) => { setStockBatchFilter(e.target.value); setStockPage(1); }}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none transition cursor-pointer"
-                >
-                  <option value="ALL">All Batches</option>
-                  <option value="BATCH-2026-Q1">BATCH-2026-Q1</option>
-                  <option value="BATCH-2026-Q2">BATCH-2026-Q2</option>
-                  <option value="BATCH-2026-Q3">BATCH-2026-Q3</option>
-                  <option value="BATCH-2026-Q4">BATCH-2026-Q4</option>
                 </select>
               </div>
 
@@ -2465,8 +2436,7 @@ export default function AdminDashboard() {
                   type="button"
                   onClick={() => {
                     setStockSearchTerm('');
-                    setStockModelFilter('ALL');
-                    setStockBatchFilter('ALL');
+                    setStockTypeFilter('ALL');
                     setStockPage(1);
                   }}
                   className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
@@ -2504,7 +2474,6 @@ export default function AdminDashboard() {
                   <tr className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 text-xs font-semibold select-none">
                     {visibleStockColumns.deviceId && <th className="py-3 px-4 font-semibold">{t('deviceId', 'Device ID')}</th>}
                     {visibleStockColumns.deviceType && <th className="py-3 px-3 font-semibold">{t('deviceType', 'Device Type')}</th>}
-                    {visibleStockColumns.batchNo && <th className="py-3 px-3 font-semibold">Batch No</th>}
                     {visibleStockColumns.price && <th className="py-3 px-3 font-semibold text-center">{t('price', 'Price')}</th>}
                     {visibleStockColumns.battery && <th className="py-3 px-3 font-semibold text-center">{t('battery', 'Battery')}</th>}
                     {visibleStockColumns.signal && <th className="py-3 px-3 font-semibold text-center">{t('signal', 'Signal')}</th>}
@@ -2545,15 +2514,6 @@ export default function AdminDashboard() {
                               {(d.device_type === 'Display Soundbox' || String(d.device_type || '').toLowerCase().includes('display') || String(d.device_type || '').toLowerCase().includes('screen'))
                                 ? '🖥️ Display (Screen QR)'
                                 : '🏷️ Standard (Printed QR)'}
-                            </span>
-                          </td>
-                        )}
-
-                        {/* Batch No */}
-                        {visibleStockColumns.batchNo && (
-                          <td className="py-3.5 px-3 font-mono text-[11px] text-slate-700 dark:text-slate-300">
-                            <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-medium">
-                              {d.batch_no || 'BATCH-2026-Q3'}
                             </span>
                           </td>
                         )}
@@ -4371,7 +4331,6 @@ export default function AdminDashboard() {
             {Object.entries({
               deviceId: 'Device ID (SN)',
               deviceType: 'Device Type',
-              batchNo: 'Batch No',
               price: 'Unit Price ($)',
               battery: 'Battery',
               signal: 'Signal',
@@ -4402,7 +4361,6 @@ export default function AdminDashboard() {
               onClick={() => setVisibleStockColumns({
                 deviceId: true,
                 deviceType: true,
-                batchNo: true,
                 price: true,
                 battery: true,
                 signal: true,
@@ -4436,19 +4394,19 @@ export default function AdminDashboard() {
         <form onSubmit={handleSingleIntakeStock} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Soundbox Serial Number (SN) *
+              Soundbox Serial Number (SN) <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
               value={singleSnInput}
               onChange={(e) => setSingleSnInput(e.target.value)}
-              placeholder="e.g. 6152608110050"
+              placeholder="e.g. 6152608110099"
               required
               className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                 Device Type <span className="text-rose-500">*</span>
@@ -4478,19 +4436,6 @@ export default function AdminDashboard() {
                 onChange={(e) => setSinglePrice(e.target.value)}
                 placeholder="39.00"
                 className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Batch / PO Ref
-              </label>
-              <input
-                type="text"
-                value={singleBatchNo}
-                onChange={(e) => setSingleBatchNo(e.target.value)}
-                placeholder="e.g. BATCH-2026-09"
-                className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
               />
             </div>
           </div>
