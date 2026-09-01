@@ -1518,41 +1518,6 @@ export default function UserDashboard() {
           {/* ======================================================== */}
           {merchantTab === 'transactions' && (
             <div className="space-y-5 sm:space-y-6">
-              
-              {/* Top Financial Aggregation Banner */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total USD Volume</span>
-                  <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
-                    ${totalHistoryMetrics.usd.toFixed(2)}
-                  </div>
-                  <span className="text-[11px] text-slate-400">Across filtered stores</span>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total KHR Volume</span>
-                  <div className="text-2xl font-black text-blue-600 dark:text-blue-400 font-mono tracking-tight">
-                    ៛{totalHistoryMetrics.khr.toLocaleString()}
-                  </div>
-                  <span className="text-[11px] text-slate-400">Bakong Khmer Riel</span>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Payment Count</span>
-                  <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                    {totalHistoryMetrics.count} <span className="text-xs font-normal text-slate-400">txns</span>
-                  </div>
-                  <span className="text-[11px] text-emerald-500 font-medium">100% Broadcast Success</span>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Avg Ticket Size</span>
-                  <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-tight">
-                    ${totalHistoryMetrics.avgUSD.toFixed(2)}
-                  </div>
-                  <span className="text-[11px] text-slate-400">Average transaction size</span>
-                </div>
-              </div>
 
               {/* Transactions Table & Advanced Filters */}
               <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
