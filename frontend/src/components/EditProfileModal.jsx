@@ -191,24 +191,6 @@ export default function EditProfileModal({ isOpen, onClose, onOpenChangePassword
           </p>
         </div>
 
-        {/* Quick Shortcut to Change Password */}
-        {onOpenChangePassword && (
-          <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/60 dark:border-slate-700/50 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-              <KeyRound className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>{isKhmer ? 'ចង់ប្តូរពាក្យសម្ងាត់គណនី?' : 'Need to change your password?'}</span>
-            </div>
-            <button
-              type="button"
-              onClick={onOpenChangePassword}
-              className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              <span>{t('changePassword', 'Change Password')}</span>
-              <ChevronRight className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-
         {/* Action Buttons */}
         <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
           <button
