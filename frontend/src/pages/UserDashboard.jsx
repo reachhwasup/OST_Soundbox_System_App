@@ -1249,11 +1249,10 @@ export default function UserDashboard() {
                               </td>
 
                               {/* Column 6: 4G Cellular Signal */}
-                              <td className="py-3.5 px-4">
+                              <td className="py-3.5 px-4 whitespace-nowrap">
                                 <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200">
                                   <Signal className="w-4 h-4 text-blue-500 shrink-0" />
-                                  <span>4G LTE</span>
-                                  <span className="text-[10px] text-slate-400 font-mono">(-65 dBm)</span>
+                                  <span className="text-xs">{device.signal || '4G LTE'}</span>
                                 </div>
                               </td>
 
