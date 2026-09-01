@@ -202,9 +202,9 @@ export default function AdminDashboard() {
     deviceId: true,
     deviceType: true,
     merchantId: true,
+    status: true,
     price: true,
     warranty: true,
-    status: true,
     battery: false,
     signal: false,
     version4g: false,
@@ -2200,9 +2200,9 @@ export default function AdminDashboard() {
                     {visibleColumns.deviceId && <th className="py-3 px-3 font-semibold min-w-[160px]">{t('deviceId', 'Device ID')}</th>}
                     {visibleColumns.deviceType && <th className="py-3 px-3 font-semibold min-w-[190px]">{t('deviceType', 'Device Type')}</th>}
                     {visibleColumns.merchantId && <th className="py-3 px-3 font-semibold min-w-[180px]">{t('merchantStore', 'Assigned Store')}</th>}
+                    {visibleColumns.status && <th className="py-3 px-3 font-semibold text-center min-w-[110px]">{t('status', 'Status')}</th>}
                     {visibleColumns.price && <th className="py-3 px-3 font-semibold text-center min-w-[110px]">{t('price', 'Price')}</th>}
                     {visibleColumns.warranty && <th className="py-3 px-3 font-semibold text-center min-w-[140px]">{t('warranty', 'Warranty (90d)')}</th>}
-                    {visibleColumns.status && <th className="py-3 px-3 font-semibold text-center min-w-[100px]">{t('status', 'Status')}</th>}
                     {visibleColumns.battery && <th className="py-3 px-3 font-semibold text-center min-w-[95px]">{t('battery', 'Battery')}</th>}
                     {visibleColumns.signal && <th className="py-3 px-3 font-semibold text-center min-w-[95px]">{t('signal', 'Signal')}</th>}
                     {visibleColumns.version4g && <th className="py-3 px-3 font-semibold min-w-[150px]">{t('version4G', '4G Version')}</th>}
@@ -2284,6 +2284,30 @@ export default function AdminDashboard() {
                             </td>
                           )}
 
+                          {/* Status */}
+                          {visibleColumns.status && (
+                            <td className="py-3.5 px-3 text-center">
+                              {String(d.status || '').toUpperCase() === 'PENDING' ? (
+                                <span className="inline-flex items-center justify-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800 whitespace-nowrap">
+                                  <Clock className="w-3 h-3 text-purple-500 animate-pulse" />
+                                  <span>{t('waitingForRegistration', 'Waiting for Registration')}</span>
+                                </span>
+                              ) : String(d.status || '').toUpperCase() === 'IN_STOCK' || !d.merchant_id ? (
+                                <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
+                                  In Stock
+                                </span>
+                              ) : isOnline ? (
+                                <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800">
+                                  Online
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
+                                  Offline
+                                </span>
+                              )}
+                            </td>
+                          )}
+
                           {/* Unit Price with Discount indicator */}
                           {visibleColumns.price && (
                             <td className="py-3.5 px-3 text-center font-mono whitespace-nowrap">
@@ -2335,30 +2359,6 @@ export default function AdminDashboard() {
                                   </span>
                                 );
                               })()}
-                            </td>
-                          )}
-
-                          {/* Status */}
-                          {visibleColumns.status && (
-                            <td className="py-3.5 px-3 text-center">
-                              {String(d.status || '').toUpperCase() === 'PENDING' ? (
-                                <span className="inline-flex items-center justify-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800 whitespace-nowrap">
-                                  <Clock className="w-3 h-3 text-purple-500 animate-pulse" />
-                                  <span>{t('waitingForRegistration', 'Waiting for Registration')}</span>
-                                </span>
-                              ) : String(d.status || '').toUpperCase() === 'IN_STOCK' || !d.merchant_id ? (
-                                <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
-                                  In Stock
-                                </span>
-                              ) : isOnline ? (
-                                <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800">
-                                  Online
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
-                                  Offline
-                                </span>
-                              )}
                             </td>
                           )}
 
@@ -4631,9 +4631,9 @@ export default function AdminDashboard() {
               deviceId: t('deviceId', 'Device ID'),
               deviceType: t('deviceType', 'Device Type'),
               merchantId: t('merchantStore', 'Assigned Store'),
+              status: t('status', 'Status'),
               price: t('price', 'Price ($)'),
               warranty: t('warranty', 'Warranty (90d Countdown)'),
-              status: t('status', 'Status'),
               battery: t('battery', 'Battery'),
               signal: t('signal', 'Signal'),
               version4g: t('version4G', '4G Version'),
@@ -4663,9 +4663,9 @@ export default function AdminDashboard() {
                 deviceId: true,
                 deviceType: true,
                 merchantId: true,
+                status: true,
                 price: true,
                 warranty: true,
-                status: true,
                 battery: false,
                 signal: false,
                 version4g: false,
