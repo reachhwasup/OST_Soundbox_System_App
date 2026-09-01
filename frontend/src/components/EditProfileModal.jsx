@@ -109,16 +109,6 @@ export default function EditProfileModal({ isOpen, onClose, onOpenChangePassword
                 </div>
               </div>
             </div>
-
-            {/* Role Badge */}
-            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase ${
-              isAdmin 
-                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
-                : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-            }`}>
-              {isAdmin ? <Shield className="w-3 h-3" /> : <Store className="w-3 h-3" />}
-              <span>{isAdmin ? t('administrator', 'System Administrator') : t('merchant', 'Store Merchant')}</span>
-            </span>
           </div>
 
           <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/50 flex items-center justify-between text-[11px] text-slate-500">
