@@ -343,6 +343,18 @@ export const translations = {
     unlinkedStoresCount: "Unlinked Stores",
     activeProvincesCount: "Provinces Covered",
 
+    // Device Detail Modal
+    merchantName: "Merchant / Owner Name",
+    merchantPhone: "Merchant Phone Number",
+    assignedStoreBranch: "Assigned Store Branch",
+    storeAddressHierarchy: "Location & Address",
+    telegramBinding: "Telegram Bot Notification",
+    commercialSalesInfo: "Commercial & Sales Details",
+    hardwareTelemetryTitle: "Hardware & Telemetry Status",
+    batchNo: "Batch Number",
+    warehouseNotes: "Warehouse / Deployment Notes",
+    copySuccess: "Copied to clipboard!",
+
     // Language & Theme
     language: "Language",
     english: "English",
@@ -701,6 +713,18 @@ export const translations = {
     activeStoresWithDevice: "ហាងមាន Soundbox",
     unlinkedStoresCount: "ហាងមិនទាន់ភ្ជាប់ Soundbox",
     activeProvincesCount: "ខេត្ត/ក្រុង កំពុងដំណើរការ",
+
+    // Device Detail Modal
+    merchantName: "ឈ្មោះអាជីវករ / ម្ចាស់ហាង",
+    merchantPhone: "លេខទូរស័ព្ទអាជីវករ",
+    assignedStoreBranch: "សាខាហាងដែលបានភ្ជាប់",
+    storeAddressHierarchy: "ទីតាំង និងអាសយដ្ឋាន",
+    telegramBinding: "ការភ្ជាប់ Telegram Bot",
+    commercialSalesInfo: "ព័ត៌មានលក់ និងតម្លៃ",
+    hardwareTelemetryTitle: "ស្ថានភាពផ្នែករឹង និងបច្ចេកទេស",
+    batchNo: "លេខឡូតិ៍ (Batch)",
+    warehouseNotes: "កំណត់សម្គាល់ឃ្លាំង / ការដាក់ឱ្យប្រើ",
+    copySuccess: "បានចម្លងទៅក្ដារតម្បៀតខ្ទាស់!",
 
     // Language & Theme
     language: "ភាសា",

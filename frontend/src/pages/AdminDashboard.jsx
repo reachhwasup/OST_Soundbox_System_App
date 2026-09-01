@@ -81,7 +81,9 @@ import {
   ShoppingBag,
   QrCode,
   Camera,
-  Upload
+  Upload,
+  User,
+  PhoneCall
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -4543,91 +4545,207 @@ export default function AdminDashboard() {
         onClose={() => setIsDeviceDetailOpen(false)}
         title={t('deviceDetails', 'Soundbox Hardware Details')}
       >
-        {selectedDeviceDetail && (
-          <div className="space-y-4">
-            
-            {/* Header Hero */}
-            <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <div className="flex items-center gap-3 font-mono">
-                <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-300 flex items-center justify-center font-bold">
-                  <Volume2 className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="font-bold text-slate-900 dark:text-white text-base">
-                    {selectedDeviceDetail.device_id || selectedDeviceDetail.device_sn}
+        {selectedDeviceDetail && (() => {
+          const linkedStore = stores.find(s => s.id === selectedDeviceDetail.merchant_id || s.name === selectedDeviceDetail.store_name);
+          const linkedUser = users.find(u => (linkedStore && (u.id === linkedStore.user_id || u.phone_number === linkedStore.owner_phone)) || u.id === selectedDeviceDetail.merchant_id || u.phone_number === selectedDeviceDetail.owner_phone || u.phone_number === selectedDeviceDetail.user_phone);
+
+          const displayMerchantName = selectedDeviceDetail.merchant_name || selectedDeviceDetail.owner_name || linkedStore?.owner_name || linkedUser?.full_name || '—';
+          const displayPhone = selectedDeviceDetail.owner_phone || selectedDeviceDetail.phone_number || selectedDeviceDetail.user_phone || linkedStore?.owner_phone || linkedUser?.phone_number || '—';
+          const displayStoreName = selectedDeviceDetail.store_name || linkedStore?.name || (String(selectedDeviceDetail.status).toUpperCase() === 'PENDING' ? (isKhmer ? 'មិនទាន់ភ្ជាប់ហាង (រង់ចាំចុះឈ្មោះ)' : 'Awaiting Store Link') : 'Unassigned');
+          
+          const displayProvince = selectedDeviceDetail.province || linkedStore?.province || '';
+          const displayDistrict = selectedDeviceDetail.district || linkedStore?.district || '';
+          const displayCommune = selectedDeviceDetail.commune || linkedStore?.commune || '';
+          const displayVillage = selectedDeviceDetail.village || linkedStore?.village || '';
+          const displayStreet = selectedDeviceDetail.street || linkedStore?.street || '';
+          const locationParts = [displayStreet, displayVillage, displayCommune, displayDistrict, displayProvince].filter(Boolean);
+          const fullAddress = locationParts.length > 0 ? locationParts.join(', ') : '—';
+
+          const wInfo = calculateWarrantyCountdown(selectedDeviceDetail);
+
+          return (
+            <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
+              
+              {/* Header Hero */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300 flex items-center justify-center font-bold">
+                    <Volume2 className="w-6 h-6" />
                   </div>
-                  <div className="text-xs text-slate-400 font-sans mt-0.5">
-                    Model: <span className="font-semibold text-slate-700 dark:text-slate-300">
+                  <div>
+                    <div className="font-bold text-slate-900 dark:text-white text-base font-mono">
+                      {selectedDeviceDetail.device_id || selectedDeviceDetail.device_sn}
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                       {selectedDeviceDetail.device_type === 'Display Soundbox' || String(selectedDeviceDetail.device_model || '').includes('Display')
                         ? '🖥️ Display Soundbox (Screen QR)' 
                         : '🏷️ Standard Soundbox (Printed QR)'}
-                    </span>
+                    </div>
+                  </div>
+                </div>
+
+                <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${
+                  String(selectedDeviceDetail.status).toUpperCase() === 'PENDING'
+                    ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                    : String(selectedDeviceDetail.status || '').toLowerCase() === 'online' || String(selectedDeviceDetail.status || '').toUpperCase() === 'ACTIVE'
+                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                    : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
+                }`}>
+                  {String(selectedDeviceDetail.status).toUpperCase() === 'PENDING'
+                    ? (isKhmer ? '🟣 រង់ចាំការចុះឈ្មោះ' : '🟣 Waiting for Registration')
+                    : selectedDeviceDetail.status || 'Offline'}
+                </span>
+              </div>
+
+              {/* 1. Merchant & Store Assignment Card (Key User Request) */}
+              <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <div className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>{t('merchantAndStoreInfo', 'Merchant & Store Assignment')}</span>
+                  </div>
+                  {displayPhone !== '—' && (
+                    <a
+                      href={`tel:${displayPhone}`}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 text-xs font-semibold hover:bg-emerald-100 transition cursor-pointer"
+                    >
+                      <PhoneCall className="w-3 h-3" />
+                      <span>{t('callMerchant', 'Call')}</span>
+                    </a>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  {/* Merchant Name */}
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+                    <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
+                      <User className="w-3 h-3 text-slate-400" />
+                      <span>{t('merchantName', 'Merchant / Owner Name')}</span>
+                    </div>
+                    <div className="font-bold text-slate-900 dark:text-white text-sm mt-1">
+                      {displayMerchantName}
+                    </div>
+                  </div>
+
+                  {/* Phone Number */}
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+                    <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <Phone className="w-3 h-3 text-slate-400" />
+                        <span>{t('merchantPhone', 'Merchant Phone Number')}</span>
+                      </span>
+                      {displayPhone !== '—' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(displayPhone);
+                            showToast({ type: 'success', title: 'Copied', message: t('copySuccess', 'Phone number copied to clipboard!') });
+                          }}
+                          title="Copy phone"
+                          className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                        >
+                          <Copy className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-sm mt-1">
+                      {displayPhone}
+                    </div>
+                  </div>
+
+                  {/* Store Name */}
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+                    <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
+                      <Store className="w-3 h-3 text-slate-400" />
+                      <span>{t('assignedStoreBranch', 'Assigned Store Branch')}</span>
+                    </div>
+                    <div className="font-bold text-slate-900 dark:text-white mt-1 truncate">
+                      {displayStoreName}
+                    </div>
+                  </div>
+
+                  {/* Telegram Chat ID */}
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+                    <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
+                      <Send className="w-3 h-3 text-slate-400" />
+                      <span>{t('telegramBinding', 'Telegram Bot Notification')}</span>
+                    </div>
+                    <div className="font-mono font-semibold text-slate-800 dark:text-slate-200 mt-1 truncate">
+                      {selectedDeviceDetail.telegram_chat_id || (isKhmer ? 'មិនទាន់ភ្ជាប់' : 'Not linked')}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Location Address */}
+                <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60 text-xs">
+                  <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-rose-500" />
+                    <span>{t('storeAddressHierarchy', 'Location & Address')}</span>
+                  </div>
+                  <div className="font-medium text-slate-800 dark:text-slate-200 mt-1">
+                    {fullAddress}
                   </div>
                 </div>
               </div>
 
-              <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${
-                String(selectedDeviceDetail.status).toUpperCase() === 'PENDING'
-                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
-                  : String(selectedDeviceDetail.status || '').toLowerCase() === 'online' || String(selectedDeviceDetail.status || '').toUpperCase() === 'ACTIVE'
-                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                  : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
-              }`}>
-                {String(selectedDeviceDetail.status).toUpperCase() === 'PENDING'
-                  ? '🟣 Waiting for Registration'
-                  : selectedDeviceDetail.status || 'Offline'}
-              </span>
-            </div>
-
-            {/* Hardware Telemetry Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
-              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('battery', 'Battery')}</span>
-                <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mt-0.5">
-                  <Battery className="w-4 h-4 text-emerald-500" />
-                  {selectedDeviceDetail.battery || '100%'}
+              {/* 2. Commercial & Pricing Card */}
+              <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <DollarSign className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>{t('commercialSalesInfo', 'Commercial & Sales Details')}</span>
                 </div>
+
+                <div className="grid grid-cols-3 gap-2.5 text-xs text-center">
+                  <div className="p-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('originalPrice', 'Price')}</span>
+                    <div className="font-mono font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                      ${Number(selectedDeviceDetail.price || 29).toFixed(2)}
+                    </div>
+                  </div>
+
+                  <div className="p-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('discount', 'Discount')}</span>
+                    <div className="font-mono font-bold text-amber-600 dark:text-amber-400 mt-0.5">
+                      {Number(selectedDeviceDetail.discount_percent) > 0 
+                        ? `${selectedDeviceDetail.discount_percent}%` 
+                        : Number(selectedDeviceDetail.discount_amount) > 0 
+                        ? `$${Number(selectedDeviceDetail.discount_amount).toFixed(2)}` 
+                        : '0%'}
+                    </div>
+                  </div>
+
+                  <div className="p-2 bg-emerald-50/70 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase font-bold">{t('finalPrice', 'Final Price')}</span>
+                    <div className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-sm mt-0.5">
+                      ${Number(selectedDeviceDetail.final_price || selectedDeviceDetail.price || 29).toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+
+                {(selectedDeviceDetail.notes || selectedDeviceDetail.batch_no) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
+                    {selectedDeviceDetail.batch_no && (
+                      <div className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg text-slate-600 dark:text-slate-400">
+                        <span className="text-[10px] uppercase font-semibold text-slate-400 block">{t('batchNo', 'Batch Number')}</span>
+                        <span className="font-mono text-slate-800 dark:text-slate-200">{selectedDeviceDetail.batch_no}</span>
+                      </div>
+                    )}
+                    {selectedDeviceDetail.notes && (
+                      <div className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg text-slate-600 dark:text-slate-400">
+                        <span className="text-[10px] uppercase font-semibold text-slate-400 block">{t('warehouseNotes', 'Warehouse / Notes')}</span>
+                        <span className="text-slate-800 dark:text-slate-200">{selectedDeviceDetail.notes}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('signal', 'Signal Quality')}</span>
-                <div className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1.5 mt-0.5">
-                  <Signal className="w-4 h-4" />
-                  {selectedDeviceDetail.signal || 'Good'}
-                </div>
-              </div>
-
-              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('version4G', '4G Firmware')}</span>
-                <div className="font-mono text-slate-700 dark:text-slate-300 font-bold mt-0.5 truncate" title={selectedDeviceDetail.version_4g}>
-                  {selectedDeviceDetail.version_4g || 'Y6_STD_1605_V1.0'}
-                </div>
-              </div>
-
-              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('versionWifi', 'WiFi Firmware')}</span>
-                <div className="font-mono text-slate-700 dark:text-slate-300 font-bold mt-0.5 truncate" title={selectedDeviceDetail.version_wifi}>
-                  {selectedDeviceDetail.version_wifi || 'esp32c2x_2M_OTA'}
-                </div>
-              </div>
-
-              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('merchantStore', 'Linked Store')}</span>
-                <div className="font-semibold text-slate-900 dark:text-white mt-0.5 truncate">
-                  {selectedDeviceDetail.store_name || (selectedDeviceDetail.status === 'PENDING' ? (isKhmer ? 'មិនទាន់ភ្ជាប់ហាង' : 'Awaiting Store Link') : 'Unassigned')}
-                </div>
-              </div>
-            </div>
-
-            {/* Warranty 90-Day Live Countdown Hero Card */}
-            {(selectedDeviceDetail.merchant_id || selectedDeviceDetail.status === 'PENDING' || selectedDeviceDetail.warranty_days) && (() => {
-              const wInfo = calculateWarrantyCountdown(selectedDeviceDetail);
-              if (wInfo.status === 'NO_WARRANTY') return null;
-              return (
-                <div className="p-4 bg-gradient-to-br from-indigo-50/70 to-blue-50/50 dark:from-indigo-950/40 dark:to-slate-900/60 rounded-2xl border border-indigo-100 dark:border-indigo-900/50 space-y-2.5">
+              {/* 3. Warranty 90-Day Live Countdown Card */}
+              {wInfo.status !== 'NO_WARRANTY' && (
+                <div className="p-4 bg-gradient-to-br from-emerald-50/70 to-teal-50/50 dark:from-emerald-950/40 dark:to-slate-900/60 rounded-2xl border border-emerald-100 dark:border-emerald-900/50 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <ShieldCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                      <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                       <div>
                         <div className="text-xs font-bold text-slate-900 dark:text-white">
                           {t('warrantyPeriod', '90-Day Warranty Protection')}
@@ -4669,38 +4787,78 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 </div>
-              );
-            })()}
+              )}
 
-            {/* Timestamps */}
-            <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/60 text-xs space-y-1.5">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Last Telemetry Heartbeat:</span>
-                <span className="font-mono text-slate-700 dark:text-slate-300">
-                  {selectedDeviceDetail.last_time || (selectedDeviceDetail.last_heartbeat ? new Date(selectedDeviceDetail.last_heartbeat).toLocaleString() : '—')}
-                </span>
+              {/* 4. Hardware Telemetry & Firmware Grid */}
+              <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2.5">
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <Smartphone className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>{t('hardwareTelemetryTitle', 'Hardware & Telemetry Status')}</span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('battery', 'Battery')}</span>
+                    <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mt-0.5">
+                      <Battery className="w-4 h-4 text-emerald-500" />
+                      {selectedDeviceDetail.battery || '100%'}
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('signal', 'Signal Quality')}</span>
+                    <div className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1.5 mt-0.5">
+                      <Signal className="w-4 h-4" />
+                      {selectedDeviceDetail.signal || 'Good'}
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('version4G', '4G Firmware')}</span>
+                    <div className="font-mono text-slate-700 dark:text-slate-300 font-bold mt-0.5 truncate" title={selectedDeviceDetail.version_4g}>
+                      {selectedDeviceDetail.version_4g || 'Y6_STD_1605_V1.0'}
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('versionWifi', 'WiFi Firmware')}</span>
+                    <div className="font-mono text-slate-700 dark:text-slate-300 font-bold mt-0.5 truncate" title={selectedDeviceDetail.version_wifi}>
+                      {selectedDeviceDetail.version_wifi || 'esp32c2x_2M_OTA'}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between border-t border-slate-200/60 dark:border-slate-700/60 pt-1.5">
-                <span className="text-slate-400">Created / Registered At:</span>
-                <span className="font-mono text-slate-700 dark:text-slate-300">
-                  {selectedDeviceDetail.created_at ? new Date(selectedDeviceDetail.created_at).toLocaleString() : '—'}
-                </span>
+
+              {/* 5. Timestamps */}
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/60 text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Last Telemetry Heartbeat:</span>
+                  <span className="font-mono text-slate-700 dark:text-slate-300">
+                    {selectedDeviceDetail.last_time || (selectedDeviceDetail.last_heartbeat ? new Date(selectedDeviceDetail.last_heartbeat).toLocaleString() : '—')}
+                  </span>
+                </div>
+                <div className="flex justify-between border-t border-slate-200/60 dark:border-slate-700/60 pt-1.5">
+                  <span className="text-slate-400">Created / Registered At:</span>
+                  <span className="font-mono text-slate-700 dark:text-slate-300">
+                    {selectedDeviceDetail.created_at ? new Date(selectedDeviceDetail.created_at).toLocaleString() : '—'}
+                  </span>
+                </div>
               </div>
-            </div>
 
-            {/* Close Button */}
-            <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
-              <button
-                type="button"
-                onClick={() => setIsDeviceDetailOpen(false)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
+              {/* Close Button */}
+              <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsDeviceDetailOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
+                >
+                  {t('close', 'Close')}
+                </button>
+              </div>
 
-          </div>
-        )}
+            </div>
+          );
+        })()}
       </Modal>
 
       {/* Modal: Cloud Speaker - Edit Merchant Assignment */}

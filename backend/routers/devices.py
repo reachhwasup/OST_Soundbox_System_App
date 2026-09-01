@@ -169,8 +169,12 @@ async def list_devices(
                    COALESCE(d.last_online, d.last_heartbeat, d.updated_at, d.created_at) AS last_time,
                    COALESCE(d.last_heartbeat, d.last_online) AS last_heartbeat,
                    d.created_at,
-                   m.name AS store_name, m.owner_phone,
-                   COALESCE(u.full_name, m.name) AS owner_name
+                   m.name AS store_name,
+                   COALESCE(u.full_name, m.name) AS merchant_name,
+                   COALESCE(m.owner_phone, u.phone_number) AS owner_phone,
+                   COALESCE(u.phone_number, m.owner_phone) AS user_phone,
+                   COALESCE(u.full_name, m.name) AS owner_name,
+                   m.province, m.district, m.commune, m.village, m.street
             FROM devices d
             LEFT JOIN merchants m ON d.merchant_id = m.id
             LEFT JOIN users u ON m.user_id = u.id
@@ -185,11 +189,11 @@ async def list_devices(
             "devices": [
                 {
                     **dict(d),
-                    "created_at": d["created_at"].isoformat() if d["created_at"] else None,
-                    "warranty_start_date": d["warranty_start_date"].isoformat() if d["warranty_start_date"] else None,
-                    "warranty_end_date": d["warranty_end_date"].isoformat() if d["warranty_end_date"] else None,
-                    "last_heartbeat": d["last_heartbeat"].isoformat() if d["last_heartbeat"] else None,
-                    "last_time": d["last_time"].strftime("%Y-%m-%d %H:%M:%S") if d["last_time"] else None
+                    "created_at": d["created_at"].isoformat() if hasattr(d["created_at"], "isoformat") else (str(d["created_at"]) if d["created_at"] else None),
+                    "warranty_start_date": d["warranty_start_date"].isoformat() if hasattr(d["warranty_start_date"], "isoformat") else (str(d["warranty_start_date"]) if d["warranty_start_date"] else None),
+                    "warranty_end_date": d["warranty_end_date"].isoformat() if hasattr(d["warranty_end_date"], "isoformat") else (str(d["warranty_end_date"]) if d["warranty_end_date"] else None),
+                    "last_heartbeat": d["last_heartbeat"].isoformat() if hasattr(d["last_heartbeat"], "isoformat") else (str(d["last_heartbeat"]) if d["last_heartbeat"] else None),
+                    "last_time": d["last_time"].strftime("%Y-%m-%d %H:%M:%S") if hasattr(d["last_time"], "strftime") else (str(d["last_time"]) if d["last_time"] else None)
                 }
                 for d in devices
             ]
