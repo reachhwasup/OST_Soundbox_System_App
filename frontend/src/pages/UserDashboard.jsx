@@ -1239,16 +1239,12 @@ export default function UserDashboard() {
                               </td>
 
                               {/* Column 5: Battery Level */}
-                              <td className="py-3.5 px-4">
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
-                                    <BatteryCharging className="w-4 h-4 text-emerald-500 shrink-0" />
-                                    <span className="font-mono">95%</span>
-                                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-normal">({isKhmer ? 'ដោតភ្លើង' : 'AC Powered'})</span>
-                                  </div>
-                                  <div className="w-24 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                    <div className="h-full bg-emerald-500 rounded-full w-[95%]"></div>
-                                  </div>
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                                  <BatteryCharging className="w-4 h-4 text-emerald-500 shrink-0" />
+                                  <span className="font-mono text-xs">
+                                    {device.battery ? (String(device.battery).includes('%') ? device.battery : `${device.battery}%`) : '100%'}
+                                  </span>
                                 </div>
                               </td>
 
