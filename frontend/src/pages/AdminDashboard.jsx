@@ -598,7 +598,6 @@ export default function AdminDashboard() {
   // Open Sell from Stock Modal
   const openSellStockModal = (device) => {
     setSellTargetDevice(device);
-    setSellStoreId(stores[0] ? String(stores[0].id) : '');
     setSellDiscountType('NONE');
     setSellDiscountPercent(0);
     setSellDiscountAmount(0);
@@ -607,13 +606,10 @@ export default function AdminDashboard() {
     setIsSellStockOpen(true);
   };
 
-  // Confirm Sale & Proceed to QR Pairing
+  // Confirm Sale & Deploy
   const handleConfirmSellAndProceedToPairing = async (e) => {
     e.preventDefault();
-    if (!sellTargetDevice || !sellStoreId) {
-      showToast({ type: 'error', title: 'Store Required', message: 'Please select a customer store.' });
-      return;
-    }
+    if (!sellTargetDevice) return;
     setSellSubmitting(true);
 
     const basePrice = Number(sellTargetDevice.price) || (sellTargetDevice.device_type === 'Display Soundbox' ? 39.00 : 29.00);
@@ -627,14 +623,13 @@ export default function AdminDashboard() {
       discPct = 0;
     }
     const finalPrice = Math.max(0, basePrice - discAmt);
-    const targetStore = stores.find(s => String(s.id) === String(sellStoreId));
 
     try {
       await api.put(`/api/devices/${sellTargetDevice.id}`, {
         device_sn: sellTargetDevice.device_sn,
         device_type: sellTargetDevice.device_type || 'Display Soundbox',
         device_model: sellTargetDevice.device_model || sellTargetDevice.device_type || 'Display Soundbox',
-        merchant_id: parseInt(sellStoreId),
+        merchant_id: null,
         price: basePrice,
         discount_amount: discAmt,
         discount_percent: discPct,
@@ -652,10 +647,10 @@ export default function AdminDashboard() {
 
       showToast({
         type: 'success',
-        title: isKhmer ? 'បានលក់ឧបករណ៍ដោយជោគជ័យ' : 'Device Sold & Assigned',
+        title: isKhmer ? 'បានលក់ឧបករណ៍ដោយជោគជ័យ' : 'Device Sold & Deployed',
         message: isKhmer 
-          ? `ឧបករណ៍បានចាត់ចែងជូន ${targetStore?.name || 'ហាង'} (ស្ថានភាព៖ រង់ចាំការចុះឈ្មោះ)` 
-          : `Soundbox assigned to ${targetStore?.name || 'store'}. Status: Waiting for Registration.`,
+          ? `ឧបករណ៍ស្ថិតក្នុងស្ថានភាព៖ រង់ចាំការចុះឈ្មោះ (អតិថិជននឹងស្កេនភ្ជាប់តាមហាងរបស់ពួកគាត់)` 
+          : `Device marked as sold. Status: Waiting for Registration (Ready for user to scan & link).`,
         duration: 5000
       });
     } catch (err) {
@@ -862,8 +857,8 @@ export default function AdminDashboard() {
   // Cloud Speaker Device (Deployed) Filtering Logic
   const filteredDevices = useMemo(() => {
     return devices.filter(d => {
-      // Must be assigned to a merchant store
-      if (!d.merchant_id) return false;
+      // Must be assigned to a merchant store OR in PENDING status (sold, waiting for user to register)
+      if (!d.merchant_id && String(d.status).toUpperCase() !== 'PENDING') return false;
 
       if (devFilterId.trim()) {
         const idMatch = String(d.device_id || d.device_sn || d.id || '').toLowerCase().includes(devFilterId.trim().toLowerCase());
@@ -907,8 +902,8 @@ export default function AdminDashboard() {
   // Warehouse Stock Devices Filtering Logic
   const filteredStockDevices = useMemo(() => {
     return devices.filter(d => {
-      // Must be unassigned / IN_STOCK
-      if (d.merchant_id && String(d.status).toUpperCase() !== 'IN_STOCK') return false;
+      // Must be IN_STOCK and unassigned (not PENDING and not assigned)
+      if (d.merchant_id || String(d.status).toUpperCase() !== 'IN_STOCK') return false;
 
       if (stockSearchTerm.trim()) {
         const q = stockSearchTerm.toLowerCase().trim();
@@ -1983,7 +1978,7 @@ export default function AdminDashboard() {
                 <span>{t('deployedSoundboxes', 'Deployed Soundboxes')}</span>
               </div>
               <div className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
-                {devices.filter(d => d.merchant_id).length}
+                {devices.filter(d => d.merchant_id || String(d.status).toUpperCase() === 'PENDING').length}
               </div>
               <div className="text-[10px] text-slate-400 mt-0.5">{t('activeInMerchantStores', 'Active in Merchant Stores')}</div>
             </div>
@@ -2267,7 +2262,7 @@ export default function AdminDashboard() {
                             </td>
                           )}
 
-                          {/* Merchant ID */}
+                          {/* Merchant ID / Store */}
                           {visibleColumns.merchantId && (
                             <td className="py-3.5 px-3 text-slate-600 dark:text-slate-300">
                               {d.store_name ? (
@@ -2275,6 +2270,11 @@ export default function AdminDashboard() {
                                   <span className="font-semibold text-slate-900 dark:text-white">{d.store_name}</span>
                                   {d.merchant_id && <span className="text-[10px] text-slate-400 font-mono">Store ID: #{d.merchant_id}</span>}
                                 </div>
+                              ) : String(d.status).toUpperCase() === 'PENDING' ? (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-2.5 py-1 rounded-md border border-purple-200/60 dark:border-purple-800/40 whitespace-nowrap">
+                                  <Clock className="w-3 h-3 text-purple-500 animate-pulse" />
+                                  <span>{t('awaitingStoreLink', 'Awaiting Store Link')}</span>
+                                </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-200/60 dark:border-amber-800/40">
                                   <Package className="w-3 h-3" />
@@ -4913,26 +4913,6 @@ export default function AdminDashboard() {
               <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
                 ${Number(sellTargetDevice.price || (sellTargetDevice.device_type === 'Display Soundbox' ? 39 : 29)).toFixed(2)}
               </span>
-            </div>
-
-            {/* Target Store Selection */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                {t('assignStore', 'Select Customer Store')} <span className="text-rose-500">*</span>
-              </label>
-              <select
-                value={sellStoreId}
-                onChange={(e) => setSellStoreId(e.target.value)}
-                className="w-full px-3 py-2.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
-                required
-              >
-                <option value="">-- {t('assignStore', 'Select Store')} --</option>
-                {stores.map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.owner_phone}) - #{s.id}
-                  </option>
-                ))}
-              </select>
             </div>
 
             {/* Discount Calculation Card */}

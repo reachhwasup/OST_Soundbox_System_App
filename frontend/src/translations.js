@@ -316,6 +316,7 @@ export const translations = {
     pairedSuccessfully: "Soundbox paired and activated successfully!",
     waitingForRegistration: "Waiting for Registration",
     confirmSaleAndDeploy: "Confirm Sale & Deploy",
+    awaitingStoreLink: "Awaiting Store Link",
     
     // Language & Theme
     language: "Language",
@@ -647,6 +648,7 @@ export const translations = {
     pairedSuccessfully: "Soundbox ត្រូវបានភ្ជាប់ និងដំណើរការដោយជោគជ័យ!",
     waitingForRegistration: "រង់ចាំការចុះឈ្មោះ",
     confirmSaleAndDeploy: "បញ្ជាក់ការលក់ & ដាក់ឱ្យប្រើ",
+    awaitingStoreLink: "មិនទាន់ភ្ជាប់ហាង (រង់ចាំការចុះឈ្មោះ)",
     
     // Language & Theme
     language: "ភាសា",

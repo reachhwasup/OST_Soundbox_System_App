@@ -582,7 +582,7 @@ async def update_device(
             idx += 1
             if payload.status.strip().upper() == 'ACTIVE':
                 updates.append("is_active = TRUE")
-            elif payload.status.strip().upper() in ['IN_STOCK', 'MAINTENANCE', 'RETIRED']:
+            elif payload.status.strip().upper() in ['IN_STOCK', 'MAINTENANCE', 'PENDING', 'RETIRED']:
                 updates.append("is_active = FALSE")
 
         if payload.merchant_id is not None:
