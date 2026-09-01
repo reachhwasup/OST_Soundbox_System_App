@@ -1320,11 +1320,58 @@ export default function UserDashboard() {
                       </tbody>
                     </table>
                   </div>
+                ) : allUserDevices.length === 0 ? (
+                  <div className="text-center py-16 px-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl space-y-4 max-w-md mx-auto my-4">
+                    <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto shadow-xs">
+                      <Volume2 className="w-7 h-7" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <h4 className="text-base font-bold text-slate-900 dark:text-white">
+                        {isKhmer ? 'មិនទាន់មានឧបករណ៍ Soundbox ភ្ជាប់នៅឡើយទេ' : 'No Soundbox Devices Linked Yet'}
+                      </h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        {isKhmer 
+                          ? 'សូមភ្ជាប់ឧបករណ៍ 4G Cloud Soundbox ទៅកាន់សាខាហាងរបស់អ្នក ដើម្បីចាប់ផ្តើមទទួលការផ្សាយសំឡេងទូទាត់ប្រាក់ភ្លាមៗ។'
+                          : 'Link a 4G Cloud Soundbox speaker to your store branch to start receiving real-time voice payment announcements.'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveCameraField(null);
+                        setScanFeedback({ field: '', message: '', isError: false });
+                        setIsDeviceModalOpen(true);
+                      }}
+                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-xs transition inline-flex items-center gap-2 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>{isKhmer ? '+ ភ្ជាប់ឧបករណ៍ Soundbox' : '+ Link Your First Soundbox'}</span>
+                    </button>
+                  </div>
                 ) : (
-                  <div className="text-center py-14 text-slate-500 space-y-2">
-                    <Volume2 className="w-10 h-10 text-slate-300 mx-auto" />
-                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">No Soundbox devices found</p>
-                    <p className="text-xs text-slate-400">Try changing your search keyword or store filter.</p>
+                  <div className="text-center py-14 px-4 space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
+                      <Search className="w-6 h-6" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                        {isKhmer ? 'រកមិនឃើញឧបករណ៍ត្រូវនឹងពាក្យស្វែងរកទេ' : 'No Soundbox devices matched your filters'}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {isKhmer ? 'សូមសាកល្បងផ្លាស់ប្តូរពាក្យគន្លឹះ ឬជ្រើសរើសសាខាផ្សេង' : 'Try adjusting your search keyword or clearing the status/branch filter.'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeviceSearchTerm('');
+                        setDeviceStoreFilter('ALL');
+                        setDeviceStatusFilter('ALL');
+                      }}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition cursor-pointer"
+                    >
+                      {isKhmer ? 'សម្អាតការស្វែងរក' : 'Clear Filters'}
+                    </button>
                   </div>
                 )}
 
