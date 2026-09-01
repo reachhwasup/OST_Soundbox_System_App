@@ -129,26 +129,8 @@ export default function Navbar({ onOpenSidebar }) {
 
             {/* Floating Profile Dropdown Popover */}
             {isProfileDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-64 sm:w-72 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="absolute right-0 mt-2 w-56 sm:w-64 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150 space-y-1">
                 
-                {/* User Info Header */}
-                <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/60 dark:border-slate-700/50 mb-1.5">
-                  <div className="flex items-center justify-between">
-                    <div className="font-bold text-xs text-slate-900 dark:text-white truncate flex items-center gap-1">
-                      <span>{user.full_name || user.phone_number}</span>
-                      <BadgeCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    </div>
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
-                      isAdmin ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
-                    }`}>
-                      {isAdmin ? 'Admin' : 'Merchant'}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 font-mono mt-0.5">
-                    {user.phone_number}
-                  </div>
-                </div>
-
                 {/* Action 1: Change Name / Edit Profile */}
                 <button
                   type="button"
