@@ -205,11 +205,11 @@ export default function AdminDashboard() {
     price: true,
     warranty: true,
     status: true,
-    battery: true,
-    signal: true,
-    version4g: true,
-    versionWifi: true,
-    lastTime: true,
+    battery: false,
+    signal: false,
+    version4g: false,
+    versionWifi: false,
+    lastTime: false,
     operation: true
   });
 
@@ -4656,12 +4656,13 @@ export default function AdminDashboard() {
                 deviceType: true,
                 merchantId: true,
                 price: true,
+                warranty: true,
                 status: true,
-                battery: true,
-                signal: true,
-                version4g: true,
-                versionWifi: true,
-                lastTime: true,
+                battery: false,
+                signal: false,
+                version4g: false,
+                versionWifi: false,
+                lastTime: false,
                 operation: true
               })}
               className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
