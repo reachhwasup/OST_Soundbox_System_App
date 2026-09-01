@@ -2308,23 +2308,12 @@ export default function AdminDashboard() {
                             </td>
                           )}
 
-                          {/* Unit Price with Discount indicator */}
+                          {/* Unit Price */}
                           {visibleColumns.price && (
                             <td className="py-3.5 px-3 text-center font-mono whitespace-nowrap">
-                              {Number(d.discount_amount) > 0 || Number(d.discount_percent) > 0 ? (
-                                <div>
-                                  <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">
-                                    ${Number(d.final_price || d.price).toFixed(2)}
-                                  </span>
-                                  <span className="text-[10px] text-slate-400 line-through ml-1.5">
-                                    ${Number(d.price || 29).toFixed(2)}
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">
-                                  ${Number(d.price || 29).toFixed(2)}
-                                </span>
-                              )}
+                              <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">
+                                ${Number(d.final_price || d.price || 29).toFixed(2)}
+                              </span>
                             </td>
                           )}
 
