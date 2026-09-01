@@ -1897,7 +1897,7 @@ export default function UserDashboard() {
                   className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white"
                 >
                   {stores.map(s => (
-                    <option key={s.id} value={s.id}>{s.name} ({s.location || s.place})</option>
+                    <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
               </div>
@@ -2183,7 +2183,7 @@ export default function UserDashboard() {
                 >
                   {stores.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.name} ({s.location || s.place || 'Main'})
+                      {s.name}
                     </option>
                   ))}
                 </select>
