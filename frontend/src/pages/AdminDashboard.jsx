@@ -2308,12 +2308,28 @@ export default function AdminDashboard() {
                             </td>
                           )}
 
-                          {/* Unit Price */}
+                          {/* Unit Price & Discount */}
                           {visibleColumns.price && (
                             <td className="py-3.5 px-3 text-center font-mono whitespace-nowrap">
-                              <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">
-                                ${Number(d.final_price || d.price || 29).toFixed(2)}
-                              </span>
+                              {Number(d.discount_amount) > 0 || Number(d.discount_percent) > 0 ? (
+                                <div className="inline-flex flex-col items-center">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">
+                                      ${Number(d.final_price || d.price).toFixed(2)}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 line-through">
+                                      ${Number(d.price || 29).toFixed(2)}
+                                    </span>
+                                  </div>
+                                  <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/60 px-1.5 py-0.2 rounded-md mt-0.5">
+                                    {Number(d.discount_percent) > 0 ? `${d.discount_percent}% OFF` : `-$${Number(d.discount_amount).toFixed(2)} OFF`}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">
+                                  ${Number(d.price || 29).toFixed(2)}
+                                </span>
+                              )}
                             </td>
                           )}
 
@@ -4360,26 +4376,6 @@ export default function AdminDashboard() {
                 <div className="font-mono text-slate-700 dark:text-slate-300 font-bold mt-0.5 truncate" title={selectedDeviceDetail.version_wifi}>
                   {selectedDeviceDetail.version_wifi || 'esp32c2x_2M_OTA'}
                 </div>
-              </div>
-
-              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('finalPrice', 'Selling Price')}</span>
-                <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 mt-0.5">
-                  <DollarSign className="w-4 h-4" />
-                  <span>${Number(selectedDeviceDetail.final_price || selectedDeviceDetail.price || 29).toFixed(2)}</span>
-                  {(Number(selectedDeviceDetail.discount_amount) > 0 || Number(selectedDeviceDetail.discount_percent) > 0) && (
-                    <span className="text-[10px] text-slate-400 line-through font-normal">
-                      ${Number(selectedDeviceDetail.price || 29).toFixed(2)}
-                    </span>
-                  )}
-                </div>
-                {(Number(selectedDeviceDetail.discount_amount) > 0 || Number(selectedDeviceDetail.discount_percent) > 0) && (
-                  <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
-                    {Number(selectedDeviceDetail.discount_percent) > 0 
-                      ? `${selectedDeviceDetail.discount_percent}% OFF (-$${Number(selectedDeviceDetail.discount_amount).toFixed(2)})`
-                      : `-$${Number(selectedDeviceDetail.discount_amount).toFixed(2)} OFF`}
-                  </div>
-                )}
               </div>
 
               <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
