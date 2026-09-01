@@ -1195,64 +1195,6 @@ export default function UserDashboard() {
           {/* ======================================================== */}
           {merchantTab === 'devices' && (
             <div className="space-y-5 sm:space-y-6">
-              
-              {/* Top Fleet Summary Metrics */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Soundbox Fleet</span>
-                    <div className="p-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 rounded-lg">
-                      <Volume2 className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                    {allUserDevices.length} <span className="text-xs font-normal text-slate-400">speakers</span>
-                  </div>
-                  <span className="text-[11px] text-slate-400">Across all store branches</span>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Active & Online</span>
-                    <div className="p-1.5 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 rounded-lg">
-                      <Zap className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
-                    {allUserDevices.filter(d => String(d.status).toUpperCase() === 'ACTIVE' || String(d.status).toUpperCase() === 'ONLINE').length}
-                  </div>
-                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span>Ready for instant broadcasts</span>
-                  </span>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Battery Status</span>
-                    <div className="p-1.5 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 rounded-lg">
-                      <BatteryCharging className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                    95% <span className="text-xs font-normal text-emerald-600 font-sans font-bold">Good</span>
-                  </div>
-                  <span className="text-[11px] text-slate-400">Continuous AC power connected</span>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">4G LTE Cellular</span>
-                    <div className="p-1.5 bg-blue-50 dark:bg-blue-950/60 text-blue-600 rounded-lg">
-                      <Signal className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-black text-blue-600 dark:text-blue-400 font-mono tracking-tight">
-                    Full <span className="text-xs font-normal text-slate-400 font-sans">(-65 dBm)</span>
-                  </div>
-                  <span className="text-[11px] text-slate-400">Ultra-low latency connection</span>
-                </div>
-              </div>
 
               {/* Device Table & Filter Toolbar Card */}
               <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
