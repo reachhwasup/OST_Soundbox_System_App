@@ -117,10 +117,10 @@ export default function Navbar({ onOpenSidebar }) {
               </div>
               <div className="hidden sm:block text-left max-w-[120px]">
                 <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                  {user.full_name || user.phone_number}
+                  {user?.full_name ? user.full_name.replace(/\s*\([^)]*\)/g, '').trim() : user?.phone_number}
                 </div>
                 <div className="text-[10px] text-slate-400 font-mono truncate">
-                  {user.phone_number}
+                  {user?.phone_number}
                 </div>
               </div>
               <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isProfileDropdownOpen ? 'rotate-180 text-emerald-600' : ''}`} />
@@ -141,7 +141,7 @@ export default function Navbar({ onOpenSidebar }) {
                 >
                   <div className="flex items-center gap-2">
                     <UserCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>{isKhmer ? 'ប្តូរឈ្មោះ & ព័ត៌មាន (Edit Profile)' : 'Edit Name & Profile'}</span>
+                    <span>{isKhmer ? 'ប្តូរឈ្មោះ និងព័ត៌មាន' : 'Edit Name & Profile'}</span>
                   </div>
                 </button>
 

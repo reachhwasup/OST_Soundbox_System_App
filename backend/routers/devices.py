@@ -13,6 +13,7 @@ class DeviceRegisterSchema(BaseModel):
     device_sn: str = Field(..., description="Serial Number of Soundbox Y6B")
     telegram_chat_id: Optional[str] = None
     device_model: str = "Y6B"
+    price: Optional[float] = 29.00
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
@@ -51,9 +52,9 @@ async def register_device(
             # Reassign / link to this merchant and activate
             await conn.execute("""
                 UPDATE devices 
-                SET merchant_id = $1, telegram_chat_id = $2, device_model = $3, status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
-                WHERE id = $4
-            """, payload.merchant_id, chat_id, payload.device_model or "Y6B", existing_device["id"])
+                SET merchant_id = $1, telegram_chat_id = $2, device_model = $3, price = COALESCE($4, price, 29.00), status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
+                WHERE id = $5
+            """, payload.merchant_id, chat_id, payload.device_model or "Y6B", payload.price, existing_device["id"])
 
             return {
                 "status": "success",
@@ -63,10 +64,10 @@ async def register_device(
         else:
             # Insert new device linked to merchant
             new_id = await conn.fetchval("""
-                INSERT INTO devices (merchant_id, device_sn, device_model, telegram_chat_id, status)
-                VALUES ($1, $2, $3, $4, 'ACTIVE')
+                INSERT INTO devices (merchant_id, device_sn, device_model, telegram_chat_id, price, status)
+                VALUES ($1, $2, $3, $4, $5, 'ACTIVE')
                 RETURNING id
-            """, payload.merchant_id, device_sn, payload.device_model or "Y6B", chat_id)
+            """, payload.merchant_id, device_sn, payload.device_model or "Y6B", chat_id, payload.price or 29.00)
 
             return {
                 "status": "success",
@@ -113,6 +114,7 @@ async def list_devices(
                    d.merchant_id,
                    COALESCE(d.batch_no, 'BATCH-STD') AS batch_no,
                    d.notes,
+                   COALESCE(d.price, 29.00) AS price,
                    COALESCE(d.telegram_chat_id, d.chat_id) AS telegram_chat_id,
                    COALESCE(d.status::text, CASE WHEN d.merchant_id IS NULL THEN 'IN_STOCK' WHEN d.is_active = FALSE THEN 'Offline' ELSE 'Online' END, 'IN_STOCK') AS status,
                    COALESCE(d.battery, '100%') AS battery,
@@ -152,6 +154,7 @@ class DeviceBulkImportSchema(BaseModel):
     device_model: str = "Y6B"
     batch_no: Optional[str] = None
     notes: Optional[str] = None
+    price: Optional[float] = 29.00
 
 
 @router.post("/bulk-import", status_code=status.HTTP_201_CREATED)
@@ -182,9 +185,9 @@ async def bulk_import_devices(
                 continue
 
             await conn.execute("""
-                INSERT INTO devices (device_id, device_sn, device_model, batch_no, notes, status, is_active, battery, signal)
-                VALUES ($1, $1, $2, $3, $4, 'IN_STOCK', FALSE, '100%', 'Good')
-            """, sn, payload.device_model or "Y6B", payload.batch_no or "BATCH-BULK", payload.notes)
+                INSERT INTO devices (device_id, device_sn, device_model, batch_no, notes, price, status, is_active, battery, signal)
+                VALUES ($1, $1, $2, $3, $4, $5, 'IN_STOCK', FALSE, '100%', 'Good')
+            """, sn, payload.device_model or "Y6B", payload.batch_no or "BATCH-BULK", payload.notes, payload.price or 29.00)
             imported_count += 1
 
         return {
@@ -201,6 +204,7 @@ class DeviceIntakeSchema(BaseModel):
     batch_no: Optional[str] = None
     notes: Optional[str] = None
     merchant_id: Optional[int] = None
+    price: Optional[float] = 29.00
 
 
 @router.post("/intake", status_code=status.HTTP_201_CREATED)
@@ -229,10 +233,10 @@ async def intake_single_device(
         is_active = True if payload.merchant_id else False
 
         new_id = await conn.fetchval("""
-            INSERT INTO devices (device_id, device_sn, device_model, merchant_id, batch_no, notes, status, is_active, battery, signal)
-            VALUES ($1, $1, $2, $3, $4, $5, $6::device_status, $7, '100%', 'Good')
+            INSERT INTO devices (device_id, device_sn, device_model, merchant_id, batch_no, notes, price, status, is_active, battery, signal)
+            VALUES ($1, $1, $2, $3, $4, $5, $6, $7::device_status, $8, '100%', 'Good')
             RETURNING id
-        """, sn, payload.device_model or "Y6B", payload.merchant_id, payload.batch_no or "BATCH-SINGLE", payload.notes, initial_status, is_active)
+        """, sn, payload.device_model or "Y6B", payload.merchant_id, payload.batch_no or "BATCH-SINGLE", payload.notes, payload.price or 29.00, initial_status, is_active)
 
         return {
             "status": "success",
@@ -382,6 +386,7 @@ class DeviceUpdateSchema(BaseModel):
     merchant_id: Optional[int] = None
     batch_no: Optional[str] = None
     notes: Optional[str] = None
+    price: Optional[float] = None
 
 
 @router.put("/{device_id}")
@@ -442,6 +447,11 @@ async def update_device(
         if payload.notes is not None:
             updates.append(f"notes = ${idx}")
             params.append(payload.notes.strip())
+            idx += 1
+
+        if payload.price is not None:
+            updates.append(f"price = ${idx}")
+            params.append(float(payload.price))
             idx += 1
 
         if payload.status is not None:

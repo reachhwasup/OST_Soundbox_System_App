@@ -73,6 +73,7 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
             devices = await conn.fetch(
                 """
                 SELECT id, device_sn, device_model, telegram_chat_id, status,
+                       COALESCE(price, 29.00) AS price,
                        COALESCE(battery, '100%') AS battery,
                        COALESCE(signal, 'Good') AS signal,
                        COALESCE(last_online, last_heartbeat, updated_at, created_at) AS last_active,

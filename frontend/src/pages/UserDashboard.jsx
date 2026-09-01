@@ -1161,6 +1161,7 @@ export default function UserDashboard() {
                         <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-500 uppercase tracking-wider">
                           <th className="py-3 px-4">{isKhmer ? 'ឧបករណ៍ Soundbox (SN)' : 'Soundbox Device (SN)'}</th>
                           <th className="py-3 px-4">{isKhmer ? 'សាខាហាង' : 'Assigned Store'}</th>
+                          <th className="py-3 px-4 text-center">{isKhmer ? 'តម្លៃឧបករណ៍' : 'Unit Price'}</th>
                           <th className="py-3 px-4">{isKhmer ? 'ស្ថានភាព' : 'Status'}</th>
                           <th className="py-3 px-4">{isKhmer ? 'សកម្មភាពចុងក្រោយ' : 'Last Active'}</th>
                           <th className="py-3 px-4">{isKhmer ? 'ថាមពលថ្ម' : 'Battery Level'}</th>
@@ -1207,7 +1208,14 @@ export default function UserDashboard() {
                                 </div>
                               </td>
 
-                              {/* Column 3: Status */}
+                              {/* Column 3: Unit Price */}
+                              <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                                <span className="font-mono text-xs font-bold text-slate-900 dark:text-white">
+                                  ${Number(device.price || 29).toFixed(2)}
+                                </span>
+                              </td>
+
+                              {/* Column 4: Status */}
                               <td className="py-3.5 px-4">
                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${
                                   isOnline

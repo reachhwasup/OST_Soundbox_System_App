@@ -168,11 +168,13 @@ export default function AdminDashboard() {
   const [bulkModel, setBulkModel] = useState('Y6B');
   const [bulkBatchNo, setBulkBatchNo] = useState(`BATCH-${new Date().toISOString().slice(0,7)}`);
   const [bulkNotes, setBulkNotes] = useState('');
+  const [bulkPrice, setBulkPrice] = useState('29.00');
   const [singleSnInput, setSingleSnInput] = useState('');
   const [singleModel, setSingleModel] = useState('Y6B');
   const [singleStoreId, setSingleStoreId] = useState('');
   const [singleBatchNo, setSingleBatchNo] = useState(`BATCH-${new Date().toISOString().slice(0,7)}`);
   const [singleNotes, setSingleNotes] = useState('');
+  const [singlePrice, setSinglePrice] = useState('29.00');
   const [stockSubmitting, setStockSubmitting] = useState(false);
 
   const [isDeviceDetailOpen, setIsDeviceDetailOpen] = useState(false);
@@ -192,6 +194,7 @@ export default function AdminDashboard() {
     deviceId: true,
     deviceType: true,
     merchantId: true,
+    price: true,
     status: true,
     battery: true,
     signal: true,
@@ -226,6 +229,7 @@ export default function AdminDashboard() {
   const [editDeviceTelegram, setEditDeviceTelegram] = useState('');
   const [editDeviceMerchantId, setEditDeviceMerchantId] = useState('');
   const [editDeviceStatus, setEditDeviceStatus] = useState('ACTIVE');
+  const [editDevicePrice, setEditDevicePrice] = useState('29.00');
 
   // Form states for Create User
   const [newPhone, setNewPhone] = useState('');
@@ -806,7 +810,8 @@ export default function AdminDashboard() {
         serial_numbers: rawLines,
         device_model: bulkModel,
         batch_no: bulkBatchNo,
-        notes: bulkNotes
+        notes: bulkNotes,
+        price: Number(bulkPrice) || 29.00
       });
       showToast({
         type: 'success',
@@ -841,6 +846,7 @@ export default function AdminDashboard() {
         device_model: singleModel,
         batch_no: singleBatchNo,
         notes: singleNotes,
+        price: Number(singlePrice) || 29.00,
         merchant_id: singleStoreId ? Number(singleStoreId) : null
       });
       showToast({
@@ -2020,7 +2026,8 @@ export default function AdminDashboard() {
                     </th>
                     {visibleColumns.deviceId && <th className="py-3 px-3 font-semibold">{t('deviceId', 'Device ID')}</th>}
                     {visibleColumns.deviceType && <th className="py-3 px-3 font-semibold">{t('deviceType', 'Device Type')}</th>}
-                    {visibleColumns.merchantId && <th className="py-3 px-3 font-semibold">{t('merchantId', 'Merchant ID')}</th>}
+                    {visibleColumns.merchantId && <th className="py-3 px-3 font-semibold">{t('merchantStore', 'Assigned Store')}</th>}
+                    {visibleColumns.price && <th className="py-3 px-3 font-semibold text-center">{t('price', 'Price')}</th>}
                     {visibleColumns.status && <th className="py-3 px-3 font-semibold text-center">{t('status', 'Status')}</th>}
                     {visibleColumns.battery && <th className="py-3 px-3 font-semibold text-center">{t('battery', 'Battery')}</th>}
                     {visibleColumns.signal && <th className="py-3 px-3 font-semibold text-center">{t('signal', 'Signal')}</th>}
@@ -2087,6 +2094,13 @@ export default function AdminDashboard() {
                                   Warehouse Stock
                                 </span>
                               )}
+                            </td>
+                          )}
+
+                          {/* Price */}
+                          {visibleColumns.price && (
+                            <td className="py-3.5 px-3 text-center font-mono font-bold text-slate-800 dark:text-slate-200">
+                              ${Number(d.price || 29).toFixed(2)}
                             </td>
                           )}
 
@@ -2302,7 +2316,7 @@ export default function AdminDashboard() {
         <div className="space-y-4">
 
           {/* 0. Warehouse Stock KPI Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
               <div className="text-[10px] sm:text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Warehouse className="w-3.5 h-3.5" />
@@ -2311,7 +2325,18 @@ export default function AdminDashboard() {
               <div className="text-xl sm:text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">
                 {devices.filter(d => !d.merchant_id || String(d.status).toUpperCase() === 'IN_STOCK').length}
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">Unassigned & Ready for Deployment</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Unassigned & Ready</div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+              <div className="text-[10px] sm:text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                <DollarSign className="w-3.5 h-3.5" />
+                <span>Stock Asset Value</span>
+              </div>
+              <div className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
+                ${devices.filter(d => !d.merchant_id || String(d.status).toUpperCase() === 'IN_STOCK').reduce((sum, d) => sum + (Number(d.price) || 29), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Valuation ($29–$39/unit)</div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
@@ -2322,7 +2347,7 @@ export default function AdminDashboard() {
               <div className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
                 {Array.from(new Set(devices.filter(d => (!d.merchant_id || String(d.status).toUpperCase() === 'IN_STOCK') && d.batch_no).map(d => d.batch_no))).length || 1}
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">Active Shipment Batches</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Active Shipments</div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
@@ -2333,7 +2358,7 @@ export default function AdminDashboard() {
               <div className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">
                 {devices.length}
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">All Registered Soundboxes</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">All Soundboxes</div>
             </div>
           </div>
 
@@ -2442,6 +2467,7 @@ export default function AdminDashboard() {
                   <tr className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 font-bold uppercase tracking-wider">
                     <th className="py-3 px-4">Soundbox (SN)</th>
                     <th className="py-3 px-3">Batch No</th>
+                    <th className="py-3 px-3 text-center">Unit Price</th>
                     <th className="py-3 px-3 text-center">Status</th>
                     <th className="py-3 px-3">Intake Date</th>
                     <th className="py-3 px-3">Hardware / Firmware</th>
@@ -2476,7 +2502,12 @@ export default function AdminDashboard() {
                           </span>
                         </td>
 
-                        {/* Column 3: Status */}
+                        {/* Column 3: Unit Price */}
+                        <td className="py-3.5 px-3 text-center font-mono font-bold text-slate-800 dark:text-slate-200">
+                          ${Number(d.price || 29).toFixed(2)}
+                        </td>
+
+                        {/* Column 4: Status */}
                         <td className="py-3.5 px-3 text-center">
                           <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
                             📦 In Stock
@@ -3989,6 +4020,14 @@ export default function AdminDashboard() {
               </div>
 
               <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">Unit Price</span>
+                <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 mt-0.5">
+                  <DollarSign className="w-4 h-4" />
+                  ${Number(selectedDeviceDetail.price || 29).toFixed(2)}
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
                 <span className="text-[10px] text-slate-400 uppercase font-semibold">Linked Store</span>
                 <div className="font-semibold text-slate-900 dark:text-white mt-0.5 truncate">
                   {selectedDeviceDetail.store_name || 'Unassigned'}
@@ -4287,7 +4326,7 @@ export default function AdminDashboard() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Device Model
@@ -4297,15 +4336,29 @@ export default function AdminDashboard() {
                     onChange={(e) => setBulkModel(e.target.value)}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
                   >
-                    <option value="Y6B">Y6B (LCD Display 4G+WiFi)</option>
+                    <option value="Y6B">Y6B (LCD 4G+WiFi)</option>
                     <option value="Y6_LCD">Y6 LCD Standard</option>
-                    <option value="S1">S1 Compact Soundbox</option>
+                    <option value="S1">S1 Compact</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Batch / PO Reference
+                    Unit Price ($ USD)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={bulkPrice}
+                    onChange={(e) => setBulkPrice(e.target.value)}
+                    placeholder="29.00"
+                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Batch / PO Ref
                   </label>
                   <input
                     type="text"
@@ -4377,7 +4430,7 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Device Model
@@ -4387,15 +4440,29 @@ export default function AdminDashboard() {
                     onChange={(e) => setSingleModel(e.target.value)}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
                   >
-                    <option value="Y6B">Y6B (LCD Display 4G+WiFi)</option>
+                    <option value="Y6B">Y6B (LCD 4G+WiFi)</option>
                     <option value="Y6_LCD">Y6 LCD Standard</option>
-                    <option value="S1">S1 Compact Soundbox</option>
+                    <option value="S1">S1 Compact</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Batch / PO Reference
+                    Unit Price ($ USD)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={singlePrice}
+                    onChange={(e) => setSinglePrice(e.target.value)}
+                    placeholder="29.00"
+                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Batch / PO Ref
                   </label>
                   <input
                     type="text"
