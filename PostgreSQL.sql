@@ -1,8 +1,30 @@
 -- ====================================================================
--- OST SOUNDBOX SYSTEM - PRODUCTION-MATCHED UNIFIED SCHEMA
+-- OST SOUNDBOX SYSTEM - PRODUCTION UNIFIED DATABASE SCHEMA
 -- ====================================================================
 
--- 1. Users Table (Authentication & Permissions)
+-- 1. Custom Enum Types
+DO $$ BEGIN
+    CREATE TYPE user_role AS ENUM ('ADMIN', 'USER');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+    CREATE TYPE user_status AS ENUM ('ACTIVE', 'PENDING', 'SUSPENDED');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+    CREATE TYPE device_status AS ENUM ('ACTIVE', 'INACTIVE', 'MAINTENANCE', 'IN_STOCK', 'RETIRED');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+    CREATE TYPE currency_type AS ENUM ('USD', 'KHR');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+    CREATE TYPE tx_status AS ENUM ('PENDING', 'PROCESSED', 'FAILED', 'DUPLICATE');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+
+-- 2. Users Table (Authentication & Permissions)
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     phone_number VARCHAR(50) NOT NULL UNIQUE,
@@ -20,14 +42,14 @@ CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 
 
--- 2. Merchants Table (Stores & Branches)
+-- 3. Merchants / Stores Table
 CREATE TABLE IF NOT EXISTS merchants (
-    merchant_id VARCHAR(100) PRIMARY KEY,
-    id SERIAL,
-    merchant_name VARCHAR(255) NOT NULL,
-    name VARCHAR(255),
-    owner_phone VARCHAR(50),
+    id SERIAL PRIMARY KEY,
+    merchant_id VARCHAR(100),
     user_id INT REFERENCES users(id) ON DELETE SET NULL,
+    name VARCHAR(255) NOT NULL,
+    merchant_name VARCHAR(255),
+    owner_phone VARCHAR(50) NOT NULL,
     place VARCHAR(255),
     location VARCHAR(255),
     province VARCHAR(100),
@@ -43,37 +65,35 @@ CREATE INDEX IF NOT EXISTS idx_merchants_user_id ON merchants(user_id);
 CREATE INDEX IF NOT EXISTS idx_merchants_owner_phone ON merchants(owner_phone);
 
 
--- 3. Devices Table (Soundbox Speakers & Telemetry)
+-- 4. Soundbox Devices Table (Hardware Fleet & Telemetry)
 CREATE TABLE IF NOT EXISTS devices (
-    device_id VARCHAR(100) PRIMARY KEY,
-    id SERIAL,
-    merchant_id VARCHAR(100),
-    chat_id VARCHAR(100),
-    device_name VARCHAR(255),
-    device_sn VARCHAR(100),
-    device_type VARCHAR(50) DEFAULT 'Soundbox',
-    device_model VARCHAR(50) DEFAULT 'Y6B',
+    id SERIAL PRIMARY KEY,
+    device_id VARCHAR(100),
+    device_sn VARCHAR(100) UNIQUE NOT NULL,
+    merchant_id INT REFERENCES merchants(id) ON DELETE SET NULL,
+    device_type VARCHAR(50) DEFAULT 'Display Soundbox',
+    price NUMERIC(10, 2) DEFAULT 29.00,
     telegram_chat_id VARCHAR(100),
-    is_active BOOLEAN DEFAULT TRUE,
     status VARCHAR(50) DEFAULT 'ACTIVE',
-    battery VARCHAR(50),
-    signal VARCHAR(50),
+    is_active BOOLEAN DEFAULT TRUE,
+    battery VARCHAR(50) DEFAULT '100%',
+    signal VARCHAR(50) DEFAULT 'Good',
     version_4g VARCHAR(255),
     version_wifi VARCHAR(255),
-    batch_no VARCHAR(100),
     notes TEXT,
-    last_online TIMESTAMP WITH TIME ZONE,
     last_heartbeat TIMESTAMP WITH TIME ZONE,
+    last_online TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_devices_chat_id ON devices(chat_id);
-CREATE INDEX IF NOT EXISTS idx_devices_merchant_id ON devices(merchant_id);
 CREATE INDEX IF NOT EXISTS idx_devices_sn ON devices(device_sn);
+CREATE INDEX IF NOT EXISTS idx_devices_merchant_id ON devices(merchant_id);
+CREATE INDEX IF NOT EXISTS idx_devices_telegram ON devices(telegram_chat_id);
+CREATE INDEX IF NOT EXISTS idx_devices_status ON devices(status);
 
 
--- 4. Transactions Table (Bank Payments & Deduplication)
+-- 5. Payment Transactions Table (Deduplication & Voice Broadcasting)
 CREATE TABLE IF NOT EXISTS transactions (
     id SERIAL PRIMARY KEY,
     txid VARCHAR(150),
@@ -94,11 +114,12 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_transactions_txid ON transactions(txid);
+CREATE INDEX IF NOT EXISTS idx_transactions_bank_txid ON transactions(bank_tx_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_device_id ON transactions(device_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at DESC);
 
 
--- 5. Group Users Table (Telegram Group Members)
+-- 6. Telegram Group Users Table
 CREATE TABLE IF NOT EXISTS group_users (
     id SERIAL PRIMARY KEY,
     chat_id VARCHAR(50) NOT NULL,
@@ -117,7 +138,7 @@ CREATE TABLE IF NOT EXISTS group_users (
 CREATE INDEX IF NOT EXISTS idx_group_users_lookup ON group_users(chat_id, user_id);
 
 
--- 6. Official Bank Bots Table
+-- 7. Official Bank Bots Whitelist
 CREATE TABLE IF NOT EXISTS official_bank_bots (
     bot_id VARCHAR(50) PRIMARY KEY,
     bot_name VARCHAR(100),
@@ -134,7 +155,7 @@ VALUES
 ON CONFLICT (bot_id) DO NOTHING;
 
 
--- 7. Security Alerts Table
+-- 8. Security & Fraud Alerts Table
 CREATE TABLE IF NOT EXISTS security_alerts (
     id BIGSERIAL PRIMARY KEY,
     device_id VARCHAR(100),
