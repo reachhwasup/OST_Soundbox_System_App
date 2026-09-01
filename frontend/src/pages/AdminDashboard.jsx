@@ -239,6 +239,7 @@ export default function AdminDashboard() {
   const [editDeviceMerchantId, setEditDeviceMerchantId] = useState('');
   const [editDeviceStatus, setEditDeviceStatus] = useState('ACTIVE');
   const [editDevicePrice, setEditDevicePrice] = useState('39.00');
+  const [editDeviceNotes, setEditDeviceNotes] = useState('');
 
   // Form states for Create User
   const [newPhone, setNewPhone] = useState('');
@@ -510,6 +511,7 @@ export default function AdminDashboard() {
     setEditDeviceTelegram(d.telegram_chat_id || '');
     setEditDeviceStatus(d.status || 'ACTIVE');
     setEditDevicePrice(d.price ? String(d.price) : '39.00');
+    setEditDeviceNotes(d.notes || '');
     const matchedStore = stores.find(s => s.name === d.store_name);
     setEditDeviceMerchantId(matchedStore ? matchedStore.id : '');
     setIsEditDeviceOpen(true);
@@ -529,6 +531,7 @@ export default function AdminDashboard() {
         telegram_chat_id: editDeviceTelegram.trim() || null,
         status: editDeviceStatus,
         price: Number(editDevicePrice) || 39.00,
+        notes: editDeviceNotes.trim() || null,
         merchant_id: editDeviceMerchantId ? parseInt(editDeviceMerchantId) : null
       });
       setIsEditDeviceOpen(false);
@@ -2537,11 +2540,20 @@ export default function AdminDashboard() {
                             <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
                               <button
                                 type="button"
+                                onClick={() => openEditDeviceModal(d)}
+                                className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                              >
+                                <Edit className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                                <span>Edit</span>
+                              </button>
+
+                              <button
+                                type="button"
                                 onClick={() => {
                                   setSelectedDeviceDetail(d);
                                   setIsDeviceDetailOpen(true);
                                 }}
-                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
                               >
                                 <Eye className="w-3 h-3 text-slate-400" />
                                 <span>Detail</span>
@@ -3403,6 +3415,19 @@ export default function AdminDashboard() {
               onChange={(e) => setEditDeviceTelegram(e.target.value)}
               placeholder="e.g. -1001234567890"
               className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
+              Warehouse Notes
+            </label>
+            <input
+              type="text"
+              value={editDeviceNotes}
+              onChange={(e) => setEditDeviceNotes(e.target.value)}
+              placeholder="e.g. Shelf A-01, tested OK"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
             />
           </div>
 
