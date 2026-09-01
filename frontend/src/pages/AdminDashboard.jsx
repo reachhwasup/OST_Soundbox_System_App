@@ -2409,65 +2409,18 @@ export default function AdminDashboard() {
                           {/* Operations */}
                           {visibleColumns.operation && (
                             <td className="py-3.5 px-4 text-center">
-                              <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
-                                {d.merchant_id && String(d.status).toUpperCase() !== 'MAINTENANCE' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setCommandTargetDevice(d);
-                                      setCommandType('VOICE_BROADCAST');
-                                      setIsDeviceCommandOpen(true);
-                                    }}
-                                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer flex items-center gap-1"
-                                  >
-                                    <Radio className="w-3 h-3" />
-                                    <span>{t('command', 'Command')}</span>
-                                  </button>
-                                )}
-
-                                <button
-                                  type="button"
-                                  onClick={() => openEditDeviceModal(d)}
-                                  className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                                >
-                                  <Edit className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-                                  <span>{t('edit', 'Edit')}</span>
-                                </button>
-
+                              <div className="flex items-center justify-center whitespace-nowrap">
                                 <button
                                   type="button"
                                   onClick={() => {
                                     setSelectedDeviceDetail(d);
                                     setIsDeviceDetailOpen(true);
                                   }}
-                                  className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer"
+                                  className="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
                                 >
-                                  {t('detail', 'Detail')}
+                                  <Eye className="w-3.5 h-3.5 text-blue-500" />
+                                  <span>{t('detail', 'Detail')}</span>
                                 </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedDeviceForMerchant(d);
-                                    const matched = stores.find(s => s.name === d.store_name);
-                                    setTargetMerchantStoreId(matched ? String(matched.id) : '');
-                                    setIsEditMerchantOpen(true);
-                                  }}
-                                  className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap"
-                                >
-                                  {d.merchant_id ? t('editStore', 'Edit Store') : t('assignStore', 'Assign Store')}
-                                </button>
-
-                                {d.merchant_id && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleReturnDeviceToStock(d)}
-                                    title={t('returnToStock', 'Unlink and return to warehouse stock')}
-                                    className="p-1.5 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-lg transition cursor-pointer"
-                                  >
-                                    <Undo2 className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
                               </div>
                             </td>
                           )}
