@@ -46,6 +46,7 @@ import {
   ArrowUpRight,
   Wifi,
   Battery,
+  BatteryCharging,
   Signal,
   Radio,
   Download,
