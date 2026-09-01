@@ -3365,7 +3365,7 @@ export default function AdminDashboard() {
       <Modal 
         isOpen={isEditDeviceOpen} 
         onClose={() => setIsEditDeviceOpen(false)} 
-        title={activeTab === 'stock' || !selectedDevice?.merchant_id ? `Edit Stock Device: ${selectedDevice?.device_sn || ''}` : `Edit Soundbox: ${selectedDevice?.device_sn || ''}`}
+        title={adminTab === 'stock' || !selectedDevice?.merchant_id ? `Edit Stock Device: ${selectedDevice?.device_sn || ''}` : `Edit Soundbox: ${selectedDevice?.device_sn || ''}`}
       >
         <form onSubmit={handleUpdateDevice} className="space-y-4">
           <div>
@@ -3422,7 +3422,7 @@ export default function AdminDashboard() {
             />
           </div>
 
-          {activeTab !== 'stock' && selectedDevice?.merchant_id && (
+          {adminTab !== 'stock' && selectedDevice?.merchant_id && (
             <>
               <div>
                 <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
