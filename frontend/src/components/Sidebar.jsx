@@ -102,17 +102,17 @@ export default function Sidebar({
       {/* Mobile Backdrop Overlay */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 md:hidden transition-opacity"
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-40 md:hidden transition-opacity"
           onClick={() => setIsOpen(false)}
         />
       )}
 
-      {/* Sidebar Container */}
-      <aside 
-        className={`fixed inset-y-0 left-0 z-50 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between transition-all duration-300 ease-in-out md:translate-x-0 ${
-          isOpen ? 'translate-x-0 shadow-2xl w-64 sm:w-68' : '-translate-x-full md:shadow-none'
+      {/* Sidebar Drawer */}
+      <aside
+        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 ease-in-out shadow-lg md:shadow-none ${
+          isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         } ${
-          isCollapsed ? 'md:w-20' : 'md:w-64 lg:w-72'
+          isCollapsed ? 'md:w-20' : 'w-64 sm:w-72'
         }`}
       >
         {/* Top Section */}
@@ -123,11 +123,7 @@ export default function Sidebar({
             isCollapsed ? 'md:justify-center' : 'justify-between'
           }`}>
             <div className={`flex items-center gap-2.5 min-w-0 ${isCollapsed ? 'md:justify-center' : ''}`}>
-              <div 
-                className="shrink-0 cursor-pointer"
-                title={t('appName', 'OST Soundbox')}
-                onClick={onToggleCollapse}
-              >
+              <div className="shrink-0 cursor-pointer" title={t('appName', 'OST Soundbox')}>
                 <OstLogo className="w-9 h-9" />
               </div>
               
@@ -148,9 +144,7 @@ export default function Sidebar({
               <button
                 type="button"
                 onClick={onToggleCollapse}
-                title={isKhmer ? "បង្រួម Sidebar" : "Collapse Sidebar"}
                 className="hidden md:flex p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
-                aria-label="Collapse sidebar"
               >
                 <PanelLeftClose className="w-4 h-4" />
               </button>
@@ -159,23 +153,24 @@ export default function Sidebar({
             {/* Close Button on Mobile Drawer */}
             <button
               onClick={() => setIsOpen(false)}
-              className="md:hidden p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
+              className="md:hidden p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
               aria-label="Close sidebar"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Navigation Links (Flat, Direct Navigation without Dropdowns) */}
-          <nav className={`flex-1 py-3 space-y-1.5 ${isCollapsed ? 'px-2' : 'px-2.5 sm:px-3 md:px-4'}`}>
+          {/* Navigation Menu Links */}
+          <nav className="flex-1 p-3 sm:p-3.5 space-y-1.5">
             
+            {/* Section Category Title */}
             {!isCollapsed && (
-              <div className="px-2 pb-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              <div className="px-3 pt-1 pb-1.5 text-[10px] font-bold tracking-wider uppercase text-slate-400 dark:text-slate-500">
                 {isAdmin ? (isKhmer ? 'ផ្ទាំងគ្រប់គ្រងប្រព័ន្ធ' : 'Administration') : (isKhmer ? 'ម៉ឺនុយ' : 'Navigation')}
               </div>
             )}
 
-            {/* Admin Flat Navigation Items */}
+            {/* Admin Console View Navigation */}
             {isAdmin && (
               <div className="space-y-1">
                 
@@ -213,28 +208,45 @@ export default function Sidebar({
                   )}
                 </button>
 
-                {/* Item 3: Soundboxes */}
+                {/* Item 3: Manage Devices (Deployed Soundboxes) */}
                 <button
                   type="button"
                   onClick={() => handleAdminSubTabClick('devices')}
-                  title={isKhmer ? 'ឧបករណ៍ Soundbox' : 'Soundbox Devices'}
+                  title={isKhmer ? 'គ្រប់គ្រងឧបករណ៍ Soundbox' : 'Manage Devices'}
                   className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
                     isCollapsed 
                       ? `h-12 justify-center ${currentSubTab === 'devices' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
                       : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'devices' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
                   }`}
                 >
-                  <Volume2 className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-amber-400'}`} />
+                  <Smartphone className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-amber-400'}`} />
                   {!isCollapsed && (
-                    <span className="truncate">{isKhmer ? 'ឧបករណ៍ Soundbox' : 'Soundbox Devices'}</span>
+                    <span className="truncate">{isKhmer ? 'គ្រប់គ្រងឧបករណ៍ Soundbox' : 'Manage Devices'}</span>
                   )}
                 </button>
 
-                {/* Item 4: User & Payment Logs */}
+                {/* Item 4: Stock & Inventory (Warehouse Stock) */}
+                <button
+                  type="button"
+                  onClick={() => handleAdminSubTabClick('inventory')}
+                  title={isKhmer ? 'ស្តុកឧបករណ៍ Soundbox' : 'Stock & Inventory'}
+                  className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
+                    isCollapsed 
+                      ? `h-12 justify-center ${currentSubTab === 'inventory' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
+                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'inventory' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                  }`}
+                >
+                  <Warehouse className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-amber-400'}`} />
+                  {!isCollapsed && (
+                    <span className="truncate">{isKhmer ? 'ស្តុកឧបករណ៍ Soundbox' : 'Stock & Inventory'}</span>
+                  )}
+                </button>
+
+                {/* Item 5: User & Payment Logs */}
                 <button
                   type="button"
                   onClick={() => handleAdminSubTabClick('user_logs')}
-                  title={isKhmer ? 'កំណត់ត្រាអតិថិជន (User Logs)' : 'User & Payment Logs'}
+                  title={isKhmer ? 'កំណត់ត្រាអតិថិជន' : 'User & Payment Logs'}
                   className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
                     isCollapsed 
                       ? `h-12 justify-center ${currentSubTab === 'user_logs' || currentSubTab === 'logs' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
@@ -243,7 +255,7 @@ export default function Sidebar({
                 >
                   <Receipt className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-emerald-400'}`} />
                   {!isCollapsed && (
-                    <span className="truncate">{isKhmer ? 'កំណត់ត្រាអតិថិជន (User Logs)' : 'User & Payment Logs'}</span>
+                    <span className="truncate">{isKhmer ? 'កំណត់ត្រាអតិថិជន' : 'User & Payment Logs'}</span>
                   )}
                 </button>
 
@@ -251,7 +263,7 @@ export default function Sidebar({
                 <button
                   type="button"
                   onClick={() => handleAdminSubTabClick('admin_logs')}
-                  title={isKhmer ? 'កំណត់ត្រាប្រព័ន្ធ (Admin Logs)' : 'Admin & Security Logs'}
+                  title={isKhmer ? 'កំណត់ត្រាប្រព័ន្ធ' : 'Admin & Security Logs'}
                   className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
                     isCollapsed 
                       ? `h-12 justify-center ${currentSubTab === 'admin_logs' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
@@ -260,7 +272,7 @@ export default function Sidebar({
                 >
                   <ShieldAlert className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-rose-400'}`} />
                   {!isCollapsed && (
-                    <span className="truncate">{isKhmer ? 'កំណត់ត្រាប្រព័ន្ធ (Admin Logs)' : 'Admin & Security Logs'}</span>
+                    <span className="truncate">{isKhmer ? 'កំណត់ត្រាប្រព័ន្ធ' : 'Admin & Security Logs'}</span>
                   )}
                 </button>
 
@@ -291,7 +303,7 @@ export default function Sidebar({
                 <button
                   type="button"
                   onClick={() => handleMerchantSubTabClick('devices')}
-                  title={isKhmer ? 'ព័ត៌មានឧបករណ៍ (Device Info)' : 'Device Info & Soundbox'}
+                  title={isKhmer ? 'ព័ត៌មានឧបករណ៍' : 'Device Info & Soundbox'}
                   className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
                     isCollapsed 
                       ? `h-12 justify-center ${currentMerchantTab === 'devices' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
@@ -300,7 +312,7 @@ export default function Sidebar({
                 >
                   <Volume2 className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-indigo-400'}`} />
                   {!isCollapsed && (
-                    <span className="truncate">{isKhmer ? 'ព័ត៌មានឧបករណ៍ (Device Info)' : 'Device Info & Soundbox'}</span>
+                    <span className="truncate">{isKhmer ? 'ព័ត៌មានឧបករណ៍' : 'Device Info & Soundbox'}</span>
                   )}
                 </button>
 
@@ -308,7 +320,7 @@ export default function Sidebar({
                 <button
                   type="button"
                   onClick={() => handleMerchantSubTabClick('transactions')}
-                  title={isKhmer ? 'ប្រវត្តិប្រតិបត្តិការ (Transaction History)' : 'Transaction History'}
+                  title={isKhmer ? 'ប្រវត្តិប្រតិបត្តិការ' : 'Transaction History'}
                   className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
                     isCollapsed 
                       ? `h-12 justify-center ${currentMerchantTab === 'transactions' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
@@ -317,7 +329,7 @@ export default function Sidebar({
                 >
                   <Receipt className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-blue-400'}`} />
                   {!isCollapsed && (
-                    <span className="truncate">{isKhmer ? 'ប្រវត្តិប្រតិបត្តិការ (Transaction History)' : 'Transaction History'}</span>
+                    <span className="truncate">{isKhmer ? 'ប្រវត្តិប្រតិបត្តិការ' : 'Transaction History'}</span>
                   )}
                 </button>
               </div>
@@ -331,7 +343,7 @@ export default function Sidebar({
               <button
                 type="button"
                 onClick={onToggleCollapse}
-                title={isCollapsed ? (isKhmer ? "ពង្រីក Sidebar (Expand)" : "Expand Sidebar") : (isKhmer ? "បង្រួម Sidebar (Collapse)" : "Collapse Sidebar")}
+                title={isCollapsed ? (isKhmer ? "ពង្រីករបារចំហៀង" : "Expand Sidebar") : (isKhmer ? "បង្រួមរបារចំហៀង" : "Collapse Sidebar")}
                 className={`hidden md:flex items-center justify-center gap-2 w-full py-2 px-2.5 rounded-xl text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer ${
                   isCollapsed ? 'justify-center' : ''
                 }`}
@@ -341,7 +353,7 @@ export default function Sidebar({
                 ) : (
                   <>
                     <PanelLeftClose className="w-4 h-4 text-slate-500" />
-                    <span>{isKhmer ? 'បង្រួមម៉ឺនុយ (Collapse)' : 'Collapse Sidebar'}</span>
+                    <span>{isKhmer ? 'បង្រួមម៉ឺនុយ' : 'Collapse Sidebar'}</span>
                   </>
                 )}
               </button>

@@ -144,6 +144,13 @@ export default function AdminDashboard() {
   const [devPageSize, setDevPageSize] = useState(10);
   const [devGoToPage, setDevGoToPage] = useState('');
 
+  // Dedicated Stock & Inventory Filter & Pagination States
+  const [stockSearchTerm, setStockSearchTerm] = useState('');
+  const [stockModelFilter, setStockModelFilter] = useState('ALL');
+  const [stockBatchFilter, setStockBatchFilter] = useState('ALL');
+  const [stockPage, setStockPage] = useState(1);
+  const [stockPageSize, setStockPageSize] = useState(10);
+
   // Cloud Speaker Device Modals State
   const [isDeviceCommandOpen, setIsDeviceCommandOpen] = useState(false);
   const [commandTargetDevice, setCommandTargetDevice] = useState(null);
@@ -666,9 +673,12 @@ export default function AdminDashboard() {
     showToast({ type: 'success', title: 'Export Successful', message: `Exported ${filteredStores.length} store records.` });
   };
 
-  // Cloud Speaker Device Filtering Logic
+  // Cloud Speaker Device (Deployed) Filtering Logic
   const filteredDevices = useMemo(() => {
     return devices.filter(d => {
+      // Must be assigned to a merchant store
+      if (!d.merchant_id) return false;
+
       if (devFilterId.trim()) {
         const idMatch = String(d.device_id || d.device_sn || d.id || '').toLowerCase().includes(devFilterId.trim().toLowerCase());
         if (!idMatch) return false;
@@ -680,16 +690,10 @@ export default function AdminDashboard() {
       if (devFilterStatus) {
         const targetSt = devFilterStatus.toLowerCase();
         const dSt = String(d.status || '').toLowerCase();
-        if (targetSt === 'in_stock') {
-          if (dSt !== 'in_stock' && d.merchant_id) return false;
-        } else if (targetSt === 'maintenance') {
-          if (dSt !== 'maintenance') return false;
-        } else if (targetSt === 'online') {
+        if (targetSt === 'online') {
           if (dSt !== 'active' && dSt !== 'online') return false;
         } else if (targetSt === 'offline') {
           if (dSt !== 'inactive' && dSt !== 'offline') return false;
-        } else {
-          if (dSt !== targetSt) return false;
         }
       }
       if (devFilterMerchant.trim()) {
@@ -712,12 +716,76 @@ export default function AdminDashboard() {
     });
   }, [devices, devFilterId, devFilterType, devFilterStatus, devFilterMerchant, devFilter4G, devFilterWifi, devFilterDate]);
 
-  // Paginated Device Items
+  // Warehouse Stock Devices Filtering Logic
+  const filteredStockDevices = useMemo(() => {
+    return devices.filter(d => {
+      // Must be unassigned / IN_STOCK
+      if (d.merchant_id && String(d.status).toUpperCase() !== 'IN_STOCK') return false;
+
+      if (stockSearchTerm.trim()) {
+        const q = stockSearchTerm.toLowerCase().trim();
+        const sn = String(d.device_sn || d.device_id || '').toLowerCase();
+        const model = String(d.device_model || '').toLowerCase();
+        const batch = String(d.batch_no || '').toLowerCase();
+        const notes = String(d.notes || '').toLowerCase();
+        if (!sn.includes(q) && !model.includes(q) && !batch.includes(q) && !notes.includes(q)) {
+          return false;
+        }
+      }
+
+      if (stockModelFilter !== 'ALL' && String(d.device_model || '').toLowerCase() !== stockModelFilter.toLowerCase()) {
+        return false;
+      }
+
+      if (stockBatchFilter !== 'ALL' && String(d.batch_no || '') !== stockBatchFilter) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [devices, stockSearchTerm, stockModelFilter, stockBatchFilter]);
+
+  // Stock Export CSV
+  const handleExportStockCSV = () => {
+    if (filteredStockDevices.length === 0) {
+      showToast({ type: 'warning', title: 'No Data', message: 'No warehouse stock records to export.' });
+      return;
+    }
+    const headers = ['Device SN', 'Model', 'Status', 'Batch No', 'Notes', '4G Version', 'WiFi Version', 'Created At'];
+    const rows = filteredStockDevices.map(d => [
+      `"${d.device_sn || ''}"`,
+      `"${d.device_model || ''}"`,
+      `"${d.status || 'IN_STOCK'}"`,
+      `"${d.batch_no || ''}"`,
+      `"${(d.notes || '').replace(/"/g, '""')}"`,
+      `"${d.version_4g || ''}"`,
+      `"${d.version_wifi || ''}"`,
+      `"${d.created_at || ''}"`
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `warehouse_stock_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast({ type: 'success', title: 'Export Successful', message: `Exported ${filteredStockDevices.length} stock records.` });
+  };
+
+  // Paginated Device Items (Deployed)
   const totalDevPages = Math.max(1, Math.ceil(filteredDevices.length / devPageSize));
   const paginatedDevices = useMemo(() => {
     const start = (devPage - 1) * devPageSize;
     return filteredDevices.slice(start, start + devPageSize);
   }, [filteredDevices, devPage, devPageSize]);
+
+  // Paginated Stock Items (Warehouse)
+  const totalStockPages = Math.max(1, Math.ceil(filteredStockDevices.length / stockPageSize));
+  const paginatedStockDevices = useMemo(() => {
+    const start = (stockPage - 1) * stockPageSize;
+    return filteredStockDevices.slice(start, start + stockPageSize);
+  }, [filteredStockDevices, stockPage, stockPageSize]);
 
   // Handle Bulk Import Stock
   const handleBulkImportStock = async (e) => {
@@ -1036,7 +1104,8 @@ export default function AdminDashboard() {
             <span className="text-[11px] sm:text-xs text-slate-400">
               {adminTab === 'users' ? 'User Accounts & Roles' :
                adminTab === 'stores' ? 'Store & Merchant Branches' :
-               adminTab === 'devices' ? 'Cloud Speaker Fleet & Telemetry' :
+               adminTab === 'devices' ? 'Deployed Soundbox Fleet & Telemetry' :
+               adminTab === 'inventory' ? 'Warehouse Stock & Inventory' :
                adminTab === 'user_logs' || adminTab === 'logs' ? 'Customer QR Payments & Broadcasts' :
                'System Security & Command Audit Trail'}
             </span>
@@ -1044,7 +1113,8 @@ export default function AdminDashboard() {
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1">
             {adminTab === 'users' ? 'User & Merchant Accounts' :
              adminTab === 'stores' ? 'Stores & Merchant Locations' :
-             adminTab === 'devices' ? 'Cloud Speaker Device Fleet' :
+             adminTab === 'devices' ? 'Manage Devices (Deployed Soundboxes)' :
+             adminTab === 'inventory' ? 'Stock & Inventory (Warehouse)' :
              adminTab === 'user_logs' || adminTab === 'logs' ? 'User & Payment Logs' :
              'Admin & Security Audit Logs'}
           </h1>
@@ -1722,39 +1792,39 @@ export default function AdminDashboard() {
       {adminTab === 'devices' && (
         <div className="space-y-4">
 
-          {/* 0. Device Stock & Inventory KPI Summary Cards */}
+          {/* 0. Deployed Devices KPI Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="text-[10px] sm:text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Warehouse className="w-3.5 h-3.5" />
-                <span>Warehouse Stock</span>
+              <div className="text-[10px] sm:text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+                <CheckCircle className="w-3.5 h-3.5" />
+                <span>Deployed Soundboxes</span>
               </div>
-              <div className="text-xl sm:text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">
-                {devices.filter(d => String(d.status).toUpperCase() === 'IN_STOCK' || !d.merchant_id).length}
+              <div className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
+                {devices.filter(d => d.merchant_id).length}
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">Unassigned & Ready</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Active in Merchant Stores</div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
               <div className="text-[10px] sm:text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                <CheckCircle className="w-3.5 h-3.5" />
-                <span>Deployed (Active)</span>
+                <Radio className="w-3.5 h-3.5" />
+                <span>Online & Connected</span>
               </div>
               <div className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
-                {devices.filter(d => d.merchant_id).length}
+                {devices.filter(d => d.merchant_id && (String(d.status).toUpperCase() === 'ONLINE' || String(d.status).toUpperCase() === 'ACTIVE')).length}
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">In Merchant Stores</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Live Telemetry Available</div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="text-[10px] sm:text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+              <div className="text-[10px] sm:text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Volume2 className="w-3.5 h-3.5" />
-                <span>Total Fleet</span>
+                <span>Offline Units</span>
               </div>
-              <div className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">
-                {devices.length}
+              <div className="text-xl sm:text-2xl font-bold text-slate-700 dark:text-slate-300 mt-1">
+                {devices.filter(d => d.merchant_id && String(d.status).toUpperCase() === 'OFFLINE').length}
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">All Soundbox Units</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Disconnected / Standby</div>
             </div>
           </div>
           
@@ -1801,9 +1871,8 @@ export default function AdminDashboard() {
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
                 >
                   <option value="">{t('allStatuses', 'All Statuses')}</option>
-                  <option value="IN_STOCK">📦 In Stock (Warehouse)</option>
-                  <option value="Online">🟢 Deployed (Online)</option>
-                  <option value="Offline">⚪ Deployed (Offline)</option>
+                  <option value="Online">🟢 Online</option>
+                  <option value="Offline">⚪ Offline</option>
                 </select>
               </div>
 
@@ -1896,15 +1965,7 @@ export default function AdminDashboard() {
           {/* 2. Action Toolbar & Batch Operations */}
           <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setIsStockModalOpen(true)}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-1.5 transition cursor-pointer"
-              >
-                <PackagePlus className="w-4 h-4" />
-                <span>Add / Import Stock</span>
-              </button>
-
+              {/* Batch Remote Command */}
               <button
                 type="button"
                 onClick={() => {
@@ -2225,6 +2286,299 @@ export default function AdminDashboard() {
                     placeholder="1"
                     className="w-12 px-1.5 py-1 text-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono focus:outline-none"
                   />
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* TAB 3B: SOUNDBOX STOCK & WAREHOUSE INVENTORY             */}
+      {/* ======================================================== */}
+      {adminTab === 'inventory' && (
+        <div className="space-y-4">
+
+          {/* 0. Warehouse Stock KPI Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+              <div className="text-[10px] sm:text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Warehouse className="w-3.5 h-3.5" />
+                <span>Warehouse Stock</span>
+              </div>
+              <div className="text-xl sm:text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">
+                {devices.filter(d => !d.merchant_id || String(d.status).toUpperCase() === 'IN_STOCK').length}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Unassigned & Ready for Deployment</div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+              <div className="text-[10px] sm:text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+                <PackagePlus className="w-3.5 h-3.5" />
+                <span>Intake Batches</span>
+              </div>
+              <div className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
+                {Array.from(new Set(devices.filter(d => (!d.merchant_id || String(d.status).toUpperCase() === 'IN_STOCK') && d.batch_no).map(d => d.batch_no))).length || 1}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Active Shipment Batches</div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+              <div className="text-[10px] sm:text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>Total Fleet Units</span>
+              </div>
+              <div className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">
+                {devices.length}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-0.5">All Registered Soundboxes</div>
+            </div>
+          </div>
+
+          {/* 1. Warehouse Stock Search & Filter Toolbar */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
+              
+              {/* Search by SN / Batch / Notes */}
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  Search Stock
+                </label>
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={stockSearchTerm}
+                    onChange={(e) => { setStockSearchTerm(e.target.value); setStockPage(1); }}
+                    placeholder="Search by SN, Model, Batch No, or Location..."
+                    className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-amber-500 focus:outline-none transition"
+                  />
+                </div>
+              </div>
+
+              {/* Model Filter */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  Hardware Model
+                </label>
+                <select
+                  value={stockModelFilter}
+                  onChange={(e) => { setStockModelFilter(e.target.value); setStockPage(1); }}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none transition"
+                >
+                  <option value="ALL">All Hardware Models</option>
+                  <option value="Y6B">Y6B 4G Speaker</option>
+                  <option value="Y6_LCD">Y6 LCD Speaker</option>
+                  <option value="S1">S1 Compact Soundbox</option>
+                </select>
+              </div>
+
+              {/* Batch Filter */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  Batch Number
+                </label>
+                <select
+                  value={stockBatchFilter}
+                  onChange={(e) => { setStockBatchFilter(e.target.value); setStockPage(1); }}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none transition"
+                >
+                  <option value="ALL">All Batches</option>
+                  {Array.from(new Set(devices.filter(d => d.batch_no).map(d => d.batch_no))).map((b, idx) => (
+                    <option key={idx} value={b}>{b}</option>
+                  ))}
+                </select>
+              </div>
+
+            </div>
+
+            {/* Toolbar Buttons */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsStockModalOpen(true)}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <PackagePlus className="w-4 h-4" />
+                  <span>+ Add / Import Stock</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStockSearchTerm('');
+                    setStockModelFilter('ALL');
+                    setStockBatchFilter('ALL');
+                    setStockPage(1);
+                  }}
+                  className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Reset</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleExportStockCSV}
+                  className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                >
+                  <Download className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Export CSV</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Warehouse Stock Table Card */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 font-bold uppercase tracking-wider">
+                    <th className="py-3 px-4">Soundbox (SN)</th>
+                    <th className="py-3 px-3">Batch No</th>
+                    <th className="py-3 px-3 text-center">Status</th>
+                    <th className="py-3 px-3">Intake Date</th>
+                    <th className="py-3 px-3">Hardware / Firmware</th>
+                    <th className="py-3 px-3">Warehouse Location & Notes</th>
+                    <th className="py-3 px-4 text-center">Operations</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                  {paginatedStockDevices.length > 0 ? (
+                    paginatedStockDevices.map((d) => (
+                      <tr 
+                        key={d.id} 
+                        className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition group"
+                      >
+                        {/* Column 1: SN & Model */}
+                        <td className="py-3.5 px-4 font-medium text-slate-900 dark:text-white">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center shrink-0">
+                              <Smartphone className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <div className="font-mono font-bold text-xs">{d.device_sn || d.device_id}</div>
+                              <div className="text-[10px] text-slate-400">{d.device_model || 'Y6B 4G Speaker'}</div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Column 2: Batch No */}
+                        <td className="py-3.5 px-3 font-mono text-[11px] text-slate-700 dark:text-slate-300">
+                          <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                            {d.batch_no || 'BATCH-2026-Q3'}
+                          </span>
+                        </td>
+
+                        {/* Column 3: Status */}
+                        <td className="py-3.5 px-3 text-center">
+                          <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
+                            📦 In Stock
+                          </span>
+                        </td>
+
+                        {/* Column 4: Intake Date */}
+                        <td className="py-3.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                          {d.created_at ? new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Aug 30, 2026'}
+                        </td>
+
+                        {/* Column 5: Hardware Versions */}
+                        <td className="py-3.5 px-3 font-mono text-[10px] text-slate-500 max-w-[150px] truncate">
+                          <div>4G: {d.version_4g || 'Y6_LCD_1605_V1.0'}</div>
+                          <div>WiFi: {d.version_wifi || 'esp32c2x_2M_OTA'}</div>
+                        </td>
+
+                        {/* Column 6: Notes / Shelf */}
+                        <td className="py-3.5 px-3 text-slate-600 dark:text-slate-400 max-w-[200px] truncate" title={d.notes}>
+                          {d.notes || 'Warehouse Ready (Tested)'}
+                        </td>
+
+                        {/* Column 7: Operations */}
+                        <td className="py-3.5 px-4 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedDeviceForMerchant(d);
+                                setTargetMerchantStoreId('');
+                                setIsEditMerchantOpen(true);
+                              }}
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer flex items-center gap-1"
+                            >
+                              <Store className="w-3 h-3" />
+                              <span>Assign Store</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedDeviceDetail(d);
+                                setIsDeviceDetailOpen(true);
+                              }}
+                              className="px-2.5 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer"
+                            >
+                              Detail
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400 text-sm">
+                        No warehouse stock items match the specified filters.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Bottom Pagination Controls */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-slate-50/75 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300">
+              <div>
+                Total In Stock: <span className="font-bold text-slate-900 dark:text-white">{filteredStockDevices.length}</span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <select
+                  value={stockPageSize}
+                  onChange={(e) => { setStockPageSize(Number(e.target.value)); setStockPage(1); }}
+                  className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-200 focus:outline-none"
+                >
+                  <option value={10}>10 / page</option>
+                  <option value={20}>20 / page</option>
+                  <option value={50}>50 / page</option>
+                </select>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={stockPage <= 1}
+                    onClick={() => setStockPage(p => Math.max(1, p - 1))}
+                    className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+
+                  <span className="px-2.5 py-0.5 rounded-lg bg-amber-600 text-white font-bold text-xs">
+                    {stockPage}
+                  </span>
+
+                  <button
+                    type="button"
+                    disabled={stockPage >= totalStockPages}
+                    onClick={() => setStockPage(p => Math.min(totalStockPages, p + 1))}
+                    className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             </div>
