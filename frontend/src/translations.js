@@ -279,8 +279,10 @@ export const translations = {
     userMerchantAccounts: "User & Merchant Accounts",
     storesMerchantLocations: "Stores & Merchant Locations",
     manageDevicesTitle: "Manage Devices (Deployed Soundboxes)",
-    userPaymentLogsTitle: "User & Payment Logs",
-    adminSecurityLogsTitle: "Admin & Security Audit Logs",
+    userActivityTitle: "User Activity",
+    userActivitySubtitle: "Audit trail of merchant & user operations, store registrations, soundbox claims, and login events.",
+    adminActivityTitle: "Admin Activity",
+    adminActivitySubtitle: "Audit trail of system administrative actions, stock intakes, sales deployments, and remote commands.",
     
     // Warranty & Discount Tracking
     warranty: "Warranty",
@@ -617,9 +619,11 @@ export const translations = {
     systemSecurityAudit: "ប្រព័ន្ធសុវត្ថិភាព & កំណត់ត្រាបញ្ជា",
     userMerchantAccounts: "គណនីអ្នកប្រើប្រាស់ & អាជីវករ",
     storesMerchantLocations: "ហាង និងទីតាំងអាជីវករ",
-    manageDevicesTitle: "គ្រប់គ្រងឧបករណ៍ (Deployed Soundboxes)",
-    userPaymentLogsTitle: "កំណត់ត្រាប្រតិបត្តិការទូទាត់ (User Logs)",
-    adminSecurityLogsTitle: "កំណត់ត្រាសុវត្ថិភាពប្រព័ន្ធ (Admin Logs)",
+    manageDevicesTitle: "គ្រប់គ្រងឧបករណ៍ Soundbox",
+    userActivityTitle: "សកម្មភាពអ្នកប្រើប្រាស់",
+    userActivitySubtitle: "កំណត់ត្រាសកម្មភាពអាជីវករ ការចុះឈ្មោះហាង ការភ្ជាប់ឧបករណ៍ Soundbox និងការចូលប្រើប្រាស់",
+    adminActivityTitle: "សកម្មភាពអ្នកគ្រប់គ្រង",
+    adminActivitySubtitle: "កំណត់ត្រាសកម្មភាពអ្នកគ្រប់គ្រង ការបញ្ចូលស្តុក ការលក់/ដាក់ឱ្យប្រើ និងការបញ្ជាឧបករណ៍ពីចម្ងាយ",
     
     // Warranty & Discount Tracking
     warranty: "ការធានា (Warranty)",

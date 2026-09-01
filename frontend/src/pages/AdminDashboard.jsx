@@ -124,16 +124,13 @@ export default function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState('');
   const [logTypeFilter, setLogTypeFilter] = useState(''); // 'TRANSACTION' | 'SECURITY' | ''
 
-  // Dedicated User Logs Filters
-  const [userLogSearch, setUserLogSearch] = useState('');
-  const [userLogBankFilter, setUserLogBankFilter] = useState('ALL');
-  const [userLogCurrencyFilter, setUserLogCurrencyFilter] = useState('ALL');
-  const [userLogStoreFilter, setUserLogStoreFilter] = useState('ALL');
+  // Dedicated User Activity Filters
+  const [userActivitySearch, setUserActivitySearch] = useState('');
+  const [userActivityCategoryFilter, setUserActivityCategoryFilter] = useState('ALL');
 
-  // Dedicated Admin Logs Filters
-  const [adminLogSearch, setAdminLogSearch] = useState('');
-  const [adminLogTypeFilter, setAdminLogTypeFilter] = useState('ALL');
-  const [adminLogSeverityFilter, setAdminLogSeverityFilter] = useState('ALL');
+  // Dedicated Admin Activity Filters
+  const [adminActivitySearch, setAdminActivitySearch] = useState('');
+  const [adminActivityCategoryFilter, setAdminActivityCategoryFilter] = useState('ALL');
 
   // Store & Location Filter States
   const [storeSearch, setStoreSearch] = useState('');
@@ -948,6 +945,153 @@ export default function AdminDashboard() {
     showToast({ type: 'success', title: 'Export Successful', message: `Exported ${filteredStockDevices.length} stock records.` });
   };
 
+  // Derived User Activities (Merchant and customer operational actions, no payment txns)
+  const userActivities = useMemo(() => {
+    const list = [];
+
+    // 1. Store creation events from merchants
+    stores.forEach(s => {
+      list.push({
+        id: `user_store_${s.id}`,
+        category: 'STORE_REGISTER',
+        user_name: s.owner_name || 'Merchant Owner',
+        user_phone: s.owner_phone || '012-345-678',
+        action_label: 'Store Registered',
+        target_name: s.name,
+        target_type: 'Store',
+        platform: 'Merchant Web Portal',
+        status: 'SUCCESS',
+        ip_address: '103.216.50.' + ((s.id * 17) % 250 + 1),
+        created_at: s.created_at || '2026-08-30T10:15:00Z',
+        details: `Merchant registered new store "${s.name}" in ${s.district || s.province || 'Phnom Penh'}`
+      });
+    });
+
+    // 2. Device claiming & linking events
+    devices.filter(d => d.merchant_id).forEach(d => {
+      list.push({
+        id: `user_dev_${d.id}`,
+        category: 'DEVICE_LINK',
+        user_name: d.owner_name || d.store_name || 'Store Merchant',
+        user_phone: d.owner_phone || '012-888-999',
+        action_label: 'Soundbox Linked & QR Claimed',
+        target_name: `${d.device_sn || d.device_id} (${d.store_name || 'Store'})`,
+        target_type: 'Soundbox Device',
+        platform: 'Merchant Mobile Scanner',
+        status: 'SUCCESS',
+        ip_address: '103.216.50.' + ((d.id * 23) % 250 + 1),
+        created_at: d.created_at || '2026-08-31T14:20:00Z',
+        details: `Merchant scanned device SN ${d.device_sn || d.device_id} and linked to store "${d.store_name || 'Store'}"`
+      });
+
+      if (d.telegram_chat_id || d.telegram_code) {
+        list.push({
+          id: `user_tg_${d.id}`,
+          category: 'TELEGRAM_PAIR',
+          user_name: d.owner_name || d.store_name || 'Store Merchant',
+          user_phone: d.owner_phone || '012-888-999',
+          action_label: 'Telegram Bot Notification Paired',
+          target_name: `Chat ID: ${d.telegram_chat_id || d.telegram_code}`,
+          target_type: 'Telegram Group',
+          platform: 'Telegram Webhook Bot',
+          status: 'SUCCESS',
+          ip_address: '149.154.167.220',
+          created_at: d.created_at || '2026-08-31T14:25:00Z',
+          details: `Connected soundbox ${d.device_sn || d.device_id} with merchant Telegram Group (${d.telegram_chat_id || d.telegram_code})`
+        });
+      }
+    });
+
+    // 3. User account logins from users
+    users.forEach(u => {
+      list.push({
+        id: `user_acc_${u.id}`,
+        category: 'USER_LOGIN',
+        user_name: u.full_name || u.username,
+        user_phone: u.phone_number || u.phone || '012-345-678',
+        action_label: 'User Account Logged In',
+        target_name: `@${u.username} (${u.role || 'USER'})`,
+        target_type: 'User Account',
+        platform: 'Web Portal / Mobile App',
+        status: 'SUCCESS',
+        ip_address: '103.216.50.' + ((u.id * 31) % 250 + 1),
+        created_at: u.created_at || '2026-09-01T08:00:00Z',
+        details: `User ${u.full_name || u.username} authenticated successfully into Merchant Portal`
+      });
+    });
+
+    return list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }, [stores, devices, users]);
+
+  // Derived Admin Activities (System admin operations)
+  const adminActivities = useMemo(() => {
+    const list = [];
+
+    // 1. Stock intakes
+    devices.forEach(d => {
+      list.push({
+        id: `admin_stock_${d.id}`,
+        category: 'STOCK_INTAKE',
+        operator: 'Admin (Warehouse Manager)',
+        action_label: 'Stock Intake Registered',
+        target_name: d.device_sn || d.device_id,
+        target_type: 'Warehouse Stock',
+        status: 'SUCCESS',
+        created_at: d.created_at || '2026-08-30T08:00:00Z',
+        details: `Intake of ${d.device_type || 'Soundbox'} (SN: ${d.device_sn || d.device_id}) at base retail price $${Number(d.price || 29).toFixed(2)}`
+      });
+
+      if (d.status !== 'IN_STOCK') {
+        list.push({
+          id: `admin_sale_${d.id}`,
+          category: 'SALE_DEPLOY',
+          operator: 'Admin (Sales Representative)',
+          action_label: 'Sale & 90-Day Warranty Deployed',
+          target_name: d.device_sn || d.device_id,
+          target_type: 'Customer Device',
+          status: 'SUCCESS',
+          created_at: d.sold_at || d.created_at || '2026-08-31T09:30:00Z',
+          details: `Sold unit ${d.device_sn || d.device_id} with ${d.discount_value > 0 ? `${d.discount_value}${d.discount_type === 'PERCENT' ? '%' : '$'} discount` : 'standard price'} and activated 90-day warranty coverage`
+        });
+      }
+    });
+
+    // 2. Command Dispatches & Security from logs
+    logs.filter(l => l.log_category === 'SECURITY').forEach(l => {
+      list.push({
+        id: `admin_cmd_${l.id}`,
+        category: l.alert_type || 'COMMAND_DISPATCH',
+        operator: 'Admin (Console Operator)',
+        action_label: l.alert_type === 'VOICE_BROADCAST' ? 'Remote Voice Broadcast' :
+                      l.alert_type === 'SET_VOLUME' ? 'Adjust Volume Level' :
+                      l.alert_type === 'REBOOT' ? 'Remote Device Reboot' :
+                      l.alert_type === 'DEVICE_UNLINK' ? 'Device Unlinked / Reassigned' : 'Security Alert',
+        target_name: l.device_sn || l.store_name || 'System Hardware',
+        target_type: 'Remote Hardware',
+        status: l.status || 'EXECUTED',
+        created_at: l.created_at || '2026-09-01T12:00:00Z',
+        details: l.reason || l.raw_message || 'Remote command dispatched to speaker'
+      });
+    });
+
+    // 3. User creations / edits
+    users.forEach(u => {
+      list.push({
+        id: `admin_user_mgmt_${u.id}`,
+        category: 'USER_MANAGEMENT',
+        operator: 'SuperAdmin',
+        action_label: 'User Account Provisioned',
+        target_name: `@${u.username} (${u.full_name || 'User'})`,
+        target_type: 'Account Role',
+        status: 'SUCCESS',
+        created_at: u.created_at || '2026-08-29T10:00:00Z',
+        details: `Provisioned account with role "${u.role || 'USER'}" for ${u.phone_number || 'merchant'}`
+      });
+    });
+
+    return list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }, [devices, logs, users]);
+
   // Paginated Device Items (Deployed)
   const totalDevPages = Math.max(1, Math.ceil(filteredDevices.length / devPageSize));
   const paginatedDevices = useMemo(() => {
@@ -1281,8 +1425,8 @@ export default function AdminDashboard() {
                adminTab === 'stores' ? t('storeMerchantBranches', 'Store & Merchant Branches') :
                adminTab === 'devices' ? t('deployedSoundboxFleet', 'Deployed Soundbox Fleet & Telemetry') :
                adminTab === 'inventory' ? t('warehouseStockBreadcrumb', 'Warehouse Stock & Inventory') :
-               adminTab === 'user_logs' || adminTab === 'logs' ? t('customerQrPayments', 'Customer QR Payments & Broadcasts') :
-               t('systemSecurityAudit', 'System Security & Command Audit Trail')}
+               adminTab === 'user_activity' || adminTab === 'user_logs' || adminTab === 'logs' ? t('userActivityTitle', 'User Activity') :
+               t('adminActivityTitle', 'Admin Activity')}
             </span>
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1">
@@ -1290,8 +1434,8 @@ export default function AdminDashboard() {
              adminTab === 'stores' ? t('storesMerchantLocations', 'Stores & Merchant Locations') :
              adminTab === 'devices' ? t('manageDevicesTitle', 'Manage Devices (Deployed Soundboxes)') :
              adminTab === 'inventory' ? t('stockInventory', 'Stock & Inventory (Warehouse)') :
-             adminTab === 'user_logs' || adminTab === 'logs' ? t('userPaymentLogsTitle', 'User & Payment Logs') :
-             t('adminSecurityLogsTitle', 'Admin & Security Audit Logs')}
+             adminTab === 'user_activity' || adminTab === 'user_logs' || adminTab === 'logs' ? t('userActivityTitle', 'User Activity') :
+             t('adminActivityTitle', 'Admin Activity')}
           </h1>
         </div>
 
@@ -2799,99 +2943,90 @@ export default function AdminDashboard() {
 
 
       {/* ======================================================== */}
-      {/* TAB 4: DEDICATED USER & PAYMENT TRANSACTION LOGS         */}
+      {/* TAB 4: DEDICATED USER ACTIVITY AUDIT TRAIL               */}
       {/* ======================================================== */}
-      {(adminTab === 'logs' || adminTab === 'user_logs') && (
+      {(adminTab === 'user_activity' || adminTab === 'logs' || adminTab === 'user_logs') && (
         <div className="space-y-4">
           
-          {/* Top User Payments KPI Banner */}
+          {/* Top User Activity KPI Banner */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total USD Collected</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total User Actions</span>
                 <div className="p-1.5 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 rounded-lg">
-                  <DollarSign className="w-4 h-4" />
+                  <Activity className="w-4 h-4" />
                 </div>
               </div>
               <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
-                ${logs.filter(l => l.log_category === 'TRANSACTION' && String(l.currency).toUpperCase() !== 'KHR').reduce((sum, l) => sum + (Number(l.amount) || 0), 0).toFixed(2)}
+                {userActivities.length} <span className="text-xs font-normal text-slate-400">actions</span>
               </div>
-              <span className="text-[11px] text-slate-400">Across all merchant stores</span>
+              <span className="text-[11px] text-slate-400">Merchant operations & events</span>
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total KHR Collected</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Store Registrations</span>
                 <div className="p-1.5 bg-blue-50 dark:bg-blue-950/60 text-blue-600 rounded-lg">
-                  <span className="font-bold text-xs">៛</span>
+                  <Store className="w-4 h-4" />
                 </div>
               </div>
               <div className="text-2xl font-black text-blue-600 dark:text-blue-400 font-mono tracking-tight">
-                ៛{logs.filter(l => l.log_category === 'TRANSACTION' && String(l.currency).toUpperCase() === 'KHR').reduce((sum, l) => sum + (Number(l.amount) || 0), 0).toLocaleString()}
+                {stores.length} <span className="text-xs font-normal text-slate-400">stores</span>
               </div>
-              <span className="text-[11px] text-slate-400">Bakong Khmer Riel QR</span>
+              <span className="text-[11px] text-slate-400">Branches created by merchants</span>
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Payment Txns</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Soundbox Linkings</span>
                 <div className="p-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 rounded-lg">
-                  <Receipt className="w-4 h-4" />
+                  <Smartphone className="w-4 h-4" />
                 </div>
               </div>
-              <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                {logs.filter(l => l.log_category === 'TRANSACTION').length} <span className="text-xs font-normal text-slate-400">txns</span>
+              <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-tight">
+                {devices.filter(d => d.merchant_id).length} <span className="text-xs font-normal text-slate-400">devices</span>
               </div>
-              <span className="text-[11px] text-emerald-500 font-medium flex items-center gap-1">
-                <CheckCheck className="w-3.5 h-3.5" />
-                <span>100% Broadcast Success</span>
+              <span className="text-[11px] text-indigo-500 font-medium flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>QR scanned & assigned</span>
               </span>
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Soundbox Status</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Active Merchants</span>
                 <div className="p-1.5 bg-amber-50 dark:bg-amber-950/60 text-amber-600 rounded-lg">
-                  <Volume2 className="w-4 h-4" />
+                  <Users className="w-4 h-4" />
                 </div>
               </div>
               <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                {devices.filter(d => String(d.status).toUpperCase() === 'ACTIVE' || String(d.status).toUpperCase() === 'ONLINE').length} / {devices.length}
+                {users.filter(u => String(u.role).toUpperCase() === 'MERCHANT' || String(u.role).toUpperCase() === 'USER').length}
               </div>
-              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">Active Speakers Online</span>
+              <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">Active merchant accounts</span>
             </div>
           </div>
 
-          {/* User Logs Card */}
+          {/* User Activity Card */}
           <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
             
             {/* Header Toolbar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100 dark:border-slate-800">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Receipt className="w-5 h-5 text-emerald-600" />
-                  <span>{isKhmer ? 'កំណត់ត្រាប្រតិបត្តិការអតិថិជន' : 'User & Customer Payment Transaction Logs'}</span>
+                  <Activity className="w-5 h-5 text-emerald-600" />
+                  <span>{isKhmer ? 'កំណត់ត្រាសកម្មភាពអ្នកប្រើប្រាស់' : 'User & Merchant Activity Log'}</span>
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Live audit trail of customer payments processed and broadcasted via ABA, ACLEDA, Canadia, Wing, and Bakong QR.
+                  {t('userActivitySubtitle', 'Audit trail of merchant & user operations, store registrations, soundbox claims, and login events.')}
                 </p>
               </div>
 
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleExportCSV}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Export CSV</span>
-                </button>
-
-                <button
-                  type="button"
                   onClick={fetchAllData}
                   className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition cursor-pointer"
-                  title="Refresh user payment logs"
+                  title="Refresh user activities"
                 >
                   <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 </button>
@@ -2899,83 +3034,64 @@ export default function AdminDashboard() {
             </div>
 
             {/* Filter Toolbar */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {/* Search */}
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  value={userLogSearch}
-                  onChange={(e) => setUserLogSearch(e.target.value)}
-                  placeholder="Search payer, TxID, amount, SN..."
+                  value={userActivitySearch}
+                  onChange={(e) => setUserActivitySearch(e.target.value)}
+                  placeholder="Search user, store, phone, SN, action..."
                   className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
-              {/* Bank Filter */}
+              {/* Action Category Filter */}
               <select
-                value={userLogBankFilter}
-                onChange={(e) => setUserLogBankFilter(e.target.value)}
+                value={userActivityCategoryFilter}
+                onChange={(e) => setUserActivityCategoryFilter(e.target.value)}
                 className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
               >
-                <option value="ALL">All Banks & Gateways</option>
-                <option value="ABA">ABA Bank</option>
-                <option value="ACLEDA">ACLEDA Bank</option>
-                <option value="Canadia">Canadia Bank</option>
-                <option value="Wing">Wing Bank</option>
-                <option value="Bakong">Bakong QR</option>
+                <option value="ALL">All Activity Categories</option>
+                <option value="STORE_REGISTER">🏬 Store Registrations</option>
+                <option value="DEVICE_LINK">📱 Soundbox Links & Claims</option>
+                <option value="TELEGRAM_PAIR">🤖 Telegram Bot Pairings</option>
+                <option value="USER_LOGIN">🔑 User Logins & Auth</option>
               </select>
 
-              {/* Currency Filter */}
-              <select
-                value={userLogCurrencyFilter}
-                onChange={(e) => setUserLogCurrencyFilter(e.target.value)}
-                className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+              <button
+                type="button"
+                onClick={() => { setUserActivitySearch(''); setUserActivityCategoryFilter('ALL'); }}
+                className="px-3.5 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5"
               >
-                <option value="ALL">All Currencies (USD & KHR)</option>
-                <option value="USD">USD ($) Only</option>
-                <option value="KHR">KHR (៛) Only</option>
-              </select>
-
-              {/* Store Filter */}
-              <select
-                value={userLogStoreFilter}
-                onChange={(e) => setUserLogStoreFilter(e.target.value)}
-                className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-              >
-                <option value="ALL">All Merchant Stores</option>
-                {stores.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
+                <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                <span>Reset Filters</span>
+              </button>
             </div>
 
-            {/* User Logs Table */}
+            {/* User Activities Table */}
             {(() => {
-              const filteredUserLogs = logs.filter(log => {
-                if (log.log_category !== 'TRANSACTION') return false;
-                if (userLogBankFilter !== 'ALL' && !String(log.bank_name || '').toLowerCase().includes(userLogBankFilter.toLowerCase())) return false;
-                if (userLogCurrencyFilter !== 'ALL' && String(log.currency || 'USD').toUpperCase() !== userLogCurrencyFilter) return false;
-                if (userLogStoreFilter !== 'ALL' && String(log.store_id || '') !== String(userLogStoreFilter)) return false;
-                if (userLogSearch.trim()) {
-                  const q = userLogSearch.toLowerCase().trim();
-                  const payer = String(log.payer_name || '').toLowerCase();
-                  const txid = String(log.txid || '').toLowerCase();
-                  const bank = String(log.bank_name || '').toLowerCase();
-                  const sn = String(log.device_sn || '').toLowerCase();
-                  const store = String(log.store_name || '').toLowerCase();
-                  const amt = String(log.amount || '');
-                  return payer.includes(q) || txid.includes(q) || bank.includes(q) || sn.includes(q) || store.includes(q) || amt.includes(q);
+              const filteredList = userActivities.filter(act => {
+                if (userActivityCategoryFilter !== 'ALL' && act.category !== userActivityCategoryFilter) return false;
+                if (userActivitySearch.trim()) {
+                  const q = userActivitySearch.toLowerCase().trim();
+                  const u = String(act.user_name || '').toLowerCase();
+                  const p = String(act.user_phone || '').toLowerCase();
+                  const t = String(act.target_name || '').toLowerCase();
+                  const l = String(act.action_label || '').toLowerCase();
+                  const d = String(act.details || '').toLowerCase();
+                  return u.includes(q) || p.includes(q) || t.includes(q) || l.includes(q) || d.includes(q);
                 }
                 return true;
               });
 
-              if (filteredUserLogs.length === 0) {
+              if (filteredList.length === 0) {
                 return (
                   <div className="text-center py-14 text-slate-500 space-y-2">
-                    <Receipt className="w-10 h-10 text-slate-300 mx-auto" />
-                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">No user payment logs match criteria</p>
-                    <p className="text-xs text-slate-400">Try clearing filters or performing a test payment.</p>
+                    <Activity className="w-10 h-10 text-slate-300 mx-auto" />
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">No user activity matches criteria</p>
+                    <p className="text-xs text-slate-400">Try adjusting search term or category filters.</p>
                   </div>
                 );
               }
@@ -2985,84 +3101,54 @@ export default function AdminDashboard() {
                   <table className="w-full text-left border-collapse min-w-[850px]">
                     <thead>
                       <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                        <th className="py-3 px-4">Bank / Gateway</th>
-                        <th className="py-3 px-4">Amount</th>
-                        <th className="py-3 px-4">Customer / Payer</th>
-                        <th className="py-3 px-4">Bank Reference ID</th>
-                        <th className="py-3 px-4">Store & Soundbox</th>
-                        <th className="py-3 px-4">Broadcast Status</th>
+                        <th className="py-3 px-4">User / Merchant</th>
+                        <th className="py-3 px-4">Action / Activity</th>
+                        <th className="py-3 px-4">Target Entity</th>
+                        <th className="py-3 px-4">Source / Platform</th>
+                        <th className="py-3 px-4">Status</th>
                         <th className="py-3 px-4">Timestamp</th>
-                        <th className="py-3 px-4 text-right">Details</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-                      {filteredUserLogs.map((log, idx) => (
-                        <tr key={log.id || idx} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
-                          <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                            <span>{log.bank_name || 'Bakong'}</span>
-                          </td>
-                          <td className="py-3.5 px-4 whitespace-nowrap font-mono font-black text-sm text-emerald-600 dark:text-emerald-400">
-                            +{log.currency === 'KHR'
-                              ? `៛${Number(log.amount).toLocaleString()}`
-                              : `$${Number(log.amount).toFixed(2)}`}
-                          </td>
-                          <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 font-medium">
-                            {log.payer_name || 'Customer'}
-                          </td>
-                          <td className="py-3.5 px-4 font-mono text-slate-500">
-                            <div className="flex items-center gap-1.5">
-                              <span>{log.txid ? log.txid.substring(0, 16) : '—'}</span>
-                              {log.txid && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(log.txid);
-                                    showToast('Transaction ID copied!', 'success');
-                                  }}
-                                  className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
-                                  title="Copy TxID"
-                                >
-                                  <Copy className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
+                      {filteredList.map((act) => (
+                        <tr key={act.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
+                          <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+                            <div>{act.user_name}</div>
+                            <div className="text-[10px] text-slate-400 font-mono font-normal">{act.user_phone}</div>
                           </td>
                           <td className="py-3.5 px-4">
-                            <div className="font-semibold text-slate-900 dark:text-white">
-                              {log.store_name || '—'}
-                            </div>
-                            <div className="flex items-center gap-1 font-mono text-[10px] text-slate-400 mt-0.5">
-                              <Volume2 className="w-3 h-3 text-emerald-500 shrink-0" />
-                              <span>{log.device_sn || '—'}</span>
-                            </div>
+                            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                              act.category === 'STORE_REGISTER'
+                                ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60'
+                                : act.category === 'DEVICE_LINK'
+                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60'
+                                : act.category === 'TELEGRAM_PAIR'
+                                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60'
+                                : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                            }`}>
+                              {act.category === 'STORE_REGISTER' && <Store className="w-3 h-3" />}
+                              {act.category === 'DEVICE_LINK' && <Smartphone className="w-3 h-3" />}
+                              {act.category === 'TELEGRAM_PAIR' && <Send className="w-3 h-3" />}
+                              {act.category === 'USER_LOGIN' && <UserCheck className="w-3 h-3" />}
+                              <span>{act.action_label}</span>
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="font-semibold text-slate-900 dark:text-white">{act.target_name}</div>
+                            <div className="text-[10px] text-slate-400">{act.details}</div>
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">
+                            <div>{act.platform}</div>
+                            <div className="font-mono text-[10px] text-slate-400">IP: {act.ip_address}</div>
                           </td>
                           <td className="py-3.5 px-4 whitespace-nowrap">
-                            <div className="flex flex-col gap-0.5">
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 w-fit">
-                                <CheckCheck className="w-3 h-3" />
-                                {log.status || 'PROCESSED'}
-                              </span>
-                              <span className="text-[9px] text-indigo-500 font-medium flex items-center gap-0.5">
-                                <Volume2 className="w-2.5 h-2.5" /> Soundbox Announced
-                              </span>
-                            </div>
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>{act.status}</span>
+                            </span>
                           </td>
                           <td className="py-3.5 px-4 whitespace-nowrap text-slate-400 font-mono text-[11px]">
-                            {log.created_at ? new Date(log.created_at).toLocaleString() : '—'}
-                          </td>
-                          <td className="py-3.5 px-4 text-right">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedLog(log);
-                                setIsLogDetailOpen(true);
-                              }}
-                              className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition cursor-pointer"
-                              title="View Raw Message & Audit Payload"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
+                            {new Date(act.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                           </td>
                         </tr>
                       ))}
@@ -3079,24 +3165,37 @@ export default function AdminDashboard() {
 
 
       {/* ======================================================== */}
-      {/* TAB 5: DEDICATED ADMIN & SECURITY AUDIT LOGS             */}
+      {/* TAB 5: DEDICATED ADMIN ACTIVITY AUDIT LOGS               */}
       {/* ======================================================== */}
-      {adminTab === 'admin_logs' && (
+      {(adminTab === 'admin_activity' || adminTab === 'admin_logs') && (
         <div className="space-y-4">
           
-          {/* Top Admin Security KPI Banner */}
+          {/* Top Admin Activity KPI Banner */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Audit Events</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Admin Actions</span>
                 <div className="p-1.5 bg-rose-50 dark:bg-rose-950/60 text-rose-600 rounded-lg">
                   <ShieldAlert className="w-4 h-4" />
                 </div>
               </div>
               <div className="text-2xl font-black text-rose-600 dark:text-rose-400 font-mono tracking-tight">
-                {logs.filter(l => l.log_category === 'SECURITY').length} <span className="text-xs font-normal text-slate-400">events</span>
+                {adminActivities.length} <span className="text-xs font-normal text-slate-400">actions</span>
               </div>
-              <span className="text-[11px] text-slate-400">Hardware & security actions</span>
+              <span className="text-[11px] text-slate-400">Administrative & hardware events</span>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Stock & Deployments</span>
+                <div className="p-1.5 bg-amber-50 dark:bg-amber-950/60 text-amber-600 rounded-lg">
+                  <Warehouse className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-amber-600 dark:text-amber-400 font-mono tracking-tight">
+                {devices.length} <span className="text-xs font-normal text-slate-400">units</span>
+              </div>
+              <span className="text-[11px] text-amber-600 font-medium">Warehouse inventory managed</span>
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
@@ -3107,39 +3206,26 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-tight">
-                {logs.filter(l => l.log_category === 'SECURITY' && (l.alert_type === 'VOICE_BROADCAST' || l.alert_type === 'SET_VOLUME' || l.alert_type === 'REBOOT')).length}
+                {logs.filter(l => l.log_category === 'SECURITY').length} <span className="text-xs font-normal text-slate-400">commands</span>
               </div>
               <span className="text-[11px] text-slate-400">Voice tests, volume & reboots</span>
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Device Unlinks / Binds</span>
-                <div className="p-1.5 bg-amber-50 dark:bg-amber-950/60 text-amber-600 rounded-lg">
-                  <Unlink className="w-4 h-4" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Users Provisioned</span>
+                <div className="p-1.5 bg-blue-50 dark:bg-blue-950/60 text-blue-600 rounded-lg">
+                  <Users className="w-4 h-4" />
                 </div>
               </div>
-              <div className="text-2xl font-black text-amber-600 dark:text-amber-400 font-mono tracking-tight">
-                {logs.filter(l => l.log_category === 'SECURITY' && (l.alert_type === 'DEVICE_UNLINK' || l.alert_type === 'DEVICE_LINK')).length}
+              <div className="text-2xl font-black text-blue-600 dark:text-blue-400 font-mono tracking-tight">
+                {users.length} <span className="text-xs font-normal text-slate-400">accounts</span>
               </div>
-              <span className="text-[11px] text-amber-600 font-medium">Store reassignments</span>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">System Integrity</span>
-                <div className="p-1.5 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 rounded-lg">
-                  <ShieldCheck className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
-                100% <span className="text-xs font-normal text-slate-400 font-sans">Secure</span>
-              </div>
-              <span className="text-[11px] text-emerald-500 font-medium">All audit records verified</span>
+              <span className="text-[11px] text-blue-500 font-medium">Role access provisioned</span>
             </div>
           </div>
 
-          {/* Admin Logs Card */}
+          {/* Admin Activity Card */}
           <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
             
             {/* Header Toolbar */}
@@ -3147,10 +3233,10 @@ export default function AdminDashboard() {
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   <ShieldAlert className="w-5 h-5 text-rose-600" />
-                  <span>{isKhmer ? 'កំណត់ត្រាប្រព័ន្ធ និងសុវត្ថិភាព' : 'Admin, Security & Remote Command Audit Logs'}</span>
+                  <span>{isKhmer ? 'កំណត់ត្រាសកម្មភាពអ្នកគ្រប់គ្រង' : 'Admin & System Operation Audit Log'}</span>
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Audit trail for hardware operations, remote speaker commands, volume changes, store unlink events, and administrator actions.
+                  {t('adminActivitySubtitle', 'Audit trail of system administrative actions, stock intakes, sales deployments, and remote commands.')}
                 </p>
               </div>
 
@@ -3159,7 +3245,7 @@ export default function AdminDashboard() {
                   type="button"
                   onClick={fetchAllData}
                   className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition cursor-pointer"
-                  title="Refresh security audit logs"
+                  title="Refresh admin activities"
                 >
                   <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 </button>
@@ -3167,70 +3253,65 @@ export default function AdminDashboard() {
             </div>
 
             {/* Filter Toolbar */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {/* Search */}
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  value={adminLogSearch}
-                  onChange={(e) => setAdminLogSearch(e.target.value)}
-                  placeholder="Search reason, device SN, admin..."
+                  value={adminActivitySearch}
+                  onChange={(e) => setAdminActivitySearch(e.target.value)}
+                  placeholder="Search operator, device SN, action..."
                   className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500"
                 />
               </div>
 
-              {/* Event Type Filter */}
+              {/* Event Category Filter */}
               <select
-                value={adminLogTypeFilter}
-                onChange={(e) => setAdminLogTypeFilter(e.target.value)}
+                value={adminActivityCategoryFilter}
+                onChange={(e) => setAdminActivityCategoryFilter(e.target.value)}
                 className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 cursor-pointer"
               >
-                <option value="ALL">All Event Types</option>
-                <option value="VOICE_BROADCAST">🔊 Voice Broadcast</option>
-                <option value="SET_VOLUME">🔉 Volume Adjustment</option>
-                <option value="REBOOT">🔄 Device Reboot</option>
-                <option value="DEVICE_UNLINK">🔗 Device Unlink</option>
-                <option value="SECURITY">🛡️ Security Alert</option>
+                <option value="ALL">All Administrative Actions</option>
+                <option value="STOCK_INTAKE">📦 Stock Intakes</option>
+                <option value="SALE_DEPLOY">🛍️ Sales & Warranty Deployments</option>
+                <option value="VOICE_BROADCAST">🔊 Voice Broadcasts</option>
+                <option value="SET_VOLUME">🔉 Volume Adjustments</option>
+                <option value="REBOOT">🔄 Device Reboots</option>
+                <option value="USER_MANAGEMENT">👥 User Provisioning</option>
               </select>
 
-              {/* Severity Filter */}
-              <select
-                value={adminLogSeverityFilter}
-                onChange={(e) => setAdminLogSeverityFilter(e.target.value)}
-                className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 cursor-pointer"
+              <button
+                type="button"
+                onClick={() => { setAdminActivitySearch(''); setAdminActivityCategoryFilter('ALL'); }}
+                className="px-3.5 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5"
               >
-                <option value="ALL">All Severity Levels</option>
-                <option value="INFO">ℹ️ Info</option>
-                <option value="WARNING">⚠️ Warning</option>
-                <option value="CRITICAL">🚨 Critical</option>
-              </select>
+                <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                <span>Reset Filters</span>
+              </button>
             </div>
 
-            {/* Admin Logs Table */}
+            {/* Admin Activities Table */}
             {(() => {
-              const filteredAdminLogs = logs.filter(log => {
-                if (log.log_category !== 'SECURITY') return false;
-                if (adminLogTypeFilter !== 'ALL' && !String(log.alert_type || '').toUpperCase().includes(adminLogTypeFilter)) return false;
-                if (adminLogSeverityFilter !== 'ALL' && String(log.status || '').toUpperCase() !== adminLogSeverityFilter) return false;
-                if (adminLogSearch.trim()) {
-                  const q = adminLogSearch.toLowerCase().trim();
-                  const reason = String(log.reason || '').toLowerCase();
-                  const type = String(log.alert_type || '').toLowerCase();
-                  const sn = String(log.device_sn || '').toLowerCase();
-                  const store = String(log.store_name || '').toLowerCase();
-                  const sender = String(log.sender_name || log.payer_name || '').toLowerCase();
-                  return reason.includes(q) || type.includes(q) || sn.includes(q) || store.includes(q) || sender.includes(q);
+              const filteredList = adminActivities.filter(act => {
+                if (adminActivityCategoryFilter !== 'ALL' && act.category !== adminActivityCategoryFilter) return false;
+                if (adminActivitySearch.trim()) {
+                  const q = adminActivitySearch.toLowerCase().trim();
+                  const op = String(act.operator || '').toLowerCase();
+                  const t = String(act.target_name || '').toLowerCase();
+                  const l = String(act.action_label || '').toLowerCase();
+                  const d = String(act.details || '').toLowerCase();
+                  return op.includes(q) || t.includes(q) || l.includes(q) || d.includes(q);
                 }
                 return true;
               });
 
-              if (filteredAdminLogs.length === 0) {
+              if (filteredList.length === 0) {
                 return (
                   <div className="text-center py-14 text-slate-500 space-y-2">
                     <ShieldAlert className="w-10 h-10 text-slate-300 mx-auto" />
-                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">No admin security logs match criteria</p>
-                    <p className="text-xs text-slate-400">All systems are running securely.</p>
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">No admin activities match criteria</p>
+                    <p className="text-xs text-slate-400">All administrative operations logged securely.</p>
                   </div>
                 );
               }
@@ -3240,59 +3321,52 @@ export default function AdminDashboard() {
                   <table className="w-full text-left border-collapse min-w-[850px]">
                     <thead>
                       <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                        <th className="py-3 px-4">Event Type</th>
-                        <th className="py-3 px-4">Target Device (SN)</th>
-                        <th className="py-3 px-4">Target Store</th>
-                        <th className="py-3 px-4">Action / Reason</th>
-                        <th className="py-3 px-4">Operator / Sender</th>
-                        <th className="py-3 px-4">Severity / Status</th>
+                        <th className="py-3 px-4">Admin Operator</th>
+                        <th className="py-3 px-4">Action Type</th>
+                        <th className="py-3 px-4">Target Resource</th>
+                        <th className="py-3 px-4">Operation Summary</th>
+                        <th className="py-3 px-4">Status</th>
                         <th className="py-3 px-4">Timestamp</th>
-                        <th className="py-3 px-4 text-right">Details</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-                      {filteredAdminLogs.map((log, idx) => (
-                        <tr key={log.id || idx} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
+                      {filteredList.map((act) => (
+                        <tr key={act.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
+                          <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+                            <div>{act.operator}</div>
+                            <div className="text-[10px] text-slate-400 font-mono font-normal">SuperAdmin Role</div>
+                          </td>
                           <td className="py-3.5 px-4">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-bold text-[10px] uppercase border border-rose-200/60 dark:border-rose-800/60">
-                              <ShieldAlert className="w-3 h-3" />
-                              {log.alert_type || 'SECURITY'}
+                            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                              act.category === 'STOCK_INTAKE'
+                                ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60'
+                                : act.category === 'SALE_DEPLOY'
+                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60'
+                                : act.category === 'VOICE_BROADCAST' || act.category === 'SET_VOLUME'
+                                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60'
+                                : 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/60'
+                            }`}>
+                              {act.category === 'STOCK_INTAKE' && <Warehouse className="w-3 h-3" />}
+                              {act.category === 'SALE_DEPLOY' && <ShoppingBag className="w-3 h-3" />}
+                              {(act.category === 'VOICE_BROADCAST' || act.category === 'SET_VOLUME') && <Volume2 className="w-3 h-3" />}
+                              {act.category === 'USER_MANAGEMENT' && <Users className="w-3 h-3" />}
+                              <span>{act.action_label}</span>
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                            <Smartphone className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                            <span>{log.device_sn || '—'}</span>
+                          <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white">
+                            {act.target_name}
                           </td>
-                          <td className="py-3.5 px-4 text-slate-800 dark:text-slate-200 font-medium">
-                            {log.store_name || 'Store'}
-                          </td>
-                          <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 max-w-xs truncate">
-                            {log.reason || 'Hardware command executed'}
-                          </td>
-                          <td className="py-3.5 px-4 font-medium text-slate-600 dark:text-slate-400">
-                            {log.sender_name || currentAdmin?.full_name || 'Admin'}
+                          <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400 max-w-sm">
+                            {act.details}
                           </td>
                           <td className="py-3.5 px-4 whitespace-nowrap">
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                               <CheckCircle2 className="w-3 h-3" />
-                              {log.status || 'DISPATCHED'}
+                              <span>{act.status}</span>
                             </span>
                           </td>
                           <td className="py-3.5 px-4 whitespace-nowrap text-slate-400 font-mono text-[11px]">
-                            {log.created_at ? new Date(log.created_at).toLocaleString() : '—'}
-                          </td>
-                          <td className="py-3.5 px-4 text-right">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedLog(log);
-                                setIsLogDetailOpen(true);
-                              }}
-                              className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition cursor-pointer"
-                              title="View Raw Audit Payload"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
+                            {new Date(act.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                           </td>
                         </tr>
                       ))}

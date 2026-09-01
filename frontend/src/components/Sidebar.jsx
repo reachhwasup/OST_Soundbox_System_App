@@ -15,7 +15,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Smartphone,
-  Warehouse
+  Warehouse,
+  Activity
 } from 'lucide-react';
 import OstLogo from './OstLogo';
 
@@ -244,37 +245,37 @@ export default function Sidebar({
                   )}
                 </button>
 
-                {/* Item 5: User & Payment Logs */}
+                {/* Item 5: User Activity */}
                 <button
                   type="button"
-                  onClick={() => handleAdminSubTabClick('user_logs')}
-                  title={isKhmer ? 'កំណត់ត្រាអតិថិជន' : 'User & Payment Logs'}
+                  onClick={() => handleAdminSubTabClick('user_activity')}
+                  title={isKhmer ? 'សកម្មភាពអ្នកប្រើប្រាស់' : 'User Activity'}
                   className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
                     isCollapsed 
-                      ? `h-12 justify-center ${currentSubTab === 'user_logs' || currentSubTab === 'logs' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
-                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'user_logs' || currentSubTab === 'logs' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                      ? `h-12 justify-center ${currentSubTab === 'user_activity' || currentSubTab === 'user_logs' || currentSubTab === 'logs' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
+                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'user_activity' || currentSubTab === 'user_logs' || currentSubTab === 'logs' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
                   }`}
                 >
-                  <Receipt className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-emerald-400'}`} />
+                  <Activity className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-emerald-400'}`} />
                   {!isCollapsed && (
-                    <span className="truncate">{isKhmer ? 'កំណត់ត្រាអតិថិជន' : 'User & Payment Logs'}</span>
+                    <span className="truncate">{isKhmer ? 'សកម្មភាពអ្នកប្រើប្រាស់' : 'User Activity'}</span>
                   )}
                 </button>
 
-                {/* Item 5: Admin & Security Logs */}
+                {/* Item 6: Admin Activity */}
                 <button
                   type="button"
-                  onClick={() => handleAdminSubTabClick('admin_logs')}
-                  title={isKhmer ? 'កំណត់ត្រាប្រព័ន្ធ' : 'Admin & Security Logs'}
+                  onClick={() => handleAdminSubTabClick('admin_activity')}
+                  title={isKhmer ? 'សកម្មភាពអ្នកគ្រប់គ្រង' : 'Admin Activity'}
                   className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
                     isCollapsed 
-                      ? `h-12 justify-center ${currentSubTab === 'admin_logs' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
-                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'admin_logs' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                      ? `h-12 justify-center ${currentSubTab === 'admin_activity' || currentSubTab === 'admin_logs' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
+                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'admin_activity' || currentSubTab === 'admin_logs' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
                   }`}
                 >
                   <ShieldAlert className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-rose-400'}`} />
                   {!isCollapsed && (
-                    <span className="truncate">{isKhmer ? 'កំណត់ត្រាប្រព័ន្ធ' : 'Admin & Security Logs'}</span>
+                    <span className="truncate">{isKhmer ? 'សកម្មភាពអ្នកគ្រប់គ្រង' : 'Admin Activity'}</span>
                   )}
                 </button>
 
