@@ -79,7 +79,7 @@ function MainLayout() {
           {isAdmin ? <AdminDashboard /> : <UserDashboard />}
         </main>
         <footer className="border-t border-slate-200 dark:border-slate-800 py-6 text-center text-xs text-slate-400 dark:text-slate-500">
-          OST Soundbox & Merchant Management Portal &copy; {new Date().getFullYear()}
+          OST Soundbox &copy; {new Date().getFullYear()}
         </footer>
       </div>
 

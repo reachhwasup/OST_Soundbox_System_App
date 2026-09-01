@@ -18,6 +18,7 @@ import {
   Sparkles,
   BadgeCheck
 } from 'lucide-react';
+import OstLogo from './OstLogo';
 import ChangePasswordModal from './ChangePasswordModal';
 import EditProfileModal from './EditProfileModal';
 
@@ -65,11 +66,9 @@ export default function Navbar({ onOpenSidebar }) {
           )}
 
           <div className="flex items-center gap-2">
-            <div className="bg-emerald-600 text-white p-1.5 rounded-xl flex items-center justify-center shadow-xs">
-              <Volume2 className="w-4 h-4" />
-            </div>
+            <OstLogo className="w-8 h-8" />
             <div>
-              <span className="text-sm sm:text-base font-bold tracking-tight text-slate-900 dark:text-white">
+              <span className="text-sm sm:text-base font-extrabold tracking-tight text-slate-900 dark:text-white">
                 {t('appName', 'OST Soundbox')}
               </span>
               <span className="hidden sm:inline-block ml-2 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500">

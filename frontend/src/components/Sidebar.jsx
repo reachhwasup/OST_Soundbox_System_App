@@ -15,6 +15,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen
 } from 'lucide-react';
+import OstLogo from './OstLogo';
 
 export default function Sidebar({ 
   activeTab, 
@@ -123,19 +124,19 @@ export default function Sidebar({
           }`}>
             <div className={`flex items-center gap-2.5 min-w-0 ${isCollapsed ? 'md:justify-center' : ''}`}>
               <div 
-                className="bg-emerald-600 text-white p-2 rounded-xl flex items-center justify-center shadow-xs shrink-0 cursor-pointer"
+                className="shrink-0 cursor-pointer"
                 title={t('appName', 'OST Soundbox')}
                 onClick={onToggleCollapse}
               >
-                <Volume2 className="w-5 h-5" />
+                <OstLogo className="w-9 h-9" />
               </div>
               
               {!isCollapsed && (
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-tight truncate">
+                  <div className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white leading-tight truncate">
                     {t('appName', 'OST Soundbox')}
                   </div>
-                  <div className="text-[9px] sm:text-[10px] text-slate-400 font-medium tracking-wide uppercase truncate">
+                  <div className="text-[9px] sm:text-[10px] text-slate-400 font-bold tracking-wide uppercase truncate">
                     {isAdmin ? 'Admin Console' : 'Merchant Portal'}
                   </div>
                 </div>
