@@ -150,6 +150,13 @@ export default function AdminDashboard() {
   const [devFilterWarranty, setDevFilterWarranty] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'EXPIRING_SOON' | 'EXPIRED'
   const [devFilterDate, setDevFilterDate] = useState('');
 
+  // Table Selection States across all tabs
+  const [userSelectedIds, setUserSelectedIds] = useState([]);
+  const [storeSelectedIds, setStoreSelectedIds] = useState([]);
+  const [stockSelectedIds, setStockSelectedIds] = useState([]);
+  const [userActSelectedIds, setUserActSelectedIds] = useState([]);
+  const [adminActSelectedIds, setAdminActSelectedIds] = useState([]);
+
   // Cloud Speaker Device Table Pagination & Selection States
   const [devSelectedIds, setDevSelectedIds] = useState([]);
   const [devPage, setDevPage] = useState(1);
@@ -1322,17 +1329,71 @@ export default function AdminDashboard() {
   };
 
   // Selection Checkbox Helpers
+  const toggleUserSelection = (id) => {
+    setUserSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+  const toggleSelectAllUsers = () => {
+    if (userSelectedIds.length === filteredUsers.length && filteredUsers.length > 0) {
+      setUserSelectedIds([]);
+    } else {
+      setUserSelectedIds(filteredUsers.map(u => u.id));
+    }
+  };
+
+  const toggleStoreSelection = (id) => {
+    setStoreSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+  const toggleSelectAllStores = () => {
+    if (storeSelectedIds.length === filteredStores.length && filteredStores.length > 0) {
+      setStoreSelectedIds([]);
+    } else {
+      setStoreSelectedIds(filteredStores.map(s => s.id));
+    }
+  };
+
   const toggleDeviceSelection = (id) => {
     setDevSelectedIds(prev => 
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
   };
-
   const toggleSelectAllDevices = () => {
     if (devSelectedIds.length === paginatedDevices.length && paginatedDevices.length > 0) {
       setDevSelectedIds([]);
     } else {
       setDevSelectedIds(paginatedDevices.map(d => d.id || d.device_id || d.device_sn));
+    }
+  };
+
+  const toggleStockSelection = (id) => {
+    setStockSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+  const toggleSelectAllStock = () => {
+    if (stockSelectedIds.length === paginatedStockDevices.length && paginatedStockDevices.length > 0) {
+      setStockSelectedIds([]);
+    } else {
+      setStockSelectedIds(paginatedStockDevices.map(d => d.id || d.device_sn));
+    }
+  };
+
+  const toggleUserActSelection = (id) => {
+    setUserActSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+  const toggleSelectAllUserAct = (list) => {
+    if (userActSelectedIds.length === list.length && list.length > 0) {
+      setUserActSelectedIds([]);
+    } else {
+      setUserActSelectedIds(list.map(l => l.id));
+    }
+  };
+
+  const toggleAdminActSelection = (id) => {
+    setAdminActSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+  const toggleSelectAllAdminAct = (list) => {
+    if (adminActSelectedIds.length === list.length && list.length > 0) {
+      setAdminActSelectedIds([]);
+    } else {
+      setAdminActSelectedIds(list.map(l => l.id));
     }
   };
 
@@ -1746,6 +1807,19 @@ export default function AdminDashboard() {
                 <thead>
 
                   <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <th className="pb-3 w-10 text-center">
+                      <button
+                        type="button"
+                        onClick={toggleSelectAllUsers}
+                        className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                      >
+                        {userSelectedIds.length === filteredUsers.length && filteredUsers.length > 0 ? (
+                          <CheckSquare className="w-4 h-4 text-emerald-600" />
+                        ) : (
+                          <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                        )}
+                      </button>
+                    </th>
                     <th className="pb-3 font-medium">{t('phoneNumber', 'Phone Number')}</th>
                     <th className="pb-3 font-medium">{t('fullName', 'Full Name')}</th>
                     <th className="pb-3 font-medium">{t('role', 'Role')}</th>
@@ -1758,7 +1832,26 @@ export default function AdminDashboard() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {filteredUsers.length > 0 ? (
                     filteredUsers.map((u) => (
-                      <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                      <tr 
+                        key={u.id} 
+                        className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition ${
+                          userSelectedIds.includes(u.id) ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : ''
+                        }`}
+                      >
+                        {/* Selection Checkbox */}
+                        <td className="py-3.5 text-center">
+                          <button
+                            type="button"
+                            onClick={() => toggleUserSelection(u.id)}
+                            className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                          >
+                            {userSelectedIds.includes(u.id) ? (
+                              <CheckSquare className="w-4 h-4 text-emerald-600" />
+                            ) : (
+                              <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                            )}
+                          </button>
+                        </td>
                         
                         {/* Emphasized User Phone Number */}
                         <td className="py-3.5">
@@ -2176,6 +2269,19 @@ export default function AdminDashboard() {
                 <thead>
 
                   <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <th className="pb-3 w-10 text-center">
+                      <button
+                        type="button"
+                        onClick={toggleSelectAllStores}
+                        className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                      >
+                        {storeSelectedIds.length === filteredStores.length && filteredStores.length > 0 ? (
+                          <CheckSquare className="w-4 h-4 text-emerald-600" />
+                        ) : (
+                          <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                        )}
+                      </button>
+                    </th>
                     <th className="pb-3 font-medium">{t('storeName', 'Store Name')}</th>
                     <th className="pb-3 font-medium">{t('owner', 'Merchant / Owner')}</th>
                     <th className="pb-3 font-medium">{t('location', 'Location (Province / District)')}</th>
@@ -2192,8 +2298,24 @@ export default function AdminDashboard() {
                           setSelectedStoreForDetails(s);
                           setIsStoreDetailsOpen(true);
                         }}
-                        className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition cursor-pointer group"
+                        className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition cursor-pointer group ${
+                          storeSelectedIds.includes(s.id) ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : ''
+                        }`}
                       >
+                        {/* Selection Checkbox */}
+                        <td className="py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => toggleStoreSelection(s.id)}
+                            className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                          >
+                            {storeSelectedIds.includes(s.id) ? (
+                              <CheckSquare className="w-4 h-4 text-emerald-600" />
+                            ) : (
+                              <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                            )}
+                          </button>
+                        </td>
                         
                         {/* Store Name */}
                         <td className="py-3.5">
@@ -2497,12 +2619,12 @@ export default function AdminDashboard() {
                       <button
                         type="button"
                         onClick={toggleSelectAllDevices}
-                        className="text-slate-400 hover:text-blue-600 transition cursor-pointer"
+                        className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
                       >
                         {devSelectedIds.length === paginatedDevices.length && paginatedDevices.length > 0 ? (
-                          <CheckSquare className="w-4 h-4 text-blue-600" />
+                          <CheckSquare className="w-4 h-4 text-emerald-600" />
                         ) : (
-                          <Square className="w-4 h-4" />
+                          <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
                         )}
                       </button>
                     </th>
@@ -2531,7 +2653,7 @@ export default function AdminDashboard() {
                         <tr 
                           key={d.id || d.device_id || d.device_sn}
                           className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition whitespace-nowrap ${
-                            isSelected ? 'bg-blue-50/40 dark:bg-blue-950/20' : ''
+                            isSelected ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : ''
                           }`}
                         >
                           {/* Selection Checkbox */}
@@ -2539,12 +2661,12 @@ export default function AdminDashboard() {
                             <button
                               type="button"
                               onClick={() => toggleDeviceSelection(d.id || d.device_id || d.device_sn)}
-                              className="text-slate-400 hover:text-blue-600 transition cursor-pointer"
+                              className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
                             >
                               {isSelected ? (
-                                <CheckSquare className="w-4 h-4 text-blue-600" />
+                                <CheckSquare className="w-4 h-4 text-emerald-600" />
                               ) : (
-                                <Square className="w-4 h-4" />
+                                <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
                               )}
                             </button>
                           </td>
@@ -2970,6 +3092,19 @@ export default function AdminDashboard() {
               <table className="w-full text-left text-xs min-w-[760px]">
                 <thead>
                   <tr className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 text-xs font-semibold select-none whitespace-nowrap">
+                    <th className="py-3 px-3.5 w-10 text-center">
+                      <button
+                        type="button"
+                        onClick={toggleSelectAllStock}
+                        className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                      >
+                        {stockSelectedIds.length === paginatedStockDevices.length && paginatedStockDevices.length > 0 ? (
+                          <CheckSquare className="w-4 h-4 text-emerald-600" />
+                        ) : (
+                          <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                        )}
+                      </button>
+                    </th>
                     {visibleStockColumns.deviceId && <th className="py-3 px-4 font-semibold min-w-[160px]">{t('deviceId', 'Device ID')}</th>}
                     {visibleStockColumns.deviceType && <th className="py-3 px-3 font-semibold min-w-[190px]">{t('deviceType', 'Device Type')}</th>}
                     {visibleStockColumns.price && <th className="py-3 px-3 font-semibold text-center min-w-[95px]">{t('price', 'Price')}</th>}
@@ -2983,8 +3118,24 @@ export default function AdminDashboard() {
                     paginatedStockDevices.map((d) => (
                       <tr 
                         key={d.id} 
-                        className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition group whitespace-nowrap"
+                        className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition group whitespace-nowrap ${
+                          stockSelectedIds.includes(d.id || d.device_sn) ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : ''
+                        }`}
                       >
+                        {/* Selection Checkbox */}
+                        <td className="py-3.5 px-3.5 text-center">
+                          <button
+                            type="button"
+                            onClick={() => toggleStockSelection(d.id || d.device_sn)}
+                            className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                          >
+                            {stockSelectedIds.includes(d.id || d.device_sn) ? (
+                              <CheckSquare className="w-4 h-4 text-emerald-600" />
+                            ) : (
+                              <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                            )}
+                          </button>
+                        </td>
                         {/* Device ID (SN) */}
                         {visibleStockColumns.deviceId && (
                           <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white">
@@ -3278,6 +3429,19 @@ export default function AdminDashboard() {
                   <table className="w-full text-left border-collapse min-w-[850px]">
                     <thead>
                       <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                        <th className="py-3 px-3.5 w-10 text-center">
+                          <button
+                            type="button"
+                            onClick={() => toggleSelectAllUserAct(filteredList)}
+                            className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                          >
+                            {userActSelectedIds.length === filteredList.length && filteredList.length > 0 ? (
+                              <CheckSquare className="w-4 h-4 text-emerald-600" />
+                            ) : (
+                              <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                            )}
+                          </button>
+                        </th>
                         <th className="py-3 px-4">User / Merchant</th>
                         <th className="py-3 px-4">Action / Activity</th>
                         <th className="py-3 px-4">Target Entity</th>
@@ -3288,7 +3452,25 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
                       {filteredList.map((act) => (
-                        <tr key={act.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
+                        <tr 
+                          key={act.id} 
+                          className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition ${
+                            userActSelectedIds.includes(act.id) ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : ''
+                          }`}
+                        >
+                          <td className="py-3.5 px-3.5 text-center">
+                            <button
+                              type="button"
+                              onClick={() => toggleUserActSelection(act.id)}
+                              className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                            >
+                              {userActSelectedIds.includes(act.id) ? (
+                                <CheckSquare className="w-4 h-4 text-emerald-600" />
+                              ) : (
+                                <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                              )}
+                            </button>
+                          </td>
                           <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
                             <div>{act.user_name}</div>
                             <div className="text-[10px] text-slate-400 font-mono font-normal">{act.user_phone}</div>
@@ -3498,6 +3680,19 @@ export default function AdminDashboard() {
                   <table className="w-full text-left border-collapse min-w-[850px]">
                     <thead>
                       <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                        <th className="py-3 px-3.5 w-10 text-center">
+                          <button
+                            type="button"
+                            onClick={() => toggleSelectAllAdminAct(filteredList)}
+                            className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                          >
+                            {adminActSelectedIds.length === filteredList.length && filteredList.length > 0 ? (
+                              <CheckSquare className="w-4 h-4 text-emerald-600" />
+                            ) : (
+                              <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                            )}
+                          </button>
+                        </th>
                         <th className="py-3 px-4">Admin Operator</th>
                         <th className="py-3 px-4">Action Type</th>
                         <th className="py-3 px-4">Target Resource</th>
@@ -3508,7 +3703,25 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
                       {filteredList.map((act) => (
-                        <tr key={act.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
+                        <tr 
+                          key={act.id} 
+                          className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition ${
+                            adminActSelectedIds.includes(act.id) ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : ''
+                          }`}
+                        >
+                          <td className="py-3.5 px-3.5 text-center">
+                            <button
+                              type="button"
+                              onClick={() => toggleAdminActSelection(act.id)}
+                              className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                            >
+                              {adminActSelectedIds.includes(act.id) ? (
+                                <CheckSquare className="w-4 h-4 text-emerald-600" />
+                              ) : (
+                                <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                              )}
+                            </button>
+                          </td>
                           <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
                             <div>{act.operator}</div>
                             <div className="text-[10px] text-slate-400 font-mono font-normal">SuperAdmin Role</div>

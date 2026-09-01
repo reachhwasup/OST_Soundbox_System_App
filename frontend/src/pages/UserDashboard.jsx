@@ -50,7 +50,9 @@ import {
   Calendar,
   ChevronRight,
   Clock,
-  Info
+  Info,
+  Square,
+  CheckSquare
 } from 'lucide-react';
 
 export default function UserDashboard() {
@@ -82,6 +84,44 @@ export default function UserDashboard() {
   const [selectedStoreIndex, setSelectedStoreIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Table Selection States
+  const [selectedStoreIds, setSelectedStoreIds] = useState([]);
+  const [selectedDeviceIds, setSelectedDeviceIds] = useState([]);
+  const [selectedTxIds, setSelectedTxIds] = useState([]);
+
+  const toggleSelectAllStores = () => {
+    if (selectedStoreIds.length === stores.length && stores.length > 0) {
+      setSelectedStoreIds([]);
+    } else {
+      setSelectedStoreIds(stores.map(s => s.id));
+    }
+  };
+  const toggleStoreSelection = (id) => {
+    setSelectedStoreIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAllDevices = () => {
+    if (selectedDeviceIds.length === filteredDevices.length && filteredDevices.length > 0) {
+      setSelectedDeviceIds([]);
+    } else {
+      setSelectedDeviceIds(filteredDevices.map(d => d.id));
+    }
+  };
+  const toggleDeviceSelection = (id) => {
+    setSelectedDeviceIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAllTxs = () => {
+    if (selectedTxIds.length === filteredTransactions.length && filteredTransactions.length > 0) {
+      setSelectedTxIds([]);
+    } else {
+      setSelectedTxIds(filteredTransactions.map(tx => tx.id));
+    }
+  };
+  const toggleTxSelection = (id) => {
+    setSelectedTxIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
 
   // Store Modals
   const [isRegisterStoreOpen, setIsRegisterStoreOpen] = useState(false);
@@ -954,7 +994,20 @@ export default function UserDashboard() {
                   <table className="w-full text-left border-collapse min-w-[700px]">
                     <thead>
                       <tr className="border-b border-slate-200 dark:border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50/50 dark:bg-slate-800/40">
-                        <th className="py-3 px-4 rounded-l-xl">Branch Name</th>
+                        <th className="py-3 px-3.5 w-10 text-center rounded-l-xl">
+                          <button
+                            type="button"
+                            onClick={toggleSelectAllStores}
+                            className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                          >
+                            {selectedStoreIds.length === stores.length && stores.length > 0 ? (
+                              <CheckSquare className="w-4 h-4 text-emerald-600" />
+                            ) : (
+                              <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                            )}
+                          </button>
+                        </th>
+                        <th className="py-3 px-4">Branch Name</th>
                         <th className="py-3 px-4">Location / Address</th>
                         <th className="py-3 px-4">Owner Phone</th>
                         <th className="py-3 px-4">Connected Devices</th>
@@ -964,7 +1017,7 @@ export default function UserDashboard() {
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
                       {stores.map((s, idx) => {
-                        const isSelected = selectedStoreIndex === idx;
+                        const isSelected = selectedStoreIndex === idx || selectedStoreIds.includes(s.id);
                         const devCount = s.devices?.length || 0;
                         return (
                           <tr 
@@ -973,6 +1026,19 @@ export default function UserDashboard() {
                               isSelected ? 'bg-emerald-50/40 dark:bg-emerald-950/20 font-medium' : ''
                             }`}
                           >
+                            <td className="py-3.5 px-3.5 text-center">
+                              <button
+                                type="button"
+                                onClick={() => toggleStoreSelection(s.id)}
+                                className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                              >
+                                {selectedStoreIds.includes(s.id) ? (
+                                  <CheckSquare className="w-4 h-4 text-emerald-600" />
+                                ) : (
+                                  <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                                )}
+                              </button>
+                            </td>
                             <td className="py-3.5 px-4">
                               <div className="flex items-center gap-2.5">
                                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
@@ -1159,6 +1225,19 @@ export default function UserDashboard() {
                     <table className="w-full text-left text-sm min-w-[850px]">
                       <thead>
                         <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          <th className="py-3 px-3.5 w-10 text-center">
+                            <button
+                              type="button"
+                              onClick={toggleSelectAllDevices}
+                              className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                            >
+                              {selectedDeviceIds.length === filteredDevices.length && filteredDevices.length > 0 ? (
+                                <CheckSquare className="w-4 h-4 text-emerald-600" />
+                              ) : (
+                                <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                              )}
+                            </button>
+                          </th>
                           <th className="py-3 px-4">{isKhmer ? 'ឧបករណ៍ Soundbox (SN)' : 'Soundbox Device (SN)'}</th>
                           <th className="py-3 px-4">{isKhmer ? 'សាខាហាង' : 'Assigned Store'}</th>
                           <th className="py-3 px-4 text-center">{isKhmer ? 'តម្លៃឧបករណ៍' : 'Unit Price'}</th>
@@ -1193,8 +1272,23 @@ export default function UserDashboard() {
                           return (
                             <tr 
                               key={device.id}
-                              className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition group"
+                              className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition group ${
+                                selectedDeviceIds.includes(device.id) ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : ''
+                              }`}
                             >
+                              <td className="py-3.5 px-3.5 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleDeviceSelection(device.id)}
+                                  className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                                >
+                                  {selectedDeviceIds.includes(device.id) ? (
+                                    <CheckSquare className="w-4 h-4 text-emerald-600" />
+                                  ) : (
+                                    <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                                  )}
+                                </button>
+                              </td>
                               {/* Column 1: SN & Model */}
                               <td className="py-3.5 px-4">
                                 <div className="space-y-0.5">
@@ -1542,6 +1636,19 @@ export default function UserDashboard() {
                     <table className="w-full text-left text-sm min-w-[700px]">
                       <thead>
                         <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          <th className="py-3 px-3.5 w-10 text-center">
+                            <button
+                              type="button"
+                              onClick={toggleSelectAllTxs}
+                              className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                            >
+                              {selectedTxIds.length === filteredTransactions.length && filteredTransactions.length > 0 ? (
+                                <CheckSquare className="w-4 h-4 text-emerald-600" />
+                              ) : (
+                                <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                              )}
+                            </button>
+                          </th>
                           <th className="py-3 px-4">{t('bank', 'Bank / Source')}</th>
                           <th className="py-3 px-4">{t('amount', 'Amount')}</th>
                           <th className="py-3 px-4">{t('payer', 'Customer / Payer')}</th>
@@ -1560,8 +1667,23 @@ export default function UserDashboard() {
                               setSelectedTxSlip(tx);
                               setIsTxSlipOpen(true);
                             }}
-                            className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition cursor-pointer group"
+                            className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition cursor-pointer group ${
+                              selectedTxIds.includes(tx.id) ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : ''
+                            }`}
                           >
+                            <td className="py-3.5 px-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={() => toggleTxSelection(tx.id)}
+                                className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                              >
+                                {selectedTxIds.includes(tx.id) ? (
+                                  <CheckSquare className="w-4 h-4 text-emerald-600" />
+                                ) : (
+                                  <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                                )}
+                              </button>
+                            </td>
                             <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white flex items-center gap-2">
                               <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                               <span>{tx.bank_name || 'Bakong'}</span>
