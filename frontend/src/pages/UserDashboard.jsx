@@ -49,6 +49,7 @@ import {
   RotateCcw,
   Calendar,
   ChevronRight,
+  Clock,
   Info
 } from 'lucide-react';
 
@@ -919,7 +920,7 @@ export default function UserDashboard() {
                   <div>
                     <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                       <Store className="w-5 h-5 text-emerald-600" />
-                      <span>{isKhmer ? 'បញ្ជីសាខាហាងទាំងអស់ (All Store Branches)' : 'Store Branches & Locations Directory'}</span>
+                      <span>{isKhmer ? 'បញ្ជីសាខាហាងទាំងអស់' : 'Store Branches & Locations Directory'}</span>
                     </h3>
                     <p className="text-xs text-slate-400">
                       Manage all your merchant store branches, operational addresses, and contact phone numbers.
@@ -1082,7 +1083,7 @@ export default function UserDashboard() {
                   <div>
                     <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                       <Volume2 className="w-5 h-5 text-indigo-600" />
-                      <span>{isKhmer ? 'បញ្ជីឧបករណ៍ Soundbox (Device Info Table)' : 'Soundbox Hardware & Device Telemetry Table'}</span>
+                      <span>{isKhmer ? 'បញ្ជីឧបករណ៍ Soundbox' : 'Soundbox Hardware & Device Telemetry'}</span>
                     </h3>
                     <p className="text-xs text-slate-400">
                       Monitor live battery health, 4G cellular signal strength, store assignment, and audio test broadcasts.
@@ -1134,7 +1135,7 @@ export default function UserDashboard() {
                     onChange={(e) => setDeviceStoreFilter(e.target.value)}
                     className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                   >
-                    <option value="ALL">All Store Branches</option>
+                    <option value="ALL">{isKhmer ? 'សាខាហាងទាំងអស់' : 'All Store Branches'}</option>
                     {stores.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
@@ -1146,11 +1147,11 @@ export default function UserDashboard() {
                     onChange={(e) => setDeviceStatusFilter(e.target.value)}
                     className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                   >
-                    <option value="ALL">All Device Statuses</option>
-                    <option value="ACTIVE">🟢 Active / Online</option>
-                    <option value="IN_STOCK">📦 In Stock</option>
-                    <option value="OFFLINE">⚪ Offline</option>
-                    <option value="MAINTENANCE">🛠️ Maintenance</option>
+                    <option value="ALL">{isKhmer ? 'ស្ថានភាពឧបករណ៍ទាំងអស់' : 'All Device Statuses'}</option>
+                    <option value="ACTIVE">{isKhmer ? '🟢 សកម្ម / អនឡាញ' : '🟢 Active / Online'}</option>
+                    <option value="IN_STOCK">{isKhmer ? '📦 ក្នុងស្តុក' : '📦 In Stock'}</option>
+                    <option value="OFFLINE">{isKhmer ? '⚪ ក្រៅបណ្តាញ' : '⚪ Offline'}</option>
+                    <option value="MAINTENANCE">{isKhmer ? '🛠️ ថែទាំ' : '🛠️ Maintenance'}</option>
                   </select>
                 </div>
 
@@ -1160,13 +1161,14 @@ export default function UserDashboard() {
                     <table className="w-full text-left text-sm min-w-[850px]">
                       <thead>
                         <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          <th className="py-3 px-4">Soundbox Device (SN)</th>
-                          <th className="py-3 px-4">Assigned Store</th>
-                          <th className="py-3 px-4">Status</th>
-                          <th className="py-3 px-4">Battery Level</th>
-                          <th className="py-3 px-4">4G Signal</th>
-                          <th className="py-3 px-4">Telegram Verification</th>
-                          <th className="py-3 px-4 text-center">Operations</th>
+                          <th className="py-3 px-4">{isKhmer ? 'ឧបករណ៍ Soundbox (SN)' : 'Soundbox Device (SN)'}</th>
+                          <th className="py-3 px-4">{isKhmer ? 'សាខាហាង' : 'Assigned Store'}</th>
+                          <th className="py-3 px-4">{isKhmer ? 'ស្ថានភាព' : 'Status'}</th>
+                          <th className="py-3 px-4">{isKhmer ? 'សកម្មភាពចុងក្រោយ' : 'Last Active'}</th>
+                          <th className="py-3 px-4">{isKhmer ? 'ថាមពលថ្ម' : 'Battery Level'}</th>
+                          <th className="py-3 px-4">{isKhmer ? 'សេវា 4G' : '4G Signal'}</th>
+                          <th className="py-3 px-4">{isKhmer ? 'Telegram Bot' : 'Telegram Verification'}</th>
+                          <th className="py-3 px-4 text-center">{isKhmer ? 'សកម្មភាព' : 'Operations'}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
@@ -1174,6 +1176,7 @@ export default function UserDashboard() {
                           const isOnline = String(device.status).toUpperCase() === 'ACTIVE' || String(device.status).toUpperCase() === 'ONLINE';
                           const isTesting = testingDeviceId === device.id;
                           const isRebooting = rebootingDeviceId === device.id;
+                          const lastActiveRaw = device.last_active || device.last_time || device.last_online || device.last_heartbeat || device.updated_at || device.created_at;
 
                           return (
                             <tr 
@@ -1218,13 +1221,30 @@ export default function UserDashboard() {
                                 </span>
                               </td>
 
-                              {/* Column 4: Battery Level */}
+                              {/* Column 4: Last Active */}
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
+                                  <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <span className="font-mono text-xs font-semibold">
+                                    {(() => {
+                                      if (!lastActiveRaw) return isKhmer ? 'មិនទាន់មាន' : 'Never';
+                                      const d = new Date(lastActiveRaw);
+                                      if (isNaN(d.getTime())) return isKhmer ? 'មិនទាន់មាន' : 'Never';
+                                      const dateStr = d.toLocaleDateString(isKhmer ? 'km-KH' : 'en-US', { month: 'short', day: 'numeric' });
+                                      const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                      return `${dateStr}, ${timeStr}`;
+                                    })()}
+                                  </span>
+                                </div>
+                              </td>
+
+                              {/* Column 5: Battery Level */}
                               <td className="py-3.5 px-4">
                                 <div className="space-y-1">
                                   <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
                                     <BatteryCharging className="w-4 h-4 text-emerald-500 shrink-0" />
                                     <span className="font-mono">95%</span>
-                                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-normal">(AC Powered)</span>
+                                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-normal">({isKhmer ? 'ដោតភ្លើង' : 'AC Powered'})</span>
                                   </div>
                                   <div className="w-24 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                                     <div className="h-full bg-emerald-500 rounded-full w-[95%]"></div>
@@ -1232,7 +1252,7 @@ export default function UserDashboard() {
                                 </div>
                               </td>
 
-                              {/* Column 5: 4G Cellular Signal */}
+                              {/* Column 6: 4G Cellular Signal */}
                               <td className="py-3.5 px-4">
                                 <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200">
                                   <Signal className="w-4 h-4 text-blue-500 shrink-0" />
@@ -1241,7 +1261,7 @@ export default function UserDashboard() {
                                 </div>
                               </td>
 
-                              {/* Column 6: Telegram Code */}
+                              {/* Column 7: Telegram Code */}
                               <td className="py-3.5 px-4">
                                 {device.telegram_chat_id ? (
                                   <div className="flex flex-wrap gap-1">
@@ -1439,7 +1459,7 @@ export default function UserDashboard() {
                     onChange={(e) => setTxStoreFilter(e.target.value)}
                     className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                   >
-                    <option value="ALL">All Store Branches</option>
+                    <option value="ALL">{isKhmer ? 'សាខាហាងទាំងអស់' : 'All Store Branches'}</option>
                     {stores.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
@@ -1451,9 +1471,9 @@ export default function UserDashboard() {
                     onChange={(e) => setTxCurrencyFilter(e.target.value)}
                     className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                   >
-                    <option value="ALL">All Currencies (USD & KHR)</option>
-                    <option value="USD">USD ($) Only</option>
-                    <option value="KHR">KHR (៛) Only</option>
+                    <option value="ALL">{isKhmer ? 'រូបិយប័ណ្ណទាំងអស់' : 'All Currencies'}</option>
+                    <option value="USD">{isKhmer ? 'ប្រាក់ដុល្លារ ($)' : 'USD ($) Only'}</option>
+                    <option value="KHR">{isKhmer ? 'ប្រាក់រៀល (៛)' : 'KHR (៛) Only'}</option>
                   </select>
 
                   {/* Bank Filter */}
@@ -1462,7 +1482,7 @@ export default function UserDashboard() {
                     onChange={(e) => setTxBankFilter(e.target.value)}
                     className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                   >
-                    <option value="ALL">All Banks</option>
+                    <option value="ALL">{isKhmer ? 'ធនាគារទាំងអស់' : 'All Banks'}</option>
                     <option value="ABA">ABA Bank</option>
                     <option value="ACLEDA">ACLEDA Bank</option>
                     <option value="Canadia">Canadia Bank</option>
@@ -1786,7 +1806,7 @@ export default function UserDashboard() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
               <div className="text-xs font-bold uppercase text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                 <MapPin className="w-4 h-4 text-emerald-600" />
-                <span>{isKhmer ? 'ទីតាំងហាង (ជ្រើសរើសដើម្បីកែប្រែ)' : 'Store Location'}</span>
+                <span>{isKhmer ? 'ទីតាំងហាង' : 'Store Location'}</span>
               </div>
               <span className="text-[11px] text-slate-400 truncate max-w-xs">{activeStore?.location}</span>
             </div>
