@@ -1012,177 +1012,176 @@ export default function UserDashboard() {
                           setEditStreetOrLandmark(resolved.streetOrLandmark);
                           setIsEditStoreOpen(true);
                         }}
-                        className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs"
+                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
                       >
-                        <Edit3 className="w-3.5 h-3.5 shrink-0 text-slate-500" />
-                        <span>{t('editStore', 'Edit Store')}</span>
+                        <Edit3 className="w-3.5 h-3.5 shrink-0" />
+                        <span>{t('editStore', 'Edit Store Details')}</span>
                       </button>
 
                       <button
-                        onClick={() => changeTab('devices')}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                        type="button"
+                        onClick={() => {
+                          resetRegisterForm();
+                          setIsRegisterStoreOpen(true);
+                        }}
+                        className="px-3.5 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs"
                       >
-                        <Volume2 className="w-3.5 h-3.5 shrink-0" />
-                        <span>Manage Speakers</span>
-                      </button>
-
-                      <button
-                        onClick={handleExportCSV}
-                        title="Export Store Statement CSV"
-                        className="p-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl transition cursor-pointer shadow-2xs"
-                      >
-                        <Download className="w-4 h-4" />
+                        <Plus className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>Add New Branch</span>
                       </button>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* 4 Financial & Operational KPI Cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Sales (USD)</span>
-                    <div className="p-2 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 rounded-xl">
-                      <DollarSign className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                    ${storeMetrics.totalUSD.toFixed(2)}
-                  </div>
-                  <p className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
-                    <TrendingUp className="w-3 h-3 text-emerald-500" />
-                    <span>Live branch revenue</span>
-                  </p>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Sales (KHR)</span>
-                    <div className="p-2 bg-blue-50 dark:bg-blue-950/60 text-blue-600 rounded-xl">
-                      <span className="font-bold text-xs">៛</span>
-                    </div>
-                  </div>
-                  <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                    ៛{storeMetrics.totalKHR.toLocaleString()}
-                  </div>
-                  <p className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
-                    <TrendingUp className="w-3 h-3 text-blue-500" />
-                    <span>Bakong QR payments</span>
-                  </p>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Payments</span>
-                    <div className="p-2 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 rounded-xl">
-                      <Receipt className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                    {storeMetrics.txCount} <span className="text-xs font-normal text-slate-400">total</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
-                    <CheckCircle2 className="w-3 h-3 text-indigo-500" />
-                    <span>Voice broadcasted</span>
-                  </p>
-                </div>
-
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Soundboxes</span>
-                    <div className="p-2 bg-amber-50 dark:bg-amber-950/60 text-amber-600 rounded-xl">
-                      <Volume2 className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                    {activeStore?.devices?.length || 0} <span className="text-xs font-normal text-slate-400">active</span>
-                  </div>
-                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span>Ready for announcements</span>
-                  </p>
-                </div>
-              </div>
-
-              {/* Connected Soundbox Speakers for Active Branch */}
+              {/* All Store Branches Table */}
               <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
                   <div>
                     <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      <Volume2 className="w-5 h-5 text-emerald-600" />
-                      <span>{t('connectedSoundboxes', 'Branch Soundbox Speakers')}</span>
+                      <Store className="w-5 h-5 text-emerald-600" />
+                      <span>{isKhmer ? 'បញ្ជីសាខាហាងទាំងអស់ (All Store Branches)' : 'Store Branches & Locations Directory'}</span>
                     </h3>
                     <p className="text-xs text-slate-400">
-                      Active soundbox speakers assigned to broadcast payments at {activeStore.name}.
+                      Manage all your merchant store branches, operational addresses, and contact phone numbers.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => changeTab('devices')}
-                    className="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <span>{isKhmer ? 'មើលឧបករណ៍ទាំងអស់' : 'View Full Fleet'}</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
 
-                {activeStore.devices && activeStore.devices.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                    {activeStore.devices.map((device) => {
-                      const isTesting = testingDeviceId === device.id;
-                      return (
-                        <div 
-                          key={device.id} 
-                          className="p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-3 shadow-2xs"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="font-mono font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                              <Smartphone className="w-4 h-4 text-emerald-600" />
-                              <span>{device.device_sn}</span>
-                            </div>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                              {device.status || 'ACTIVE'}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-200/60 dark:border-slate-700/50">
-                            <span className="font-medium">Model: {device.device_model || 'Y6B'}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleTriggerTestVoice(device)}
-                              disabled={isTesting}
-                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            >
-                              <BellRing className={`w-3 h-3 ${isTesting ? 'animate-spin' : ''}`} />
-                              <span>Test Voice</span>
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-3">
-                    <Volume2 className="w-10 h-10 text-slate-400 mx-auto" />
-                    <div className="space-y-1">
-                      <p className="text-sm font-bold text-slate-800 dark:text-slate-200">No Soundbox at this Branch</p>
-                      <p className="text-xs text-slate-400">Link a 4G Cloud Speaker to start receiving real-time voice payment announcements.</p>
-                    </div>
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => {
-                        setActiveCameraField(null);
-                        setScanFeedback({ field: '', message: '', isError: false });
-                        setIsDeviceModalOpen(true);
+                        resetRegisterForm();
+                        setIsRegisterStoreOpen(true);
                       }}
-                      className="text-xs font-bold px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>+ Link Soundbox</span>
+                      <span>+ Add Branch</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => fetchStoresData(true)}
+                      className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition cursor-pointer"
+                      title="Refresh Store List"
+                    >
+                      <RefreshCw className="w-4 h-4" />
                     </button>
                   </div>
-                )}
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse min-w-[700px]">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50/50 dark:bg-slate-800/40">
+                        <th className="py-3 px-4 rounded-l-xl">Branch Name</th>
+                        <th className="py-3 px-4">Location / Address</th>
+                        <th className="py-3 px-4">Owner Phone</th>
+                        <th className="py-3 px-4">Connected Devices</th>
+                        <th className="py-3 px-4">Status</th>
+                        <th className="py-3 px-4 text-right rounded-r-xl">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                      {stores.map((s, idx) => {
+                        const isSelected = selectedStoreIndex === idx;
+                        const devCount = s.devices?.length || 0;
+                        return (
+                          <tr 
+                            key={s.id}
+                            className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition ${
+                              isSelected ? 'bg-emerald-50/40 dark:bg-emerald-950/20 font-medium' : ''
+                            }`}
+                          >
+                            <td className="py-3.5 px-4">
+                              <div className="flex items-center gap-2.5">
+                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                                  isSelected 
+                                    ? 'bg-emerald-600 text-white shadow-xs' 
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                                }`}>
+                                  <Store className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                    <span>{s.name}</span>
+                                    {isSelected && (
+                                      <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-1.5 py-0.2 rounded font-bold">
+                                        Current
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[10px] text-slate-400 font-mono">ID: #{s.id}</span>
+                                </div>
+                              </div>
+                            </td>
+
+                            <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 max-w-xs">
+                              <div className="flex items-center gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                <span className="truncate">{s.location || s.place || 'Phnom Penh, Cambodia'}</span>
+                              </div>
+                            </td>
+
+                            <td className="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-400">
+                              {s.owner_phone || user?.phone_number || '-'}
+                            </td>
+
+                            <td className="py-3.5 px-4">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
+                                <Volume2 className="w-3.5 h-3.5 text-indigo-600" />
+                                <span>{devCount} {devCount === 1 ? 'Speaker' : 'Speakers'}</span>
+                              </span>
+                            </td>
+
+                            <td className="py-3.5 px-4">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                ACTIVE
+                              </span>
+                            </td>
+
+                            <td className="py-3.5 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {!isSelected && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedStoreIndex(idx);
+                                      setEditName(s.name);
+                                    }}
+                                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer"
+                                  >
+                                    Select
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedStoreIndex(idx);
+                                    setEditName(s.name || '');
+                                    const resolved = resolveStoreLocationCodes(s);
+                                    setEditProvinceId(resolved.provinceId);
+                                    setEditDistrictId(resolved.districtId);
+                                    setEditCommuneId(resolved.communeId);
+                                    setEditVillageId(resolved.villageId);
+                                    setEditStreetOrLandmark(resolved.streetOrLandmark);
+                                    setIsEditStoreOpen(true);
+                                  }}
+                                  className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/80 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Edit3 className="w-3 h-3" />
+                                  <span>Edit</span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
