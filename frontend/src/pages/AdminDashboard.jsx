@@ -765,12 +765,13 @@ export default function AdminDashboard() {
       showToast({ type: 'warning', title: 'No Data', message: 'No warehouse stock records to export.' });
       return;
     }
-    const headers = ['Device SN', 'Model', 'Status', 'Batch No', 'Notes', '4G Version', 'WiFi Version', 'Created At'];
+    const headers = ['Device SN', 'Device Type', 'Model', 'Batch No', 'Unit Price ($)', 'Notes', '4G Version', 'WiFi Version', 'Created At'];
     const rows = filteredStockDevices.map(d => [
       `"${d.device_sn || ''}"`,
+      `"${d.device_type || 'Soundbox'}"`,
       `"${d.device_model || ''}"`,
-      `"${d.status || 'IN_STOCK'}"`,
       `"${d.batch_no || ''}"`,
+      Number(d.price || 29).toFixed(2),
       `"${(d.notes || '').replace(/"/g, '""')}"`,
       `"${d.version_4g || ''}"`,
       `"${d.version_wifi || ''}"`,
@@ -2509,7 +2510,6 @@ export default function AdminDashboard() {
                     <th className="py-3 px-3">Model</th>
                     <th className="py-3 px-3">Batch No</th>
                     <th className="py-3 px-3 text-center">Unit Price</th>
-                    <th className="py-3 px-3 text-center">Status</th>
                     <th className="py-3 px-3">Intake Date</th>
                     <th className="py-3 px-3">Hardware / Firmware</th>
                     <th className="py-3 px-3">Warehouse Location & Notes</th>
@@ -2552,19 +2552,12 @@ export default function AdminDashboard() {
                           </span>
                         </td>
 
-                        {/* Column 3: Unit Price */}
+                        {/* Column 5: Unit Price */}
                         <td className="py-3.5 px-3 text-center font-mono font-bold text-slate-800 dark:text-slate-200">
                           ${Number(d.price || 29).toFixed(2)}
                         </td>
 
-                        {/* Column 4: Status */}
-                        <td className="py-3.5 px-3 text-center">
-                          <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
-                            📦 In Stock
-                          </span>
-                        </td>
-
-                        {/* Column 4: Intake Date */}
+                        {/* Column 6: Intake Date */}
                         <td className="py-3.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-400 whitespace-nowrap">
                           {d.created_at ? new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Aug 30, 2026'}
                         </td>
