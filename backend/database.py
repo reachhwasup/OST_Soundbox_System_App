@@ -165,6 +165,12 @@ async def init_db():
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS batch_no VARCHAR(100);
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(10, 2) DEFAULT 0.00;
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(5, 2) DEFAULT 0.00;
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS final_price NUMERIC(10, 2) DEFAULT 29.00;
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_days INT DEFAULT 90;
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_start_date TIMESTAMP WITH TIME ZONE;
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_end_date TIMESTAMP WITH TIME ZONE;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS last_online TIMESTAMP WITH TIME ZONE;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_id VARCHAR(100);
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_name VARCHAR(255);

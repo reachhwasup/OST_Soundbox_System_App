@@ -1162,6 +1162,7 @@ export default function UserDashboard() {
                           <th className="py-3 px-4">{isKhmer ? 'ឧបករណ៍ Soundbox (SN)' : 'Soundbox Device (SN)'}</th>
                           <th className="py-3 px-4">{isKhmer ? 'សាខាហាង' : 'Assigned Store'}</th>
                           <th className="py-3 px-4 text-center">{isKhmer ? 'តម្លៃឧបករណ៍' : 'Unit Price'}</th>
+                          <th className="py-3 px-4 text-center">{isKhmer ? 'ការធានា (Warranty)' : 'Warranty (90d)'}</th>
                           <th className="py-3 px-4">{isKhmer ? 'ស្ថានភាព' : 'Status'}</th>
                           <th className="py-3 px-4">{isKhmer ? 'សកម្មភាពចុងក្រោយ' : 'Last Active'}</th>
                           <th className="py-3 px-4">{isKhmer ? 'ថាមពលថ្ម' : 'Battery Level'}</th>
@@ -1176,6 +1177,18 @@ export default function UserDashboard() {
                           const isTesting = testingDeviceId === device.id;
                           const isRebooting = rebootingDeviceId === device.id;
                           const lastActiveRaw = device.last_active || device.last_time || device.last_online || device.last_heartbeat || device.updated_at || device.created_at;
+
+                          // Compute warranty countdown
+                          const now = new Date();
+                          const durationDays = Number(device.warranty_days) || 90;
+                          let endDate = device.warranty_end_date ? new Date(device.warranty_end_date) : null;
+                          if (!endDate && device.warranty_start_date) {
+                            endDate = new Date(new Date(device.warranty_start_date).getTime() + durationDays * 86400000);
+                          }
+                          if (!endDate && device.created_at) {
+                            endDate = new Date(new Date(device.created_at).getTime() + durationDays * 86400000);
+                          }
+                          const daysLeft = endDate ? Math.ceil((endDate.getTime() - now.getTime()) / 86400000) : 0;
 
                           return (
                             <tr 
@@ -1208,14 +1221,45 @@ export default function UserDashboard() {
                                 </div>
                               </td>
 
-                              {/* Column 3: Unit Price */}
+                              {/* Column 3: Unit Price & Discount */}
                               <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                                <span className="font-mono text-xs font-bold text-slate-900 dark:text-white">
-                                  ${Number(device.price || 29).toFixed(2)}
-                                </span>
+                                {Number(device.discount_amount) > 0 || Number(device.discount_percent) > 0 ? (
+                                  <div>
+                                    <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                      ${Number(device.final_price || device.price).toFixed(2)}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 line-through ml-1.5 font-mono">
+                                      ${Number(device.price || 29).toFixed(2)}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="font-mono text-xs font-bold text-slate-900 dark:text-white">
+                                    ${Number(device.price || 29).toFixed(2)}
+                                  </span>
+                                )}
                               </td>
 
-                              {/* Column 4: Status */}
+                              {/* Column 4: 90-Day Warranty Live Countdown */}
+                              <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                                {daysLeft <= 0 ? (
+                                  <span className="px-2.5 py-1 bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                                    {isKhmer ? 'ផុតកំណត់' : 'Expired'}
+                                  </span>
+                                ) : daysLeft <= 15 ? (
+                                  <span className="px-2.5 py-1 bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                    {daysLeft} {isKhmer ? 'ថ្ងៃនៅសល់' : 'days left'}
+                                  </span>
+                                ) : (
+                                  <span className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+                                    <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                                    {daysLeft} {isKhmer ? 'ថ្ងៃនៅសល់' : 'days left'}
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* Column 5: Status */}
                               <td className="py-3.5 px-4">
                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${
                                   isOnline

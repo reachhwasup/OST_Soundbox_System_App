@@ -71,7 +71,11 @@ import {
   Boxes,
   DollarSign,
   Unlink,
-  Smartphone
+  Smartphone,
+  Shield,
+  Tag,
+  Percent,
+  Calendar
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -193,6 +197,7 @@ export default function AdminDashboard() {
     deviceType: true,
     merchantId: true,
     price: true,
+    warranty: true,
     status: true,
     battery: true,
     signal: true,
@@ -228,7 +233,6 @@ export default function AdminDashboard() {
   const [isLogDetailOpen, setIsLogDetailOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState(null);
 
-
   // Soundbox Device Edit/Delete Modals state
   const [isEditDeviceOpen, setIsEditDeviceOpen] = useState(false);
   const [isDeleteDeviceOpen, setIsDeleteDeviceOpen] = useState(false);
@@ -240,6 +244,11 @@ export default function AdminDashboard() {
   const [editDeviceStatus, setEditDeviceStatus] = useState('ACTIVE');
   const [editDevicePrice, setEditDevicePrice] = useState('39.00');
   const [editDeviceNotes, setEditDeviceNotes] = useState('');
+  const [editDiscountType, setEditDiscountType] = useState('NONE'); // NONE, PERCENT, AMOUNT
+  const [editDiscountPercent, setEditDiscountPercent] = useState(0);
+  const [editDiscountAmount, setEditDiscountAmount] = useState(0);
+  const [editWarrantyDays, setEditWarrantyDays] = useState(90);
+  const [editWarrantyStartDate, setEditWarrantyStartDate] = useState('');
 
   // Form states for Create User
   const [newPhone, setNewPhone] = useState('');
@@ -503,6 +512,40 @@ export default function AdminDashboard() {
     }
   };
 
+  // Helper to calculate Warranty Days Remaining & Expiry Date
+  const calculateWarrantyCountdown = (device) => {
+    if (!device) return { status: 'NO_WARRANTY', days: 0, text: t('noWarranty', 'No Warranty') };
+    const now = new Date();
+    let endDate = device.warranty_end_date ? new Date(device.warranty_end_date) : null;
+    let startDate = device.warranty_start_date ? new Date(device.warranty_start_date) : null;
+    const totalDays = Number(device.warranty_days) || 90;
+
+    if (!endDate && startDate) {
+      endDate = new Date(startDate.getTime() + totalDays * 24 * 60 * 60 * 1000);
+    }
+    if (!endDate) {
+      if (device.merchant_id) {
+        startDate = device.created_at ? new Date(device.created_at) : now;
+        endDate = new Date(startDate.getTime() + totalDays * 24 * 60 * 60 * 1000);
+      } else {
+        return { status: 'NO_WARRANTY', days: 0, text: t('inStock', 'In Stock (No Warranty)'), startDate: null, endDate: null, totalDays, progress: 0 };
+      }
+    }
+
+    const diffMs = endDate.getTime() - now.getTime();
+    const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    const elapsedDays = Math.max(0, totalDays - Math.max(0, daysLeft));
+    const progress = Math.min(100, Math.max(0, (elapsedDays / totalDays) * 100));
+
+    if (daysLeft <= 0) {
+      return { status: 'EXPIRED', days: 0, text: t('expired', 'Expired'), startDate, endDate, totalDays, progress: 100 };
+    } else if (daysLeft <= 15) {
+      return { status: 'EXPIRING_SOON', days: daysLeft, text: `${daysLeft} ${t('daysLeft', 'days left')}`, startDate, endDate, totalDays, progress };
+    } else {
+      return { status: 'ACTIVE', days: daysLeft, text: `${daysLeft} ${t('daysLeft', 'days left')}`, startDate, endDate, totalDays, progress };
+    }
+  };
+
   // Open Edit Device Modal
   const openEditDeviceModal = (d) => {
     setSelectedDevice(d);
@@ -512,6 +555,24 @@ export default function AdminDashboard() {
     setEditDeviceStatus(d.status || 'ACTIVE');
     setEditDevicePrice(d.price ? String(d.price) : '39.00');
     setEditDeviceNotes(d.notes || '');
+    
+    if (d.discount_percent && Number(d.discount_percent) > 0) {
+      setEditDiscountType('PERCENT');
+      setEditDiscountPercent(Number(d.discount_percent));
+      setEditDiscountAmount(0);
+    } else if (d.discount_amount && Number(d.discount_amount) > 0) {
+      setEditDiscountType('AMOUNT');
+      setEditDiscountAmount(Number(d.discount_amount));
+      setEditDiscountPercent(0);
+    } else {
+      setEditDiscountType('NONE');
+      setEditDiscountPercent(0);
+      setEditDiscountAmount(0);
+    }
+
+    setEditWarrantyDays(d.warranty_days ? Number(d.warranty_days) : 90);
+    setEditWarrantyStartDate(d.warranty_start_date ? d.warranty_start_date.split('T')[0] : '');
+
     const matchedStore = stores.find(s => s.name === d.store_name);
     setEditDeviceMerchantId(matchedStore ? matchedStore.id : '');
     setIsEditDeviceOpen(true);
@@ -523,6 +584,19 @@ export default function AdminDashboard() {
     if (!selectedDevice) return;
     setSubmitting(true);
     setError('');
+
+    const basePrice = Number(editDevicePrice) || 29.00;
+    let discAmt = 0;
+    let discPct = 0;
+    if (editDiscountType === 'PERCENT') {
+      discPct = Number(editDiscountPercent) || 0;
+      discAmt = (discPct / 100.0) * basePrice;
+    } else if (editDiscountType === 'AMOUNT') {
+      discAmt = Number(editDiscountAmount) || 0;
+      discPct = 0;
+    }
+    const finalPrice = Math.max(0, basePrice - discAmt);
+
     try {
       await api.put(`/api/devices/${selectedDevice.id}`, {
         device_sn: editDeviceSn.trim(),
@@ -530,7 +604,12 @@ export default function AdminDashboard() {
         device_model: editDeviceType.trim() || 'Display Soundbox',
         telegram_chat_id: editDeviceTelegram.trim() || null,
         status: editDeviceStatus,
-        price: Number(editDevicePrice) || 39.00,
+        price: basePrice,
+        discount_amount: discAmt,
+        discount_percent: discPct,
+        final_price: finalPrice,
+        warranty_days: Number(editWarrantyDays) || 90,
+        warranty_start_date: editWarrantyStartDate ? new Date(editWarrantyStartDate).toISOString() : null,
         notes: editDeviceNotes.trim() || null,
         merchant_id: editDeviceMerchantId ? parseInt(editDeviceMerchantId) : null
       });
@@ -2035,7 +2114,8 @@ export default function AdminDashboard() {
                     {visibleColumns.deviceId && <th className="py-3 px-3 font-semibold min-w-[160px]">{t('deviceId', 'Device ID')}</th>}
                     {visibleColumns.deviceType && <th className="py-3 px-3 font-semibold min-w-[190px]">{t('deviceType', 'Device Type')}</th>}
                     {visibleColumns.merchantId && <th className="py-3 px-3 font-semibold min-w-[180px]">{t('merchantStore', 'Assigned Store')}</th>}
-                    {visibleColumns.price && <th className="py-3 px-3 font-semibold text-center min-w-[95px]">{t('price', 'Price')}</th>}
+                    {visibleColumns.price && <th className="py-3 px-3 font-semibold text-center min-w-[110px]">{t('price', 'Price')}</th>}
+                    {visibleColumns.warranty && <th className="py-3 px-3 font-semibold text-center min-w-[140px]">{t('warranty', 'Warranty (90d)')}</th>}
                     {visibleColumns.status && <th className="py-3 px-3 font-semibold text-center min-w-[100px]">{t('status', 'Status')}</th>}
                     {visibleColumns.battery && <th className="py-3 px-3 font-semibold text-center min-w-[95px]">{t('battery', 'Battery')}</th>}
                     {visibleColumns.signal && <th className="py-3 px-3 font-semibold text-center min-w-[95px]">{t('signal', 'Signal')}</th>}
@@ -2113,10 +2193,57 @@ export default function AdminDashboard() {
                             </td>
                           )}
 
-                          {/* Price */}
+                          {/* Unit Price with Discount indicator */}
                           {visibleColumns.price && (
-                            <td className="py-3.5 px-3 text-center font-mono font-bold text-slate-800 dark:text-slate-200">
-                              ${Number(d.price || 29).toFixed(2)}
+                            <td className="py-3.5 px-3 text-center font-mono whitespace-nowrap">
+                              {Number(d.discount_amount) > 0 || Number(d.discount_percent) > 0 ? (
+                                <div>
+                                  <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">
+                                    ${Number(d.final_price || d.price).toFixed(2)}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 line-through ml-1.5">
+                                    ${Number(d.price || 29).toFixed(2)}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">
+                                  ${Number(d.price || 29).toFixed(2)}
+                                </span>
+                              )}
+                            </td>
+                          )}
+
+                          {/* Warranty 90-Day Live Countdown */}
+                          {visibleColumns.warranty && (
+                            <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                              {(() => {
+                                const wInfo = calculateWarrantyCountdown(d);
+                                if (!d.merchant_id || wInfo.status === 'NO_WARRANTY') {
+                                  return <span className="text-slate-400 text-[11px]">—</span>;
+                                }
+                                if (wInfo.status === 'EXPIRED') {
+                                  return (
+                                    <span className="px-2.5 py-1 bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                                      {t('expired', 'Expired')}
+                                    </span>
+                                  );
+                                }
+                                if (wInfo.status === 'EXPIRING_SOON') {
+                                  return (
+                                    <span className="px-2.5 py-1 bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                      {wInfo.text}
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <span className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+                                    <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                                    {wInfo.text}
+                                  </span>
+                                );
+                              })()}
                             </td>
                           )}
 
@@ -3361,16 +3488,16 @@ export default function AdminDashboard() {
         </div>
       </Modal>
 
-      {/* Modal: Edit Soundbox Hardware */}
+      {/* Modal: Edit Soundbox Hardware (with Discount Calculator & 90-Day Warranty) */}
       <Modal 
         isOpen={isEditDeviceOpen} 
         onClose={() => setIsEditDeviceOpen(false)} 
-        title={adminTab === 'stock' || !selectedDevice?.merchant_id ? `Edit Stock Device: ${selectedDevice?.device_sn || ''}` : `Edit Soundbox: ${selectedDevice?.device_sn || ''}`}
+        title={adminTab === 'stock' || !selectedDevice?.merchant_id ? `${t('editStockDeviceTitle', 'Edit Stock Device')}: ${selectedDevice?.device_sn || ''}` : `${t('editSoundboxTitle', 'Edit Soundbox')}: ${selectedDevice?.device_sn || ''}`}
       >
         <form onSubmit={handleUpdateDevice} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
-              Serial Number (SN) <span className="text-rose-500">*</span>
+              {t('serialNumber', 'Serial Number (SN)')} <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
@@ -3383,7 +3510,7 @@ export default function AdminDashboard() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">Device Type</label>
+              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">{t('deviceType', 'Device Type')}</label>
               <select
                 value={editDeviceType}
                 onChange={(e) => {
@@ -3393,12 +3520,12 @@ export default function AdminDashboard() {
                 }}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
               >
-                <option value="Display Soundbox">🖥️ Display Soundbox (Screen QR)</option>
-                <option value="Standard Soundbox">🏷️ Standard Soundbox (Printed QR)</option>
+                <option value="Display Soundbox">{t('displaySoundboxOpt', '🖥️ Display Soundbox (Screen QR)')}</option>
+                <option value="Standard Soundbox">{t('standardSoundboxOpt', '🏷️ Standard Soundbox (Printed QR)')}</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">Unit Price ($)</label>
+              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">{t('originalPrice', 'Unit Price ($)')}</label>
               <input
                 type="number"
                 step="0.01"
@@ -3409,9 +3536,141 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          {/* Discount Calculator Card */}
+          {adminTab !== 'stock' && selectedDevice?.merchant_id && (
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>{t('discount', 'Discount Calculation')}</span>
+                </span>
+                <span className="text-[11px] font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                  {t('finalPrice', 'Final Price')}: ${(() => {
+                    const bp = Number(editDevicePrice) || 29.0;
+                    let da = 0;
+                    if (editDiscountType === 'PERCENT') da = ((Number(editDiscountPercent) || 0) / 100.0) * bp;
+                    else if (editDiscountType === 'AMOUNT') da = Number(editDiscountAmount) || 0;
+                    return Math.max(0, bp - da).toFixed(2);
+                  })()}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditDiscountType('NONE')}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+                    editDiscountType === 'NONE'
+                      ? 'bg-white dark:bg-slate-700 border-blue-500 text-blue-600 dark:text-blue-300 shadow-2xs'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  {t('noDiscount', 'No Discount')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setEditDiscountType('PERCENT'); if (editDiscountPercent === 0) setEditDiscountPercent(10); }}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition cursor-pointer flex items-center justify-center gap-1 ${
+                    editDiscountType === 'PERCENT'
+                      ? 'bg-white dark:bg-slate-700 border-emerald-500 text-emerald-600 dark:text-emerald-300 shadow-2xs'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  <Percent className="w-3 h-3" />
+                  <span>{t('percentageDiscount', '% Off')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setEditDiscountType('AMOUNT'); if (editDiscountAmount === 0) setEditDiscountAmount(5); }}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition cursor-pointer flex items-center justify-center gap-1 ${
+                    editDiscountType === 'AMOUNT'
+                      ? 'bg-white dark:bg-slate-700 border-indigo-500 text-indigo-600 dark:text-indigo-300 shadow-2xs'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  <DollarSign className="w-3 h-3" />
+                  <span>{t('fixedDiscount', '$ Off')}</span>
+                </button>
+              </div>
+
+              {editDiscountType === 'PERCENT' && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('discountPercent', 'Discount %')}:</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={editDiscountPercent}
+                    onChange={(e) => setEditDiscountPercent(Number(e.target.value))}
+                    className="w-24 px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white"
+                  />
+                  <span className="text-xs text-slate-400 font-mono">
+                    (-${(((Number(editDiscountPercent) || 0) / 100.0) * (Number(editDevicePrice) || 29)).toFixed(2)})
+                  </span>
+                </div>
+              )}
+
+              {editDiscountType === 'AMOUNT' && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('discountAmount', 'Discount Amount ($)')}:</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={editDiscountAmount}
+                    onChange={(e) => setEditDiscountAmount(Number(e.target.value))}
+                    className="w-24 px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Warranty Period & Live Countdown Configuration */}
+          {adminTab !== 'stock' && selectedDevice?.merchant_id && (
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>{t('warrantyPeriod', 'Warranty Period & Countdown')}</span>
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
+                  {editWarrantyDays} {t('daysRemaining', 'Days')}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('warrantyPeriod', 'Duration')}</label>
+                  <select
+                    value={editWarrantyDays}
+                    onChange={(e) => setEditWarrantyDays(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-xs text-slate-900 dark:text-white cursor-pointer"
+                  >
+                    <option value={90}>{t('duration90Days', '90 Days (3 Months)')}</option>
+                    <option value={180}>{t('duration180Days', '180 Days (6 Months)')}</option>
+                    <option value={365}>{t('duration365Days', '365 Days (1 Year)')}</option>
+                    <option value={30}>{t('duration30Days', '30 Days (1 Month)')}</option>
+                    <option value={60}>{t('duration60Days', '60 Days (2 Months)')}</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('warrantyStart', 'Start Date')}</label>
+                  <input
+                    type="date"
+                    value={editWarrantyStartDate}
+                    onChange={(e) => setEditWarrantyStartDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-xs text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
-              Warehouse Notes
+              {t('warehouseNotes', 'Warehouse Notes')}
             </label>
             <input
               type="text"
@@ -3439,14 +3698,14 @@ export default function AdminDashboard() {
 
               <div>
                 <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
-                  Assign to Store
+                  {t('assignStore', 'Assign to Store')}
                 </label>
                 <select
                   value={editDeviceMerchantId}
                   onChange={(e) => setEditDeviceMerchantId(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                 >
-                  <option value="">-- Unassigned (No Store) --</option>
+                  <option value="">{t('unassignedNoStore', '-- Unassigned (No Store) --')}</option>
                   {stores.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name} ({s.owner_phone})
@@ -3463,14 +3722,14 @@ export default function AdminDashboard() {
               onClick={() => setIsEditDeviceOpen(false)}
               className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-300 font-medium"
             >
-              Cancel
+              {t('cancel', 'Cancel')}
             </button>
             <button
               type="submit"
               disabled={submitting}
               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-sm"
             >
-              {submitting ? 'Saving...' : 'Save Changes'}
+              {submitting ? 'Saving...' : t('saveChanges', 'Save Changes')}
             </button>
           </div>
         </form>
@@ -4018,7 +4277,7 @@ export default function AdminDashboard() {
             {/* Hardware Telemetry Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
               <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold">Battery</span>
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('battery', 'Battery')}</span>
                 <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mt-0.5">
                   <Battery className="w-4 h-4 text-emerald-500" />
                   {selectedDeviceDetail.battery || '100%'}
@@ -4026,7 +4285,7 @@ export default function AdminDashboard() {
               </div>
 
               <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold">Signal Quality</span>
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('signal', 'Signal Quality')}</span>
                 <div className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1.5 mt-0.5">
                   <Signal className="w-4 h-4" />
                   {selectedDeviceDetail.signal || 'Excellent'}
@@ -4034,34 +4293,91 @@ export default function AdminDashboard() {
               </div>
 
               <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold">4G Firmware</span>
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('version4G', '4G Firmware')}</span>
                 <div className="font-mono text-slate-700 dark:text-slate-300 font-bold mt-0.5 truncate" title={selectedDeviceDetail.version_4g}>
                   {selectedDeviceDetail.version_4g || 'Y6_LCD_1605_V1.0'}
                 </div>
               </div>
 
               <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold">WiFi Firmware</span>
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('versionWifi', 'WiFi Firmware')}</span>
                 <div className="font-mono text-slate-700 dark:text-slate-300 font-bold mt-0.5 truncate" title={selectedDeviceDetail.version_wifi}>
                   {selectedDeviceDetail.version_wifi || 'esp32c2x_2M_OTA'}
                 </div>
               </div>
 
               <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold">Unit Price</span>
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('finalPrice', 'Final Price Paid')}</span>
                 <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 mt-0.5">
                   <DollarSign className="w-4 h-4" />
-                  ${Number(selectedDeviceDetail.price || 29).toFixed(2)}
+                  ${Number(selectedDeviceDetail.final_price || selectedDeviceDetail.price || 29).toFixed(2)}
+                  {(Number(selectedDeviceDetail.discount_amount) > 0 || Number(selectedDeviceDetail.discount_percent) > 0) && (
+                    <span className="text-[10px] text-slate-400 line-through">
+                      ${Number(selectedDeviceDetail.price || 29).toFixed(2)}
+                    </span>
+                  )}
                 </div>
               </div>
 
               <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold">Linked Store</span>
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('merchantStore', 'Linked Store')}</span>
                 <div className="font-semibold text-slate-900 dark:text-white mt-0.5 truncate">
                   {selectedDeviceDetail.store_name || 'Unassigned'}
                 </div>
               </div>
             </div>
+
+            {/* Warranty 90-Day Live Countdown Hero Card */}
+            {selectedDeviceDetail.merchant_id && (() => {
+              const wInfo = calculateWarrantyCountdown(selectedDeviceDetail);
+              return (
+                <div className="p-4 bg-gradient-to-br from-indigo-50/70 to-blue-50/50 dark:from-indigo-950/40 dark:to-slate-900/60 rounded-2xl border border-indigo-100 dark:border-indigo-900/50 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white">
+                          {t('warrantyPeriod', '90-Day Warranty Protection')}
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                          {selectedDeviceDetail.warranty_days || 90} {t('daysRemaining', 'Days Standard Coverage')}
+                        </div>
+                      </div>
+                    </div>
+
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      wInfo.status === 'EXPIRED'
+                        ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                        : wInfo.status === 'EXPIRING_SOON'
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                    }`}>
+                      {wInfo.text}
+                    </span>
+                  </div>
+
+                  {/* Visual Progress bar */}
+                  <div className="space-y-1">
+                    <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-500 ${
+                          wInfo.status === 'EXPIRED'
+                            ? 'bg-rose-500'
+                            : wInfo.status === 'EXPIRING_SOON'
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${wInfo.progress}%` }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                      <span>{t('warrantyStart', 'Start')}: {wInfo.startDate ? wInfo.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
+                      <span>{t('warrantyEnd', 'Expires')}: {wInfo.endDate ? wInfo.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Timestamps */}
             <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/60 text-xs space-y-1.5">
@@ -4237,17 +4553,18 @@ export default function AdminDashboard() {
 
           <div className="grid grid-cols-2 gap-2.5">
             {Object.entries({
-              deviceId: 'Device ID',
-              deviceType: 'Device Type',
-              merchantId: 'Assigned Store',
-              price: 'Price ($)',
-              status: 'Status',
-              battery: 'Battery',
-              signal: 'Signal',
-              version4g: '4G Version',
-              versionWifi: 'WiFi Version',
-              lastTime: 'Last Time',
-              operation: 'Operation'
+              deviceId: t('deviceId', 'Device ID'),
+              deviceType: t('deviceType', 'Device Type'),
+              merchantId: t('merchantStore', 'Assigned Store'),
+              price: t('price', 'Price ($)'),
+              warranty: t('warranty', 'Warranty (90d Countdown)'),
+              status: t('status', 'Status'),
+              battery: t('battery', 'Battery'),
+              signal: t('signal', 'Signal'),
+              version4g: t('version4G', '4G Version'),
+              versionWifi: t('versionWifi', 'WiFi Version'),
+              lastTime: t('lastTime', 'Last Time'),
+              operation: t('operation', 'Operation')
             }).map(([key, label]) => (
               <label 
                 key={key} 

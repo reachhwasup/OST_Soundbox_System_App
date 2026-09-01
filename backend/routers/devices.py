@@ -12,9 +12,15 @@ class DeviceRegisterSchema(BaseModel):
     merchant_id: int
     device_sn: str = Field(..., description="Serial Number of Soundbox Y6B")
     telegram_chat_id: Optional[str] = None
-    device_type: str = "Soundbox"
-    device_model: str = "Y6B"
+    device_type: str = "Display Soundbox"
+    device_model: str = "Display Soundbox"
     price: Optional[float] = 29.00
+    discount_amount: Optional[float] = 0.00
+    discount_percent: Optional[float] = 0.00
+    final_price: Optional[float] = None
+    warranty_days: Optional[int] = 90
+    warranty_start_date: Optional[str] = None
+    warranty_end_date: Optional[str] = None
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
@@ -50,12 +56,26 @@ async def register_device(
         chat_id = payload.telegram_chat_id.strip() if payload.telegram_chat_id and payload.telegram_chat_id.strip() else None
 
         if existing_device:
-            # Reassign / link to this merchant and activate
+            # Calculate final price with discount
+            base_price = float(payload.price or 29.00)
+            disc_amt = float(payload.discount_amount or 0.0)
+            if payload.discount_percent and float(payload.discount_percent) > 0:
+                disc_amt = (float(payload.discount_percent) / 100.0) * base_price
+            calc_final_price = max(0.0, base_price - disc_amt)
+            w_days = int(payload.warranty_days or 90)
+
+            # Reassign / link to this merchant and activate with warranty
             await conn.execute("""
                 UPDATE devices 
-                SET merchant_id = $1, telegram_chat_id = $2, device_type = $3, device_model = $4, price = COALESCE($5, price, 29.00), status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
-                WHERE id = $6
-            """, payload.merchant_id, chat_id, payload.device_type or "Soundbox", payload.device_model or "Y6B", payload.price, existing_device["id"])
+                SET merchant_id = $1, telegram_chat_id = $2, device_type = $3, device_model = $4, 
+                    price = $5, discount_amount = $6, discount_percent = $7, final_price = $8,
+                    warranty_days = $9, 
+                    warranty_start_date = COALESCE(warranty_start_date, CURRENT_TIMESTAMP),
+                    warranty_end_date = COALESCE(warranty_end_date, CURRENT_TIMESTAMP + ($9 || ' days')::INTERVAL),
+                    status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
+                WHERE id = $10
+            """, payload.merchant_id, chat_id, payload.device_type or "Display Soundbox", payload.device_model or "Display Soundbox", 
+               base_price, disc_amt, float(payload.discount_percent or 0.0), calc_final_price, w_days, existing_device["id"])
 
             return {
                 "status": "success",
@@ -63,12 +83,28 @@ async def register_device(
                 "device_id": existing_device["id"]
             }
         else:
-            # Insert new device linked to merchant
+            base_price = float(payload.price or 29.00)
+            disc_amt = float(payload.discount_amount or 0.0)
+            if payload.discount_percent and float(payload.discount_percent) > 0:
+                disc_amt = (float(payload.discount_percent) / 100.0) * base_price
+            calc_final_price = max(0.0, base_price - disc_amt)
+            w_days = int(payload.warranty_days or 90)
+
+            # Insert new device linked to merchant with warranty
             new_id = await conn.fetchval("""
-                INSERT INTO devices (merchant_id, device_sn, device_type, device_model, telegram_chat_id, price, status)
-                VALUES ($1, $2, $3, $4, $5, $6, 'ACTIVE')
+                INSERT INTO devices (
+                    merchant_id, device_sn, device_type, device_model, telegram_chat_id, 
+                    price, discount_amount, discount_percent, final_price, 
+                    warranty_days, warranty_start_date, warranty_end_date, status
+                )
+                VALUES (
+                    $1, $2, $3, $4, $5, 
+                    $6, $7, $8, $9, 
+                    $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + ($10 || ' days')::INTERVAL, 'ACTIVE'
+                )
                 RETURNING id
-            """, payload.merchant_id, device_sn, payload.device_type or "Soundbox", payload.device_model or "Y6B", chat_id, payload.price or 29.00)
+            """, payload.merchant_id, device_sn, payload.device_type or "Display Soundbox", payload.device_model or "Display Soundbox", chat_id, 
+               base_price, disc_amt, float(payload.discount_percent or 0.0), calc_final_price, w_days)
 
             return {
                 "status": "success",
@@ -111,12 +147,18 @@ async def list_devices(
             SELECT d.id, 
                    COALESCE(d.device_id, d.device_sn, d.id::text) AS device_id,
                    COALESCE(d.device_sn, d.device_id, d.id::text) AS device_sn,
-                   COALESCE(d.device_type, 'Soundbox') AS device_type,
-                   COALESCE(d.device_model, d.device_name, 'Y6B') AS device_model,
+                   COALESCE(d.device_type, 'Display Soundbox') AS device_type,
+                   COALESCE(d.device_model, d.device_name, 'Display Soundbox') AS device_model,
                    d.merchant_id,
                    COALESCE(d.batch_no, 'BATCH-STD') AS batch_no,
                    d.notes,
                    COALESCE(d.price, 29.00) AS price,
+                   COALESCE(d.discount_amount, 0.00) AS discount_amount,
+                   COALESCE(d.discount_percent, 0.00) AS discount_percent,
+                   COALESCE(d.final_price, d.price, 29.00) AS final_price,
+                   COALESCE(d.warranty_days, 90) AS warranty_days,
+                   d.warranty_start_date,
+                   d.warranty_end_date,
                    COALESCE(d.telegram_chat_id, d.chat_id) AS telegram_chat_id,
                    COALESCE(d.status::text, CASE WHEN d.merchant_id IS NULL THEN 'IN_STOCK' WHEN d.is_active = FALSE THEN 'Offline' ELSE 'Online' END, 'IN_STOCK') AS status,
                    COALESCE(d.battery, '100%') AS battery,
@@ -143,6 +185,8 @@ async def list_devices(
                 {
                     **dict(d),
                     "created_at": d["created_at"].isoformat() if d["created_at"] else None,
+                    "warranty_start_date": d["warranty_start_date"].isoformat() if d["warranty_start_date"] else None,
+                    "warranty_end_date": d["warranty_end_date"].isoformat() if d["warranty_end_date"] else None,
                     "last_heartbeat": d["last_heartbeat"].isoformat() if d["last_heartbeat"] else None,
                     "last_time": d["last_time"].strftime("%Y-%m-%d %H:%M:%S") if d["last_time"] else None
                 }
@@ -391,6 +435,12 @@ class DeviceUpdateSchema(BaseModel):
     batch_no: Optional[str] = None
     notes: Optional[str] = None
     price: Optional[float] = None
+    discount_amount: Optional[float] = None
+    discount_percent: Optional[float] = None
+    final_price: Optional[float] = None
+    warranty_days: Optional[int] = None
+    warranty_start_date: Optional[str] = None
+    warranty_end_date: Optional[str] = None
 
 
 @router.put("/{device_id}")
@@ -462,6 +512,50 @@ async def update_device(
             updates.append(f"price = ${idx}")
             params.append(float(payload.price))
             idx += 1
+
+        if payload.discount_amount is not None:
+            updates.append(f"discount_amount = ${idx}")
+            params.append(float(payload.discount_amount))
+            idx += 1
+
+        if payload.discount_percent is not None:
+            updates.append(f"discount_percent = ${idx}")
+            params.append(float(payload.discount_percent))
+            idx += 1
+
+        if payload.final_price is not None:
+            updates.append(f"final_price = ${idx}")
+            params.append(float(payload.final_price))
+            idx += 1
+        elif payload.price is not None or payload.discount_amount is not None or payload.discount_percent is not None:
+            # Auto-compute final price if components provided
+            p_val = float(payload.price if payload.price is not None else 29.0)
+            d_amt = float(payload.discount_amount if payload.discount_amount is not None else 0.0)
+            if payload.discount_percent and float(payload.discount_percent) > 0:
+                d_amt = (float(payload.discount_percent) / 100.0) * p_val
+            f_val = max(0.0, p_val - d_amt)
+            updates.append(f"final_price = ${idx}")
+            params.append(f_val)
+            idx += 1
+
+        if payload.warranty_days is not None:
+            updates.append(f"warranty_days = ${idx}")
+            params.append(int(payload.warranty_days))
+            idx += 1
+
+        if payload.warranty_start_date is not None:
+            updates.append(f"warranty_start_date = ${idx}::timestamptz")
+            params.append(payload.warranty_start_date)
+            idx += 1
+
+        if payload.warranty_end_date is not None:
+            updates.append(f"warranty_end_date = ${idx}::timestamptz")
+            params.append(payload.warranty_end_date)
+            idx += 1
+        elif payload.warranty_days is not None or payload.merchant_id is not None:
+            w_d = payload.warranty_days if payload.warranty_days is not None else 90
+            updates.append(f"warranty_start_date = COALESCE(warranty_start_date, CURRENT_TIMESTAMP)")
+            updates.append(f"warranty_end_date = COALESCE(warranty_start_date, CURRENT_TIMESTAMP) + ({w_d} || ' days')::INTERVAL")
 
         if payload.status is not None:
             updates.append(f"status = ${idx}::device_status")
