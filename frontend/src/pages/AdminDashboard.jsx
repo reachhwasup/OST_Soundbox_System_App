@@ -2017,9 +2017,9 @@ export default function AdminDashboard() {
           {/* 3. Cloud Speaker Data Table */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs min-w-[980px]">
+              <table className="w-full text-left text-xs min-w-[1100px]">
                 <thead>
-                  <tr className="bg-slate-50/75 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-semibold select-none">
+                  <tr className="bg-slate-50/75 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-semibold select-none whitespace-nowrap">
                     <th className="py-3 px-4 w-10 text-center">
                       <button
                         type="button"
@@ -2033,17 +2033,17 @@ export default function AdminDashboard() {
                         )}
                       </button>
                     </th>
-                    {visibleColumns.deviceId && <th className="py-3 px-3 font-semibold">{t('deviceId', 'Device ID')}</th>}
-                    {visibleColumns.deviceType && <th className="py-3 px-3 font-semibold">{t('deviceType', 'Device Type')}</th>}
-                    {visibleColumns.merchantId && <th className="py-3 px-3 font-semibold">{t('merchantStore', 'Assigned Store')}</th>}
-                    {visibleColumns.price && <th className="py-3 px-3 font-semibold text-center">{t('price', 'Price')}</th>}
-                    {visibleColumns.status && <th className="py-3 px-3 font-semibold text-center">{t('status', 'Status')}</th>}
-                    {visibleColumns.battery && <th className="py-3 px-3 font-semibold text-center">{t('battery', 'Battery')}</th>}
-                    {visibleColumns.signal && <th className="py-3 px-3 font-semibold text-center">{t('signal', 'Signal')}</th>}
-                    {visibleColumns.version4g && <th className="py-3 px-3 font-semibold">{t('version4G', '4G Version')}</th>}
-                    {visibleColumns.versionWifi && <th className="py-3 px-3 font-semibold">{t('versionWifi', 'WiFi Version')}</th>}
-                    {visibleColumns.lastTime && <th className="py-3 px-3 font-semibold">{t('lastTime', 'Last Time')}</th>}
-                    {visibleColumns.operation && <th className="py-3 px-4 font-semibold text-center">{t('operation', 'Operation')}</th>}
+                    {visibleColumns.deviceId && <th className="py-3 px-3 font-semibold min-w-[160px]">{t('deviceId', 'Device ID')}</th>}
+                    {visibleColumns.deviceType && <th className="py-3 px-3 font-semibold min-w-[190px]">{t('deviceType', 'Device Type')}</th>}
+                    {visibleColumns.merchantId && <th className="py-3 px-3 font-semibold min-w-[180px]">{t('merchantStore', 'Assigned Store')}</th>}
+                    {visibleColumns.price && <th className="py-3 px-3 font-semibold text-center min-w-[95px]">{t('price', 'Price')}</th>}
+                    {visibleColumns.status && <th className="py-3 px-3 font-semibold text-center min-w-[100px]">{t('status', 'Status')}</th>}
+                    {visibleColumns.battery && <th className="py-3 px-3 font-semibold text-center min-w-[95px]">{t('battery', 'Battery')}</th>}
+                    {visibleColumns.signal && <th className="py-3 px-3 font-semibold text-center min-w-[95px]">{t('signal', 'Signal')}</th>}
+                    {visibleColumns.version4g && <th className="py-3 px-3 font-semibold min-w-[150px]">{t('version4G', '4G Version')}</th>}
+                    {visibleColumns.versionWifi && <th className="py-3 px-3 font-semibold min-w-[150px]">{t('versionWifi', 'WiFi Version')}</th>}
+                    {visibleColumns.lastTime && <th className="py-3 px-3 font-semibold min-w-[140px]">{t('lastTime', 'Last Time')}</th>}
+                    {visibleColumns.operation && <th className="py-3 px-4 font-semibold text-center min-w-[160px]">{t('operation', 'Operation')}</th>}
                   </tr>
                 </thead>
 
@@ -2056,7 +2056,7 @@ export default function AdminDashboard() {
                       return (
                         <tr 
                           key={d.id || d.device_id || d.device_sn}
-                          className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition ${
+                          className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition whitespace-nowrap ${
                             isSelected ? 'bg-blue-50/40 dark:bg-blue-950/20' : ''
                           }`}
                         >
@@ -2085,7 +2085,7 @@ export default function AdminDashboard() {
                           {/* Device Type */}
                           {visibleColumns.deviceType && (
                             <td className="py-3.5 px-3">
-                              <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1.5 ${
+                              <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1.5 whitespace-nowrap ${
                                 (d.device_type === 'Display Soundbox' || String(d.device_type || '').toLowerCase().includes('display') || String(d.device_type || '').toLowerCase().includes('screen'))
                                   ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
                                   : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
@@ -2187,7 +2187,7 @@ export default function AdminDashboard() {
                           {/* Operations */}
                           {visibleColumns.operation && (
                             <td className="py-3.5 px-4 text-center">
-                              <div className="flex items-center justify-center gap-1.5">
+                              <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
                                 {d.merchant_id && String(d.status).toUpperCase() !== 'MAINTENANCE' && (
                                   <button
                                     type="button"
@@ -2469,19 +2469,19 @@ export default function AdminDashboard() {
           {/* 2. Warehouse Stock Table Card */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+              <table className="w-full text-left text-xs min-w-[1100px]">
                 <thead>
-                  <tr className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 text-xs font-semibold select-none">
-                    {visibleStockColumns.deviceId && <th className="py-3 px-4 font-semibold">{t('deviceId', 'Device ID')}</th>}
-                    {visibleStockColumns.deviceType && <th className="py-3 px-3 font-semibold">{t('deviceType', 'Device Type')}</th>}
-                    {visibleStockColumns.price && <th className="py-3 px-3 font-semibold text-center">{t('price', 'Price')}</th>}
-                    {visibleStockColumns.battery && <th className="py-3 px-3 font-semibold text-center">{t('battery', 'Battery')}</th>}
-                    {visibleStockColumns.signal && <th className="py-3 px-3 font-semibold text-center">{t('signal', 'Signal')}</th>}
-                    {visibleStockColumns.version4g && <th className="py-3 px-3 font-semibold">{t('version4G', '4G Version')}</th>}
-                    {visibleStockColumns.versionWifi && <th className="py-3 px-3 font-semibold">{t('versionWifi', 'WiFi Version')}</th>}
-                    {visibleStockColumns.intakeDate && <th className="py-3 px-3 font-semibold">Intake Date</th>}
-                    {visibleStockColumns.notes && <th className="py-3 px-3 font-semibold">Warehouse Notes</th>}
-                    {visibleStockColumns.operation && <th className="py-3 px-4 font-semibold text-center">{t('operation', 'Operation')}</th>}
+                  <tr className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 text-xs font-semibold select-none whitespace-nowrap">
+                    {visibleStockColumns.deviceId && <th className="py-3 px-4 font-semibold min-w-[160px]">{t('deviceId', 'Device ID')}</th>}
+                    {visibleStockColumns.deviceType && <th className="py-3 px-3 font-semibold min-w-[190px]">{t('deviceType', 'Device Type')}</th>}
+                    {visibleStockColumns.price && <th className="py-3 px-3 font-semibold text-center min-w-[95px]">{t('price', 'Price')}</th>}
+                    {visibleStockColumns.battery && <th className="py-3 px-3 font-semibold text-center min-w-[95px]">{t('battery', 'Battery')}</th>}
+                    {visibleStockColumns.signal && <th className="py-3 px-3 font-semibold text-center min-w-[95px]">{t('signal', 'Signal')}</th>}
+                    {visibleStockColumns.version4g && <th className="py-3 px-3 font-semibold min-w-[150px]">{t('version4G', '4G Version')}</th>}
+                    {visibleStockColumns.versionWifi && <th className="py-3 px-3 font-semibold min-w-[150px]">{t('versionWifi', 'WiFi Version')}</th>}
+                    {visibleStockColumns.intakeDate && <th className="py-3 px-3 font-semibold min-w-[120px]">Intake Date</th>}
+                    {visibleStockColumns.notes && <th className="py-3 px-3 font-semibold min-w-[200px]">Warehouse Notes</th>}
+                    {visibleStockColumns.operation && <th className="py-3 px-4 font-semibold text-center min-w-[180px]">{t('operation', 'Operation')}</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
@@ -2489,7 +2489,7 @@ export default function AdminDashboard() {
                     paginatedStockDevices.map((d) => (
                       <tr 
                         key={d.id} 
-                        className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition group"
+                        className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition group whitespace-nowrap"
                       >
                         {/* Device ID (SN) */}
                         {visibleStockColumns.deviceId && (
@@ -2506,7 +2506,7 @@ export default function AdminDashboard() {
                         {/* Device Type */}
                         {visibleStockColumns.deviceType && (
                           <td className="py-3.5 px-3">
-                            <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1.5 ${
+                            <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1.5 whitespace-nowrap ${
                               (d.device_type === 'Display Soundbox' || String(d.device_type || '').toLowerCase().includes('display') || String(d.device_type || '').toLowerCase().includes('screen'))
                                 ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
                                 : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
@@ -2528,8 +2528,8 @@ export default function AdminDashboard() {
                         {/* Battery */}
                         {visibleStockColumns.battery && (
                           <td className="py-3.5 px-3 text-center">
-                            <span className="inline-flex items-center gap-1 font-mono font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full text-[11px]">
-                              <BatteryCharging className="w-3 h-3" />
+                            <span className="inline-flex items-center gap-1 font-mono font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-0.5 rounded-full text-[11px]">
+                              <BatteryCharging className="w-3.5 h-3.5" />
                               {d.battery || '100%'}
                             </span>
                           </td>
@@ -2538,8 +2538,8 @@ export default function AdminDashboard() {
                         {/* Signal */}
                         {visibleStockColumns.signal && (
                           <td className="py-3.5 px-3 text-center">
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-full">
-                              <Wifi className="w-3 h-3" />
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2.5 py-0.5 rounded-full">
+                              <Wifi className="w-3.5 h-3.5" />
                               {d.signal || 'Good'}
                             </span>
                           </td>
@@ -2568,7 +2568,7 @@ export default function AdminDashboard() {
 
                         {/* Warehouse Notes */}
                         {visibleStockColumns.notes && (
-                          <td className="py-3.5 px-3 text-slate-600 dark:text-slate-400 max-w-[200px] truncate" title={d.notes}>
+                          <td className="py-3.5 px-3 text-slate-600 dark:text-slate-400 max-w-[220px] truncate" title={d.notes}>
                             {d.notes || 'Warehouse Ready (Tested)'}
                           </td>
                         )}
@@ -2576,7 +2576,7 @@ export default function AdminDashboard() {
                         {/* Operations */}
                         {visibleStockColumns.operation && (
                           <td className="py-3.5 px-4 text-center">
-                            <div className="flex items-center justify-center gap-1.5">
+                            <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -2596,9 +2596,10 @@ export default function AdminDashboard() {
                                   setSelectedDeviceDetail(d);
                                   setIsDeviceDetailOpen(true);
                                 }}
-                                className="px-2.5 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer"
+                                className="px-2.5 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1"
                               >
-                                Detail
+                                <Eye className="w-3 h-3 text-slate-400" />
+                                <span>Detail</span>
                               </button>
                             </div>
                           </td>
