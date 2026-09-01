@@ -1105,137 +1105,84 @@ export default function UserDashboard() {
                 </div>
               </div>
 
-              {/* Grid: Connected Speakers Preview & Recent Live Payments */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                
-                {/* Left: Connected Soundbox Speakers */}
-                <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
-                  <div className="flex items-center justify-between">
+              {/* Connected Soundbox Speakers for Active Branch */}
+              <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                  <div>
                     <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                       <Volume2 className="w-5 h-5 text-emerald-600" />
-                      <span>{t('connectedSoundboxes', 'Soundbox Speakers')}</span>
+                      <span>{t('connectedSoundboxes', 'Branch Soundbox Speakers')}</span>
                     </h3>
-                    <button
-                      onClick={() => changeTab('devices')}
-                      className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline"
-                    >
-                      View All
-                    </button>
+                    <p className="text-xs text-slate-400">
+                      Active soundbox speakers assigned to broadcast payments at {activeStore.name}.
+                    </p>
                   </div>
-
-                  {activeStore.devices && activeStore.devices.length > 0 ? (
-                    <div className="space-y-3">
-                      {activeStore.devices.map((device) => {
-                        const isTesting = testingDeviceId === device.id;
-                        return (
-                          <div 
-                            key={device.id} 
-                            className="p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-2.5 shadow-2xs"
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="font-mono font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                                <Smartphone className="w-4 h-4 text-emerald-600" />
-                                <span>{device.device_sn}</span>
-                              </div>
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                                {device.status || 'ACTIVE'}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-200/60 dark:border-slate-700/50">
-                              <span className="font-medium">Model: {device.device_model || 'Y6B'}</span>
-                              <button
-                                type="button"
-                                onClick={() => handleTriggerTestVoice(device)}
-                                disabled={isTesting}
-                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                              >
-                                <BellRing className={`w-3 h-3 ${isTesting ? 'animate-spin' : ''}`} />
-                                <span>Test Voice</span>
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-2">
-                      <Volume2 className="w-8 h-8 text-slate-400 mx-auto" />
-                      <p className="text-xs font-bold text-slate-700 dark:text-slate-300">No Soundbox at this Branch</p>
-                      <button
-                        onClick={() => {
-                          setActiveCameraField(null);
-                          setScanFeedback({ field: '', message: '', isError: false });
-                          setIsDeviceModalOpen(true);
-                        }}
-                        className="text-xs font-bold px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs"
-                      >
-                        + Link Speaker
-                      </button>
-                    </div>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => changeTab('devices')}
+                    className="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>{isKhmer ? 'មើលឧបករណ៍ទាំងអស់' : 'View Full Fleet'}</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
                 </div>
 
-                {/* Right: Recent Live Payments Stream */}
-                <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      <CreditCard className="w-5 h-5 text-emerald-600" />
-                      <span>{t('livePayments', 'Recent Payments Stream')}</span>
-                    </h3>
-                    <button
-                      onClick={() => changeTab('transactions')}
-                      className="text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline flex items-center gap-1"
-                    >
-                      <span>Full History</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  {activeStore.recent_transactions && activeStore.recent_transactions.length > 0 ? (
-                    <div className="space-y-2.5">
-                      {activeStore.recent_transactions.slice(0, 5).map((tx) => (
+                {activeStore.devices && activeStore.devices.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                    {activeStore.devices.map((device) => {
+                      const isTesting = testingDeviceId === device.id;
+                      return (
                         <div 
-                          key={tx.id}
-                          onClick={() => {
-                            setSelectedTxSlip(tx);
-                            setIsTxSlipOpen(true);
-                          }}
-                          className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-2xl flex items-center justify-between cursor-pointer hover:border-emerald-400 transition shadow-2xs"
+                          key={device.id} 
+                          className="p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-3 shadow-2xs"
                         >
-                          <div className="space-y-0.5">
-                            <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                              <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 rounded text-[10px] font-bold">
-                                {tx.bank_name || 'Bank'}
-                              </span>
-                              <span>{tx.payer_name || 'Customer'}</span>
+                          <div className="flex items-center justify-between">
+                            <div className="font-mono font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                              <Smartphone className="w-4 h-4 text-emerald-600" />
+                              <span>{device.device_sn}</span>
                             </div>
-                            <div className="text-[11px] text-slate-400 font-mono flex items-center gap-1.5">
-                              <span>SN: {tx.device_sn}</span>
-                              <span>•</span>
-                              <span>{tx.created_at ? new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
-                            </div>
-                          </div>
-
-                          <div className="text-right">
-                            <div className="text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                              +{tx.currency === 'USD' ? `$${Number(tx.amount).toFixed(2)}` : `៛${Number(tx.amount).toLocaleString()}`}
-                            </div>
-                            <span className="text-[9px] text-emerald-700 bg-emerald-100/60 dark:bg-emerald-950 px-1 py-0.2 rounded font-bold uppercase">
-                              {tx.status || 'VERIFIED'}
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                              {device.status || 'ACTIVE'}
                             </span>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-10 text-slate-400 space-y-1">
-                      <DollarSign className="w-8 h-8 mx-auto text-slate-300" />
-                      <p className="text-xs font-bold">No payments received yet today</p>
-                    </div>
-                  )}
-                </div>
 
+                          <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-200/60 dark:border-slate-700/50">
+                            <span className="font-medium">Model: {device.device_model || 'Y6B'}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleTriggerTestVoice(device)}
+                              disabled={isTesting}
+                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              <BellRing className={`w-3 h-3 ${isTesting ? 'animate-spin' : ''}`} />
+                              <span>Test Voice</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-3">
+                    <Volume2 className="w-10 h-10 text-slate-400 mx-auto" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-bold text-slate-800 dark:text-slate-200">No Soundbox at this Branch</p>
+                      <p className="text-xs text-slate-400">Link a 4G Cloud Speaker to start receiving real-time voice payment announcements.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveCameraField(null);
+                        setScanFeedback({ field: '', message: '', isError: false });
+                        setIsDeviceModalOpen(true);
+                      }}
+                      className="text-xs font-bold px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Link Soundbox</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
