@@ -219,8 +219,8 @@ export default function AdminDashboard() {
     deviceId: true,
     deviceType: true,
     price: true,
-    intakeDate: true,
-    notes: true,
+    intakeDate: false,
+    notes: false,
     operation: true
   });
 
@@ -4775,8 +4775,8 @@ export default function AdminDashboard() {
                 deviceId: true,
                 deviceType: true,
                 price: true,
-                intakeDate: true,
-                notes: true,
+                intakeDate: false,
+                notes: false,
                 operation: true
               })}
               className="text-xs text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
