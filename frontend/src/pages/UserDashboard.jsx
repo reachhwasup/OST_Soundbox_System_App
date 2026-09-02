@@ -1183,19 +1183,6 @@ export default function UserDashboard() {
 
                     <button
                       type="button"
-                      onClick={() => {
-                        setActiveCameraField(null);
-                        setScanFeedback({ field: '', message: '', isError: false });
-                        setIsDeviceModalOpen(true);
-                      }}
-                      className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap shadow-xs cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>{isKhmer ? 'ភ្ជាប់ឧបករណ៍' : 'Link Soundbox'}</span>
-                    </button>
-
-                    <button
-                      type="button"
                       onClick={() => fetchStoresData(true)}
                       className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition cursor-pointer"
                       title={isKhmer ? 'ផ្ទុកទិន្នន័យឡើងវិញ' : 'Refresh'}
