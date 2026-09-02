@@ -201,7 +201,7 @@ export default function UserDashboard() {
           batteryLevel: null,
           signalStrength: null,
           telegramChatId: '',
-          status: 'NO_DEVICE'
+          status: 'OFFLINE'
         });
       } else {
         devices.forEach((d, idx) => {
@@ -221,7 +221,7 @@ export default function UserDashboard() {
               : (d.battery_level !== undefined ? d.battery_level : 85),
             signalStrength: d.signal_strength || '4G',
             telegramChatId: d.telegram_chat_id || '',
-            status: String(d.status || 'ACTIVE').toUpperCase()
+            status: (String(d.status || '').toUpperCase() === 'ACTIVE' || String(d.status || '').toUpperCase() === 'ONLINE') ? 'ONLINE' : 'OFFLINE'
           });
         });
       }
@@ -256,12 +256,10 @@ export default function UserDashboard() {
     }
 
     if (unifiedStatusFilter !== 'ALL') {
-      if (unifiedStatusFilter === 'ACTIVE') {
-        result = result.filter(r => r.hasDevice && (r.status === 'ACTIVE' || r.status === 'ONLINE'));
+      if (unifiedStatusFilter === 'ONLINE' || unifiedStatusFilter === 'ACTIVE') {
+        result = result.filter(r => r.hasDevice && (r.status === 'ONLINE' || r.status === 'ACTIVE'));
       } else if (unifiedStatusFilter === 'OFFLINE') {
-        result = result.filter(r => r.hasDevice && r.status === 'OFFLINE');
-      } else if (unifiedStatusFilter === 'NO_DEVICE') {
-        result = result.filter(r => !r.hasDevice);
+        result = result.filter(r => !r.hasDevice || r.status === 'OFFLINE');
       }
     }
 
@@ -1227,9 +1225,8 @@ export default function UserDashboard() {
                     className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                   >
                     <option value="ALL">{isKhmer ? 'ស្ថានភាពទាំងអស់' : 'All Statuses'}</option>
-                    <option value="ACTIVE">{isKhmer ? '🟢 អនឡាញ / សកម្ម' : '🟢 Online / Active'}</option>
+                    <option value="ONLINE">{isKhmer ? '🟢 អនឡាញ' : '🟢 Online'}</option>
                     <option value="OFFLINE">{isKhmer ? '⚪ ក្រៅបណ្តាញ' : '⚪ Offline'}</option>
-                    <option value="NO_DEVICE">{isKhmer ? '⚠️ មិនទាន់មាន Soundbox' : '⚠️ No Soundbox'}</option>
                   </select>
 
                   {/* Province Filter */}
@@ -1398,21 +1395,15 @@ export default function UserDashboard() {
 
                               {/* Status */}
                               <td className="py-3.5 px-4">
-                                {r.hasDevice ? (
-                                  isOnline ? (
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                      ACTIVE
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                                      OFFLINE
-                                    </span>
-                                  )
+                                {isOnline ? (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    {isKhmer ? 'អនឡាញ' : 'ONLINE'}
+                                  </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60">
-                                    UNLINKED
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                    {isKhmer ? 'ក្រៅបណ្តាញ' : 'OFFLINE'}
                                   </span>
                                 )}
                               </td>
