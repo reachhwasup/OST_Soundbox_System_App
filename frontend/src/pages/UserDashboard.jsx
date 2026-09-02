@@ -1154,14 +1154,19 @@ export default function UserDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-                      {filteredStoresList.map((s, idx) => {
-                        const isSelected = selectedStoreIndex === idx || selectedStoreIds.includes(s.id);
+                      {filteredStoresList.map((s) => {
+                        const isCurrentStore = activeStore?.id === s.id;
+                        const isRowChecked = selectedStoreIds.includes(s.id);
                         const devCount = s.devices?.length || 0;
                         return (
                           <tr 
                             key={s.id}
                             className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition ${
-                              isSelected ? 'bg-emerald-50/40 dark:bg-emerald-950/20 font-medium' : ''
+                              isRowChecked 
+                                ? 'bg-emerald-50/60 dark:bg-emerald-950/30' 
+                                : isCurrentStore 
+                                  ? 'bg-emerald-50/30 dark:bg-emerald-950/15' 
+                                  : ''
                             }`}
                           >
                             <td className="py-3.5 px-3.5 text-center">
@@ -1170,7 +1175,7 @@ export default function UserDashboard() {
                                 onClick={() => toggleStoreSelection(s.id)}
                                 className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
                               >
-                                {selectedStoreIds.includes(s.id) ? (
+                                {isRowChecked ? (
                                   <CheckSquare className="w-4 h-4 text-emerald-600" />
                                 ) : (
                                   <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
@@ -1180,7 +1185,7 @@ export default function UserDashboard() {
                             <td className="py-3.5 px-4">
                               <div className="flex items-center gap-2.5">
                                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                                  isSelected 
+                                  isCurrentStore 
                                     ? 'bg-emerald-600 text-white shadow-xs' 
                                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                                 }`}>
@@ -1189,7 +1194,7 @@ export default function UserDashboard() {
                                 <div>
                                   <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                                     <span>{s.name}</span>
-                                    {isSelected && (
+                                    {isCurrentStore && (
                                       <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-1.5 py-0.2 rounded font-bold">
                                         Current
                                       </span>
@@ -1227,12 +1232,20 @@ export default function UserDashboard() {
 
                             <td className="py-3.5 px-4 text-right">
                               <div className="flex items-center justify-end gap-1.5">
-                                {!isSelected && (
+                                {!isCurrentStore && (
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      setSelectedStoreIndex(idx);
-                                      setEditName(s.name);
+                                      const storeIdx = stores.findIndex(item => item.id === s.id);
+                                      if (storeIdx !== -1) {
+                                        setSelectedStoreIndex(storeIdx);
+                                        setEditName(s.name);
+                                        showToast({
+                                          type: 'success',
+                                          title: isKhmer ? 'ប្តូរសាខាជោគជ័យ' : 'Active Store Switched',
+                                          message: isKhmer ? `បានប្តូរទៅកាន់សាខា "${s.name}"` : `Switched active branch to "${s.name}"`
+                                        });
+                                      }
                                     }}
                                     className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer"
                                   >
@@ -1242,7 +1255,8 @@ export default function UserDashboard() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    setSelectedStoreIndex(idx);
+                                    const storeIdx = stores.findIndex(item => item.id === s.id);
+                                    if (storeIdx !== -1) setSelectedStoreIndex(storeIdx);
                                     setEditName(s.name || '');
                                     const resolved = resolveStoreLocationCodes(s);
                                     setEditProvinceId(resolved.provinceId);
