@@ -83,7 +83,8 @@ import {
   Camera,
   Upload,
   User,
-  PhoneCall
+  PhoneCall,
+  ArrowUpDown
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -138,9 +139,13 @@ export default function AdminDashboard() {
   const [storeSearch, setStoreSearch] = useState('');
   const [storeProvinceFilter, setStoreProvinceFilter] = useState('');
   const [storeDistrictFilter, setStoreDistrictFilter] = useState('');
+  const [storeCommuneFilter, setStoreCommuneFilter] = useState('');
   const [storeSoundboxFilter, setStoreSoundboxFilter] = useState(''); // '' | 'WITH_DEVICE' | 'MULTI_DEVICE' | 'NO_DEVICE'
   const [storeDeviceTypeFilter, setStoreDeviceTypeFilter] = useState('ALL'); // 'ALL' | 'Display' | 'Standard'
+  const [storeOnlineFilter, setStoreOnlineFilter] = useState('ALL'); // 'ALL' | 'ONLINE' | 'OFFLINE' | 'NO_DEVICE'
+  const [storeOwnerFilter, setStoreOwnerFilter] = useState('ALL');
   const [storeDateFilter, setStoreDateFilter] = useState('');
+  const [storeSortBy, setStoreSortBy] = useState('NEWEST'); // 'NEWEST' | 'OLDEST' | 'NAME_ASC' | 'NAME_DESC' | 'DEVICES_DESC' | 'DEVICES_ASC'
 
   // Cloud Speaker Device Manager Filter States
   const [devFilterId, setDevFilterId] = useState('');
@@ -804,9 +809,38 @@ export default function AdminDashboard() {
     return Array.from(set).filter(Boolean).sort();
   }, [stores, storeProvinceFilter]);
 
-  // Filtered Stores & Locations Logic
+  // Available Communes for Stores Filter (Context-aware based on province and district)
+  const availableCommunes = useMemo(() => {
+    const set = new Set();
+    stores.forEach(s => {
+      const p = (s.province || s.place || s.location || '').trim();
+      const d = (s.district || '').trim();
+      if (!storeProvinceFilter || p.toLowerCase().includes(storeProvinceFilter.toLowerCase())) {
+        if (!storeDistrictFilter || d.toLowerCase().includes(storeDistrictFilter.toLowerCase())) {
+          if (s.commune && s.commune.trim()) {
+            set.add(s.commune.trim());
+          }
+        }
+      }
+    });
+    return Array.from(set).filter(Boolean).sort();
+  }, [stores, storeProvinceFilter, storeDistrictFilter]);
+
+  // Available Merchant Owners for Stores Filter
+  const availableOwners = useMemo(() => {
+    const map = new Map();
+    stores.forEach(s => {
+      const owner = (s.owner_name || '').trim();
+      if (owner) {
+        map.set(owner, s.owner_phone ? `${owner} (${s.owner_phone})` : owner);
+      }
+    });
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [stores]);
+
+  // Filtered Stores & Locations Logic with Multi-Filters & Sorting
   const filteredStores = useMemo(() => {
-    return stores.filter(s => {
+    const result = stores.filter(s => {
       if (storeSearch.trim()) {
         const q = storeSearch.trim().toLowerCase();
         const nameMatch = String(s.name || '').toLowerCase().includes(q);
@@ -835,12 +869,41 @@ export default function AdminDashboard() {
         if (!d.includes(storeDistrictFilter.toLowerCase())) return false;
       }
 
+      if (storeCommuneFilter) {
+        const c = (s.commune || '').toLowerCase();
+        if (!c.includes(storeCommuneFilter.toLowerCase())) return false;
+      }
+
+      if (storeOwnerFilter !== 'ALL') {
+        const o = (s.owner_name || '').trim();
+        if (o !== storeOwnerFilter) return false;
+      }
+
       if (storeSoundboxFilter === 'WITH_DEVICE') {
         if (!s.device_count || s.device_count <= 0) return false;
       } else if (storeSoundboxFilter === 'MULTI_DEVICE') {
         if (!s.device_count || s.device_count < 2) return false;
       } else if (storeSoundboxFilter === 'NO_DEVICE') {
         if (s.device_count && s.device_count > 0) return false;
+      }
+
+      // Online Connection Status Filter
+      if (storeOnlineFilter !== 'ALL') {
+        const storeDevs = (s.devices && s.devices.length > 0)
+          ? s.devices
+          : devices.filter(dev => Number(dev.merchant_id) === Number(s.id));
+        
+        const hasOnlineDev = storeDevs.some(dev => 
+          String(dev.status || '').toUpperCase() === 'ACTIVE' || String(dev.status || '').toLowerCase() === 'online'
+        );
+
+        if (storeOnlineFilter === 'ONLINE') {
+          if (!hasOnlineDev) return false;
+        } else if (storeOnlineFilter === 'OFFLINE') {
+          if (storeDevs.length === 0 || hasOnlineDev) return false;
+        } else if (storeOnlineFilter === 'NO_DEVICE') {
+          if (storeDevs.length > 0) return false;
+        }
       }
 
       if (storeDeviceTypeFilter !== 'ALL') {
@@ -871,16 +934,41 @@ export default function AdminDashboard() {
 
       return true;
     });
-  }, [stores, devices, storeSearch, storeProvinceFilter, storeDistrictFilter, storeSoundboxFilter, storeDeviceTypeFilter, storeDateFilter]);
+
+    // Sorting Logic
+    return result.sort((a, b) => {
+      if (storeSortBy === 'OLDEST') {
+        return (new Date(a.created_at || 0) - new Date(b.created_at || 0)) || (a.id - b.id);
+      }
+      if (storeSortBy === 'NAME_ASC') {
+        return (a.name || '').localeCompare(b.name || '');
+      }
+      if (storeSortBy === 'NAME_DESC') {
+        return (b.name || '').localeCompare(a.name || '');
+      }
+      if (storeSortBy === 'DEVICES_DESC') {
+        return ((b.device_count || 0) - (a.device_count || 0)) || (b.id - a.id);
+      }
+      if (storeSortBy === 'DEVICES_ASC') {
+        return ((a.device_count || 0) - (b.device_count || 0)) || (a.id - b.id);
+      }
+      // Default: NEWEST
+      return (new Date(b.created_at || 0) - new Date(a.created_at || 0)) || (b.id - a.id);
+    });
+  }, [stores, devices, storeSearch, storeProvinceFilter, storeDistrictFilter, storeCommuneFilter, storeOwnerFilter, storeSoundboxFilter, storeOnlineFilter, storeDeviceTypeFilter, storeDateFilter, storeSortBy]);
 
   // Reset Store Filters
   const handleResetStoreFilters = () => {
     setStoreSearch('');
     setStoreProvinceFilter('');
     setStoreDistrictFilter('');
+    setStoreCommuneFilter('');
     setStoreSoundboxFilter('');
     setStoreDeviceTypeFilter('ALL');
+    setStoreOnlineFilter('ALL');
+    setStoreOwnerFilter('ALL');
     setStoreDateFilter('');
+    setStoreSortBy('NEWEST');
   };
 
   // Export Stores CSV
@@ -2044,19 +2132,147 @@ export default function AdminDashboard() {
           </div>
 
           {/* Stores Search & Filter Toolbar */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-3.5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-4">
+            
+            {/* Quick Presets Filter Bar */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mr-1 shrink-0 flex items-center gap-1">
+                <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-600" />
+                <span>{t('quickPresets', 'Quick Presets')}:</span>
+              </span>
+
+              {/* All Stores */}
+              <button
+                type="button"
+                onClick={() => {
+                  setStoreSoundboxFilter('');
+                  setStoreOnlineFilter('ALL');
+                }}
+                className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer text-xs ${
+                  storeSoundboxFilter === '' && storeOnlineFilter === 'ALL'
+                    ? 'bg-emerald-600 text-white shadow-2xs'
+                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                {t('allStoresCount', 'All Stores')} ({stores.length})
+              </button>
+
+              {/* With Soundbox */}
+              <button
+                type="button"
+                onClick={() => {
+                  setStoreSoundboxFilter('WITH_DEVICE');
+                  setStoreOnlineFilter('ALL');
+                }}
+                className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer text-xs flex items-center gap-1 ${
+                  storeSoundboxFilter === 'WITH_DEVICE' && storeOnlineFilter === 'ALL'
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60'
+                }`}
+              >
+                <span>📱 {t('activeStoresWithDevice', 'Stores with Soundbox')}</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">
+                  {stores.filter(s => (s.device_count || 0) > 0).length}
+                </span>
+              </button>
+
+              {/* Online Now */}
+              <button
+                type="button"
+                onClick={() => {
+                  setStoreSoundboxFilter('');
+                  setStoreOnlineFilter('ONLINE');
+                }}
+                className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer text-xs flex items-center gap-1 ${
+                  storeOnlineFilter === 'ONLINE'
+                    ? 'bg-emerald-600 text-white shadow-2xs'
+                    : 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>{t('storeOnlineOption', '🟢 Soundbox Online')}</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">
+                  {stores.filter(s => {
+                    const sDevs = (s.devices && s.devices.length > 0) ? s.devices : devices.filter(d => Number(d.merchant_id) === Number(s.id));
+                    return sDevs.some(d => String(d.status || '').toUpperCase() === 'ACTIVE' || String(d.status || '').toLowerCase() === 'online');
+                  }).length}
+                </span>
+              </button>
+
+              {/* Offline */}
+              <button
+                type="button"
+                onClick={() => {
+                  setStoreSoundboxFilter('');
+                  setStoreOnlineFilter('OFFLINE');
+                }}
+                className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer text-xs flex items-center gap-1 ${
+                  storeOnlineFilter === 'OFFLINE'
+                    ? 'bg-slate-700 text-white shadow-2xs'
+                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                <span>⚪ {t('storeOfflineOption', 'Soundbox Offline')}</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 dark:bg-slate-700">
+                  {stores.filter(s => {
+                    const sDevs = (s.devices && s.devices.length > 0) ? s.devices : devices.filter(d => Number(d.merchant_id) === Number(s.id));
+                    return sDevs.length > 0 && !sDevs.some(d => String(d.status || '').toUpperCase() === 'ACTIVE' || String(d.status || '').toLowerCase() === 'online');
+                  }).length}
+                </span>
+              </button>
+
+              {/* Unassigned / No Soundbox */}
+              <button
+                type="button"
+                onClick={() => {
+                  setStoreSoundboxFilter('NO_DEVICE');
+                  setStoreOnlineFilter('ALL');
+                }}
+                className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer text-xs flex items-center gap-1 ${
+                  storeSoundboxFilter === 'NO_DEVICE'
+                    ? 'bg-amber-600 text-white shadow-2xs'
+                    : 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60'
+                }`}
+              >
+                <span>⚠️ {t('unlinkedStoresCount', 'Unlinked Stores')}</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">
+                  {stores.filter(s => !s.device_count || s.device_count === 0).length}
+                </span>
+              </button>
+
+              {/* Multiple Devices */}
+              <button
+                type="button"
+                onClick={() => {
+                  setStoreSoundboxFilter('MULTI_DEVICE');
+                  setStoreOnlineFilter('ALL');
+                }}
+                className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer text-xs flex items-center gap-1 ${
+                  storeSoundboxFilter === 'MULTI_DEVICE'
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60'
+                }`}
+              >
+                <span>⚡ {t('multipleSoundboxes', 'Multiple Soundboxes (≥2)')}</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">
+                  {stores.filter(s => (s.device_count || 0) >= 2).length}
+                </span>
+              </button>
+            </div>
+
+            {/* Filter Grid Row 1: Search, Province, District, Commune, Owner */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               
               {/* 1. Store Search Input */}
-              <div className="lg:col-span-2">
+              <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('searchStorePlaceholder', 'Search store, owner, phone, street...')}
+                  {t('searchStorePlaceholder', 'Search store, owner, phone...')}
                 </label>
                 <div className="relative">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
-                    placeholder={t('searchStorePlaceholder', 'Search store, owner, phone, street...')}
+                    placeholder={t('searchStorePlaceholder', 'Search store, owner, phone...')}
                     value={storeSearch}
                     onChange={(e) => setStoreSearch(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
@@ -2074,6 +2290,7 @@ export default function AdminDashboard() {
                   onChange={(e) => {
                     setStoreProvinceFilter(e.target.value);
                     setStoreDistrictFilter('');
+                    setStoreCommuneFilter('');
                   }}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
                 >
@@ -2091,7 +2308,10 @@ export default function AdminDashboard() {
                 </label>
                 <select
                   value={storeDistrictFilter}
-                  onChange={(e) => setStoreDistrictFilter(e.target.value)}
+                  onChange={(e) => {
+                    setStoreDistrictFilter(e.target.value);
+                    setStoreCommuneFilter('');
+                  }}
                   disabled={availableDistricts.length === 0}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer disabled:opacity-50"
                 >
@@ -2102,7 +2322,47 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-              {/* 4. Soundbox Status */}
+              {/* 4. Commune / Sangkat */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('communeSangkat', 'Commune / Sangkat')}
+                </label>
+                <select
+                  value={storeCommuneFilter}
+                  onChange={(e) => setStoreCommuneFilter(e.target.value)}
+                  disabled={availableCommunes.length === 0}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer disabled:opacity-50"
+                >
+                  <option value="">{t('allCommunes', 'All Communes / Sangkats')}</option>
+                  {availableCommunes.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 5. Merchant / Owner */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('merchantOwner', 'Merchant / Owner')}
+                </label>
+                <select
+                  value={storeOwnerFilter}
+                  onChange={(e) => setStoreOwnerFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
+                >
+                  <option value="ALL">{t('allOwners', 'All Merchant Owners')}</option>
+                  {availableOwners.map(([name, label]) => (
+                    <option key={name} value={name}>{label}</option>
+                  ))}
+                </select>
+              </div>
+
+            </div>
+
+            {/* Filter Grid Row 2: Hardware Status, Online Status, Device Type, Date, Sort By */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 pt-1">
+
+              {/* 6. Soundbox Hardware Quantity */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('soundboxHardware', 'Soundbox Hardware')}
@@ -2119,7 +2379,24 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-              {/* 5. Device Hardware Type */}
+              {/* 7. Online Connection Status */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('onlineConnectionStatus', 'Connection Status')}
+                </label>
+                <select
+                  value={storeOnlineFilter}
+                  onChange={(e) => setStoreOnlineFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
+                >
+                  <option value="ALL">{t('allOnlineStatuses', 'All Connection Statuses')}</option>
+                  <option value="ONLINE">{t('storeOnlineOption', '🟢 Soundbox Online / Broadcasting')}</option>
+                  <option value="OFFLINE">{t('storeOfflineOption', '⚪ Soundbox Offline / Standby')}</option>
+                  <option value="NO_DEVICE">{t('noSoundbox', '⚠️ No Soundbox Linked')}</option>
+                </select>
+              </div>
+
+              {/* 8. Device Hardware Type */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('deviceType', 'Device Type')}
@@ -2135,24 +2412,53 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-            </div>
-
-            {/* Bottom Row: Date Filter & Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                  {t('storeRegDate', 'Registration Date')}:
+              {/* 9. Registration Date */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('storeRegDate', 'Registration Date')}
                 </label>
                 <input
                   type="date"
                   value={storeDateFilter}
                   onChange={(e) => setStoreDateFilter(e.target.value)}
-                  className="px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
                 />
               </div>
 
+              {/* 10. Sort By Selector */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('sortBy', 'Sort By')}
+                </label>
+                <select
+                  value={storeSortBy}
+                  onChange={(e) => setStoreSortBy(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer font-medium"
+                >
+                  <option value="NEWEST">✨ {t('sortNewest', 'Newest Registered')}</option>
+                  <option value="OLDEST">⏳ {t('sortOldest', 'Oldest Registered')}</option>
+                  <option value="NAME_ASC">🔤 {t('sortNameAsc', 'Store Name (A → Z)')}</option>
+                  <option value="NAME_DESC">🔤 {t('sortNameDesc', 'Store Name (Z → A)')}</option>
+                  <option value="DEVICES_DESC">🔊 {t('sortDevicesDesc', 'Most Soundboxes (Highest)')}</option>
+                  <option value="DEVICES_ASC">🔈 {t('sortDevicesAsc', 'Fewest Soundboxes (Lowest)')}</option>
+                </select>
+              </div>
+
+            </div>
+
+            {/* Bottom Row: Results Counter & Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                <span>Showing <strong className="text-slate-900 dark:text-white font-mono">{filteredStores.length}</strong> of <strong className="text-slate-900 dark:text-white font-mono">{stores.length}</strong> store locations</span>
+                {filteredStores.length < stores.length && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                    Filtered
+                  </span>
+                )}
+              </div>
+
               <div className="flex items-center gap-2 self-end sm:self-auto">
-                {(storeSearch || storeProvinceFilter || storeDistrictFilter || storeSoundboxFilter || storeDeviceTypeFilter !== 'ALL' || storeDateFilter) && (
+                {(storeSearch || storeProvinceFilter || storeDistrictFilter || storeCommuneFilter || storeOwnerFilter !== 'ALL' || storeSoundboxFilter || storeOnlineFilter !== 'ALL' || storeDeviceTypeFilter !== 'ALL' || storeDateFilter || storeSortBy !== 'NEWEST') && (
                   <button
                     type="button"
                     onClick={handleResetStoreFilters}

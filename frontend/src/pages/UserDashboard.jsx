@@ -45,6 +45,7 @@ import {
   Signal,
   BatteryCharging,
   Sliders,
+  SlidersHorizontal,
   BellRing,
   RotateCcw,
   Calendar,
@@ -84,6 +85,60 @@ export default function UserDashboard() {
   const [selectedStoreIndex, setSelectedStoreIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Store Tab Filter States
+  const [storeSearch, setStoreSearch] = useState('');
+  const [storeProvinceFilter, setStoreProvinceFilter] = useState('ALL');
+  const [storeSpeakerFilter, setStoreSpeakerFilter] = useState('ALL');
+  const [storeSortBy, setStoreSortBy] = useState('DEFAULT');
+
+  // Available Store Provinces
+  const availableStoreProvinces = useMemo(() => {
+    const set = new Set();
+    stores.forEach(s => {
+      const p = (s.province || s.place || s.location || '').trim();
+      if (p) set.add(p);
+    });
+    return Array.from(set).sort();
+  }, [stores]);
+
+  // Filtered Stores List
+  const filteredStoresList = useMemo(() => {
+    const res = stores.filter(s => {
+      if (storeSearch.trim()) {
+        const q = storeSearch.trim().toLowerCase();
+        const nameMatch = String(s.name || '').toLowerCase().includes(q);
+        const locMatch = String(s.location || s.place || '').toLowerCase().includes(q);
+        const phoneMatch = String(s.owner_phone || '').toLowerCase().includes(q);
+        const idMatch = String(s.id || '').includes(q);
+        if (!nameMatch && !locMatch && !phoneMatch && !idMatch) return false;
+      }
+      if (storeProvinceFilter !== 'ALL') {
+        const p = (s.province || s.place || s.location || '').toLowerCase();
+        if (!p.includes(storeProvinceFilter.toLowerCase())) return false;
+      }
+      const devCount = s.devices?.length || 0;
+      if (storeSpeakerFilter === 'WITH_DEVICE' && devCount < 1) return false;
+      if (storeSpeakerFilter === 'NO_DEVICE' && devCount > 0) return false;
+      if (storeSpeakerFilter === 'MULTI_DEVICE' && devCount < 2) return false;
+      return true;
+    });
+
+    return res.sort((a, b) => {
+      if (storeSortBy === 'NAME_ASC') return (a.name || '').localeCompare(b.name || '');
+      if (storeSortBy === 'NAME_DESC') return (b.name || '').localeCompare(a.name || '');
+      if (storeSortBy === 'SPEAKERS_DESC') return ((b.devices?.length || 0) - (a.devices?.length || 0));
+      if (storeSortBy === 'OLDEST') return (a.id - b.id);
+      return (b.id - a.id);
+    });
+  }, [stores, storeSearch, storeProvinceFilter, storeSpeakerFilter, storeSortBy]);
+
+  const handleResetStoreFilters = () => {
+    setStoreSearch('');
+    setStoreProvinceFilter('ALL');
+    setStoreSpeakerFilter('ALL');
+    setStoreSortBy('DEFAULT');
+  };
 
   // Table Selection States
   const [selectedStoreIds, setSelectedStoreIds] = useState([]);
@@ -990,6 +1045,162 @@ export default function UserDashboard() {
                   </div>
                 </div>
 
+                {/* Store Search & Filter Toolbar */}
+                <div className="bg-slate-50/70 dark:bg-slate-800/50 rounded-2xl border border-slate-200/70 dark:border-slate-800 p-3.5 sm:p-4 space-y-3">
+                  
+                  {/* Quick Presets Bar */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mr-1 shrink-0 flex items-center gap-1">
+                      <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{isKhmer ? 'ជម្រើសរហ័ស' : 'Presets'}:</span>
+                    </span>
+
+                    {/* All Branches */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStoreSpeakerFilter('ALL');
+                        setStoreProvinceFilter('ALL');
+                      }}
+                      className={`px-3 py-1 rounded-xl font-bold transition shrink-0 cursor-pointer text-xs ${
+                        storeSpeakerFilter === 'ALL' && storeProvinceFilter === 'ALL'
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'bg-white hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700/80'
+                      }`}
+                    >
+                      {isKhmer ? 'សាខាទាំងអស់' : 'All Branches'} ({stores.length})
+                    </button>
+
+                    {/* With Speakers */}
+                    <button
+                      type="button"
+                      onClick={() => setStoreSpeakerFilter('WITH_DEVICE')}
+                      className={`px-3 py-1 rounded-xl font-bold transition shrink-0 cursor-pointer text-xs flex items-center gap-1 ${
+                        storeSpeakerFilter === 'WITH_DEVICE'
+                          ? 'bg-blue-600 text-white shadow-2xs'
+                          : 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60'
+                      }`}
+                    >
+                      <span>📱 {isKhmer ? 'មាន Soundbox (≥1)' : 'With Soundbox (≥1)'}</span>
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">
+                        {stores.filter(s => (s.devices?.length || 0) > 0).length}
+                      </span>
+                    </button>
+
+                    {/* Unlinked / No Speaker */}
+                    <button
+                      type="button"
+                      onClick={() => setStoreSpeakerFilter('NO_DEVICE')}
+                      className={`px-3 py-1 rounded-xl font-bold transition shrink-0 cursor-pointer text-xs flex items-center gap-1 ${
+                        storeSpeakerFilter === 'NO_DEVICE'
+                          ? 'bg-amber-600 text-white shadow-2xs'
+                          : 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60'
+                      }`}
+                    >
+                      <span>⚠️ {isKhmer ? 'គ្មាន Soundbox' : 'Unlinked (0)'}</span>
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">
+                        {stores.filter(s => (s.devices?.length || 0) === 0).length}
+                      </span>
+                    </button>
+
+                    {/* Multiple Speakers */}
+                    <button
+                      type="button"
+                      onClick={() => setStoreSpeakerFilter('MULTI_DEVICE')}
+                      className={`px-3 py-1 rounded-xl font-bold transition shrink-0 cursor-pointer text-xs flex items-center gap-1 ${
+                        storeSpeakerFilter === 'MULTI_DEVICE'
+                          ? 'bg-indigo-600 text-white shadow-2xs'
+                          : 'bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60'
+                      }`}
+                    >
+                      <span>⚡ {isKhmer ? 'ឧបករណ៍ច្រើន (≥2)' : 'Multi-Device (≥2)'}</span>
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">
+                        {stores.filter(s => (s.devices?.length || 0) >= 2).length}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Filter Inputs Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+                    
+                    {/* Search */}
+                    <div>
+                      <div className="relative">
+                        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <input
+                          type="text"
+                          placeholder={isKhmer ? 'ស្វែងរកសាខា អាសយដ្ឋាន លេខទូរស័ព្ទ...' : 'Search branch, address, phone...'}
+                          value={storeSearch}
+                          onChange={(e) => setStoreSearch(e.target.value)}
+                          className="w-full pl-9 pr-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Province / City */}
+                    <div>
+                      <select
+                        value={storeProvinceFilter}
+                        onChange={(e) => setStoreProvinceFilter(e.target.value)}
+                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
+                      >
+                        <option value="ALL">{isKhmer ? 'គ្រប់ខេត្ត / រាជធានី' : 'All Provinces / Cities'}</option>
+                        {availableStoreProvinces.map(p => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Speaker Hardware */}
+                    <div>
+                      <select
+                        value={storeSpeakerFilter}
+                        onChange={(e) => setStoreSpeakerFilter(e.target.value)}
+                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
+                      >
+                        <option value="ALL">{isKhmer ? 'គ្រប់ឧបករណ៍ Soundbox' : 'All Soundbox Status'}</option>
+                        <option value="WITH_DEVICE">{isKhmer ? '📱 មានភ្ជាប់ Soundbox (≥1)' : '📱 With Soundbox (≥1)'}</option>
+                        <option value="NO_DEVICE">{isKhmer ? '⚠️ គ្មាន Soundbox (0)' : '⚠️ No Soundbox (0)'}</option>
+                        <option value="MULTI_DEVICE">{isKhmer ? '⚡ Soundbox ច្រើន (≥2)' : '⚡ Multi-Device (≥2)'}</option>
+                      </select>
+                    </div>
+
+                    {/* Sort By */}
+                    <div>
+                      <select
+                        value={storeSortBy}
+                        onChange={(e) => setStoreSortBy(e.target.value)}
+                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer font-medium"
+                      >
+                        <option value="DEFAULT">✨ {isKhmer ? 'ចុះឈ្មោះថ្មីបំផុត' : 'Newest First'}</option>
+                        <option value="OLDEST">⏳ {isKhmer ? 'ចុះឈ្មោះមុនគេ' : 'Oldest First'}</option>
+                        <option value="NAME_ASC">🔤 {isKhmer ? 'ឈ្មោះសាខា (A → Z)' : 'Branch Name (A → Z)'}</option>
+                        <option value="NAME_DESC">🔤 {isKhmer ? 'ឈ្មោះសាខា (Z → A)' : 'Branch Name (Z → A)'}</option>
+                        <option value="SPEAKERS_DESC">🔊 {isKhmer ? 'Soundbox ច្រើនជាងគេ' : 'Most Speakers'}</option>
+                      </select>
+                    </div>
+
+                  </div>
+
+                  {/* Filter Status Summary & Reset */}
+                  {(storeSearch || storeProvinceFilter !== 'ALL' || storeSpeakerFilter !== 'ALL' || storeSortBy !== 'DEFAULT') && (
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-xs">
+                      <span className="text-slate-500 dark:text-slate-400">
+                        {isKhmer ? 'បង្ហាញ' : 'Showing'} <strong className="text-slate-900 dark:text-white font-mono">{filteredStoresList.length}</strong> {isKhmer ? 'នៃ' : 'of'} <strong className="text-slate-900 dark:text-white font-mono">{stores.length}</strong> {isKhmer ? 'សាខា' : 'store branches'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleResetStoreFilters}
+                        className="px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white bg-white dark:bg-slate-900 hover:bg-slate-100 rounded-lg transition flex items-center gap-1 cursor-pointer border border-slate-200 dark:border-slate-700"
+                      >
+                        <RotateCcw className="w-3 h-3 text-slate-400" />
+                        <span>{isKhmer ? 'កំណត់ឡើងវិញ' : 'Reset Filters'}</span>
+                      </button>
+                    </div>
+                  )}
+
+                </div>
+
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse min-w-[700px]">
                     <thead>
@@ -1016,7 +1227,7 @@ export default function UserDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-                      {stores.map((s, idx) => {
+                      {filteredStoresList.map((s, idx) => {
                         const isSelected = selectedStoreIndex === idx || selectedStoreIds.includes(s.id);
                         const devCount = s.devices?.length || 0;
                         return (
