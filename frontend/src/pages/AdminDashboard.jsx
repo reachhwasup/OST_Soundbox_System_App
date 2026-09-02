@@ -3412,10 +3412,10 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-              {/* 5. Intake / Registration Date */}
+              {/* 5. Registration Date */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('intakeDate', 'Intake Date')}
+                  {t('registrationDate', 'Registration Date')}
                 </label>
                 <input
                   type="date"
@@ -3435,8 +3435,8 @@ export default function AdminDashboard() {
                   onChange={(e) => setStockSortBy(e.target.value)}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer font-medium"
                 >
-                  <option value="NEWEST">✨ {t('sortNewest', 'Newest Intake')}</option>
-                  <option value="OLDEST">⏳ {t('sortOldest', 'Oldest Intake')}</option>
+                  <option value="NEWEST">✨ {t('sortNewest', 'Newest Registered')}</option>
+                  <option value="OLDEST">⏳ {t('sortOldest', 'Oldest Registered')}</option>
                   <option value="SN_ASC">🔤 {t('sortSnAsc', 'Serial Number (A → Z)')}</option>
                   <option value="SN_DESC">🔤 {t('sortSnDesc', 'Serial Number (Z → A)')}</option>
                   <option value="PRICE_DESC">💰 {t('sortPriceDesc', 'Price (Highest First)')}</option>
