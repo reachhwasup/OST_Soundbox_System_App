@@ -1361,21 +1361,7 @@ export default function UserDashboard() {
                                     </div>
                                   </div>
                                 ) : (
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-slate-400 text-xs italic">
-                                      {isKhmer ? 'មិនទាន់មានឧបករណ៍' : 'No soundbox'}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setNewDeviceStoreId(r.storeId);
-                                        setIsDeviceModalOpen(true);
-                                      }}
-                                      className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold underline cursor-pointer"
-                                    >
-                                      {isKhmer ? '+ ភ្ជាប់' : '+ Link'}
-                                    </button>
-                                  </div>
+                                  <span className="text-slate-400 font-mono">-</span>
                                 )}
                               </td>
 
@@ -1406,7 +1392,7 @@ export default function UserDashboard() {
                                     @{r.telegramChatId}
                                   </span>
                                 ) : (
-                                  <span className="text-slate-400 text-[11px]">{isKhmer ? 'មិនទាន់ភ្ជាប់' : 'Not set'}</span>
+                                  <span className="text-slate-400 font-mono">-</span>
                                 )}
                               </td>
 
