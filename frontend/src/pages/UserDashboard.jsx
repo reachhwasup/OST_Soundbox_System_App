@@ -61,13 +61,36 @@ export default function UserDashboard() {
   const { t, isKhmer } = useLanguage();
   const { showToast } = useToast();
 
-  // Active Merchant Navigation Tab ('stores' | 'devices' | 'transactions')
-  const [merchantTab, setMerchantTab] = useState(() => localStorage.getItem('soundbox_merchant_tab') || 'stores');
+  // Active Merchant Navigation Tab ('stores' | 'transactions')
+  const [merchantTab, setMerchantTab] = useState(() => {
+    const saved = localStorage.getItem('soundbox_merchant_tab');
+    return saved === 'transactions' ? 'transactions' : 'stores';
+  });
+
+  // Stores & Devices Sub-Tab ('stores' | 'devices')
+  const [storeDeviceSubTab, setStoreDeviceSubTab] = useState(() => {
+    const saved = localStorage.getItem('soundbox_store_device_subtab');
+    if (saved === 'devices' || localStorage.getItem('soundbox_merchant_tab') === 'devices') return 'devices';
+    return 'stores';
+  });
+
+  const handleSubTabChange = (sub) => {
+    setStoreDeviceSubTab(sub);
+    localStorage.setItem('soundbox_store_device_subtab', sub);
+  };
 
   useEffect(() => {
     const handleTabSync = (e) => {
       if (e.detail) {
-        setMerchantTab(e.detail);
+        if (e.detail === 'devices') {
+          setMerchantTab('stores');
+          setStoreDeviceSubTab('devices');
+          localStorage.setItem('soundbox_store_device_subtab', 'devices');
+        } else if (e.detail === 'stores') {
+          setMerchantTab('stores');
+        } else {
+          setMerchantTab(e.detail);
+        }
       }
     };
     window.addEventListener('soundbox_merchant_tab_change', handleTabSync);
@@ -1003,10 +1026,99 @@ export default function UserDashboard() {
 
           {/* ======================================================== */}
           {/* ======================================================== */}
-          {/* TAB 1: STORES & BRANCHES DIRECTORY TABLE                 */}
+          {/* TAB 1: COMBINED STORES & DEVICES DIRECTORY               */}
           {/* ======================================================== */}
-          {merchantTab === 'stores' && (
+          {(merchantTab === 'stores' || merchantTab === 'devices') && (
             <div className="space-y-5 sm:space-y-6">
+
+              {/* Segmented Sub-Tab Switcher Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+                {/* Segmented Control */}
+                <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/90 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                  <button
+                    type="button"
+                    onClick={() => handleSubTabChange('stores')}
+                    className={`px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                      storeDeviceSubTab === 'stores'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <Store className="w-4 h-4" />
+                    <span>{isKhmer ? 'សាខាហាង' : 'Store Branches'}</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                      storeDeviceSubTab === 'stores'
+                        ? 'bg-white/25 text-white'
+                        : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                    }`}>
+                      {stores.length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSubTabChange('devices')}
+                    className={`px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                      storeDeviceSubTab === 'devices'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <Volume2 className="w-4 h-4" />
+                    <span>{isKhmer ? 'ឧបករណ៍ Soundbox' : 'Soundbox Devices'}</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                      storeDeviceSubTab === 'devices'
+                        ? 'bg-white/25 text-white'
+                        : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                    }`}>
+                      {allUserDevices.length}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Quick Action Button for current active sub-tab */}
+                <div className="flex items-center gap-2">
+                  {storeDeviceSubTab === 'stores' ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        resetRegisterForm();
+                        setIsRegisterStoreOpen(true);
+                      }}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap shadow-xs cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>{isKhmer ? 'បន្ថែមសាខា' : 'Add Branch'}</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveCameraField(null);
+                        setScanFeedback({ field: '', message: '', isError: false });
+                        setIsDeviceModalOpen(true);
+                      }}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap shadow-xs cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>{isKhmer ? 'ភ្ជាប់ឧបករណ៍' : 'Link Soundbox'}</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => fetchStoresData(true)}
+                    className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition cursor-pointer"
+                    title={isKhmer ? 'ផ្ទុកទិន្នន័យឡើងវិញ' : 'Refresh Data'}
+                  >
+                    <RefreshCw className="w-4 h-4 text-slate-500" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Sub-View 1: Stores Directory */}
+              {storeDeviceSubTab === 'stores' && (
+                <div className="space-y-5 sm:space-y-6">
 
               {/* All Store Branches Table */}
               <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
@@ -1247,14 +1359,9 @@ export default function UserDashboard() {
             </div>
           )}
 
-          {/* ======================================================== */}
-          {/* TAB 2: DEDICATED DEVICE INFO & SOUNDBOX MANAGEMENT       */}
-          {/* ======================================================== */}
-          {/* ======================================================== */}
-          {/* TAB 2: DEDICATED DEVICE INFO & SOUNDBOX MANAGEMENT TABLE */}
-          {/* ======================================================== */}
-          {merchantTab === 'devices' && (
-            <div className="space-y-5 sm:space-y-6">
+              {/* Sub-View 2: Soundbox Devices */}
+              {storeDeviceSubTab === 'devices' && (
+                <div className="space-y-5 sm:space-y-6">
 
               {/* Device Table & Filter Toolbar Card */}
               <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
@@ -1613,6 +1720,9 @@ export default function UserDashboard() {
 
             </div>
           )}
+
+        </div>
+      )}
 
           {/* ======================================================== */}
           {/* TAB 3: DEDICATED TRANSACTION HISTORY & STATEMENT          */}

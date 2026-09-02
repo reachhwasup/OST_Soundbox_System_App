@@ -284,41 +284,24 @@ export default function Sidebar({
             {/* Standard Merchant View Navigation */}
             {!isAdmin && (
               <div className="space-y-1">
-                {/* Item 1: Stores & Branches */}
+                {/* Item 1: Stores & Devices */}
                 <button
                   type="button"
                   onClick={() => handleMerchantSubTabClick('stores')}
-                  title={t('storeBranches', 'Stores & Branches')}
+                  title={isKhmer ? 'ហាង និងឧបករណ៍ Soundbox' : 'Stores & Devices'}
                   className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
                     isCollapsed 
-                      ? `h-12 justify-center ${currentMerchantTab === 'stores' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
-                      : `px-3 py-2.5 gap-2.5 ${currentMerchantTab === 'stores' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                      ? `h-12 justify-center ${currentMerchantTab === 'stores' || currentMerchantTab === 'devices' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
+                      : `px-3 py-2.5 gap-2.5 ${currentMerchantTab === 'stores' || currentMerchantTab === 'devices' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
                   }`}
                 >
                   <Store className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-emerald-400'}`} />
                   {!isCollapsed && (
-                    <span className="truncate">{t('storeBranches', 'Stores & Branches')}</span>
+                    <span className="truncate">{isKhmer ? 'ហាង និងឧបករណ៍ Soundbox' : 'Stores & Devices'}</span>
                   )}
                 </button>
 
-                {/* Item 2: Device Info & Soundbox */}
-                <button
-                  type="button"
-                  onClick={() => handleMerchantSubTabClick('devices')}
-                  title={isKhmer ? 'ព័ត៌មានឧបករណ៍' : 'Device Info & Soundbox'}
-                  className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
-                    isCollapsed 
-                      ? `h-12 justify-center ${currentMerchantTab === 'devices' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
-                      : `px-3 py-2.5 gap-2.5 ${currentMerchantTab === 'devices' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
-                  }`}
-                >
-                  <Volume2 className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-emerald-400'}`} />
-                  {!isCollapsed && (
-                    <span className="truncate">{isKhmer ? 'ព័ត៌មានឧបករណ៍' : 'Device Info & Soundbox'}</span>
-                  )}
-                </button>
-
-                {/* Item 3: Transaction History */}
+                {/* Item 2: Transaction History */}
                 <button
                   type="button"
                   onClick={() => handleMerchantSubTabClick('transactions')}

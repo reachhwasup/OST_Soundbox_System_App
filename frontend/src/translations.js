@@ -65,6 +65,9 @@ export const translations = {
     // Dashboard & Stats
     myStores: "My Stores & Branches",
     storeBranches: "Stores",
+    storesAndDevices: "Stores & Devices",
+    storeBranchesTab: "Store Branches",
+    soundboxDevicesTab: "Soundbox Devices",
     activeStore: "Active Store",
     totalStores: "Total Stores",
     connectedSoundboxes: "Connected Soundboxes",
@@ -450,6 +453,9 @@ export const translations = {
     // Dashboard & Stats
     myStores: "ហាង និងសាខារបស់ខ្ញុំ",
     storeBranches: "សាខាហាង",
+    storesAndDevices: "ហាង និងឧបករណ៍ Soundbox",
+    storeBranchesTab: "សាខាហាង",
+    soundboxDevicesTab: "ឧបករណ៍ Soundbox",
     activeStore: "ហាងកំពុងជ្រើសរើស",
     totalStores: "ហាងសរុប",
     connectedSoundboxes: "ឧបករណ៍ Soundbox ដែលបានភ្ជាប់",
