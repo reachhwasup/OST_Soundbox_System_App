@@ -2718,26 +2718,6 @@ export default function UserDashboard() {
                 </div>
               )}
 
-              {/* Branch Contact & Creation Metadata (Non-table fields) */}
-              <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-2.5">
-                <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
-                  <Phone className="w-4 h-4 text-emerald-600" />
-                  <span>{isKhmer ? 'ព័ត៌មានទំនាក់ទំនងសាខា' : 'Branch Contact & Metadata'}</span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
-                    <span className="text-[10px] text-slate-400 font-semibold block">{isKhmer ? 'លេខទូរស័ព្ទទាក់ទង' : 'Contact Phone'}</span>
-                    <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400 text-xs mt-0.5 block">{r.store?.owner_phone || user?.phone_number || '—'}</span>
-                  </div>
-
-                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
-                    <span className="text-[10px] text-slate-400 font-semibold block">{isKhmer ? 'ថ្ងៃបង្កើតសាខា' : 'Branch Created Date'}</span>
-                    <span className="font-mono text-[11px] text-slate-700 dark:text-slate-300 mt-0.5 block">{r.store?.created_at ? new Date(r.store.created_at).toLocaleDateString() : '—'}</span>
-                  </div>
-                </div>
-              </div>
-
               {/* Close Footer */}
               <div className="pt-2 flex justify-end">
                 <button
