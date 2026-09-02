@@ -141,7 +141,6 @@ export default function AdminDashboard() {
   const [storeDistrictFilter, setStoreDistrictFilter] = useState('');
   const [storeCommuneFilter, setStoreCommuneFilter] = useState('');
   const [storeSoundboxFilter, setStoreSoundboxFilter] = useState(''); // '' | 'WITH_DEVICE' | 'MULTI_DEVICE' | 'NO_DEVICE'
-  const [storeDeviceTypeFilter, setStoreDeviceTypeFilter] = useState('ALL'); // 'ALL' | 'Display' | 'Standard'
   const [storeOnlineFilter, setStoreOnlineFilter] = useState('ALL'); // 'ALL' | 'ONLINE' | 'OFFLINE' | 'NO_DEVICE'
   const [storeOwnerFilter, setStoreOwnerFilter] = useState('ALL');
   const [storeDateFilter, setStoreDateFilter] = useState('');
@@ -809,7 +808,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     setStorePage(1);
-  }, [storeSearch, storeProvinceFilter, storeDistrictFilter, storeCommuneFilter, storeOwnerFilter, storeSoundboxFilter, storeOnlineFilter, storeDeviceTypeFilter, storeDateFilter, storeSortBy]);
+  }, [storeSearch, storeProvinceFilter, storeDistrictFilter, storeCommuneFilter, storeOwnerFilter, storeSoundboxFilter, storeOnlineFilter, storeDateFilter, storeSortBy]);
 
   useEffect(() => {
     setUserActPage(1);
@@ -942,27 +941,6 @@ export default function AdminDashboard() {
         }
       }
 
-      if (storeDeviceTypeFilter !== 'ALL') {
-        const hasMatchingType = (s.devices || []).some(dev => {
-          const dType = String(dev.device_type || dev.device_model || '');
-          if (storeDeviceTypeFilter === 'Display') return dType.includes('Display');
-          if (storeDeviceTypeFilter === 'Standard') return !dType.includes('Display');
-          return true;
-        });
-        if (!s.devices || s.devices.length === 0) {
-          const matchingGlobalDev = devices.some(dev => {
-            if (Number(dev.merchant_id) !== Number(s.id)) return false;
-            const dType = String(dev.device_type || dev.device_model || '');
-            if (storeDeviceTypeFilter === 'Display') return dType.includes('Display');
-            if (storeDeviceTypeFilter === 'Standard') return !dType.includes('Display');
-            return true;
-          });
-          if (!matchingGlobalDev) return false;
-        } else if (!hasMatchingType) {
-          return false;
-        }
-      }
-
       if (storeDateFilter.trim()) {
         const dateStr = String(s.created_at || '');
         if (!dateStr.includes(storeDateFilter.trim())) return false;
@@ -991,7 +969,7 @@ export default function AdminDashboard() {
       // Default: NEWEST
       return (new Date(b.created_at || 0) - new Date(a.created_at || 0)) || (b.id - a.id);
     });
-  }, [stores, devices, storeSearch, storeProvinceFilter, storeDistrictFilter, storeCommuneFilter, storeOwnerFilter, storeSoundboxFilter, storeOnlineFilter, storeDeviceTypeFilter, storeDateFilter, storeSortBy]);
+  }, [stores, devices, storeSearch, storeProvinceFilter, storeDistrictFilter, storeCommuneFilter, storeOwnerFilter, storeSoundboxFilter, storeOnlineFilter, storeDateFilter, storeSortBy]);
 
   // Reset Store Filters
   const handleResetStoreFilters = () => {
@@ -1000,7 +978,6 @@ export default function AdminDashboard() {
     setStoreDistrictFilter('');
     setStoreCommuneFilter('');
     setStoreSoundboxFilter('');
-    setStoreDeviceTypeFilter('ALL');
     setStoreOnlineFilter('ALL');
     setStoreOwnerFilter('ALL');
     setStoreDateFilter('');
@@ -2454,8 +2431,8 @@ export default function AdminDashboard() {
 
             </div>
 
-            {/* Filter Grid Row 2: Hardware Status, Online Status, Device Type, Date, Sort By */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 pt-1">
+            {/* Filter Grid Row 2: Hardware Status, Online Status, Date, Sort By */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-3 pt-1">
 
               {/* 6. Soundbox Hardware Quantity */}
               <div>
@@ -2491,23 +2468,7 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-              {/* 8. Device Hardware Type */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('deviceType', 'Device Type')}
-                </label>
-                <select
-                  value={storeDeviceTypeFilter}
-                  onChange={(e) => setStoreDeviceTypeFilter(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
-                >
-                  <option value="ALL">{t('allHardwareTypes', 'All Hardware Types')}</option>
-                  <option value="Display">{t('displaySoundbox', '🖥️ Display Soundbox (Screen QR)')}</option>
-                  <option value="Standard">{t('standardSoundbox', '🏷️ Standard Soundbox (Printed QR)')}</option>
-                </select>
-              </div>
-
-              {/* 9. Registration Date */}
+              {/* 8. Registration Date */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('storeRegDate', 'Registration Date')}
@@ -2520,7 +2481,7 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              {/* 10. Sort By Selector */}
+              {/* 9. Sort By Selector */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('sortBy', 'Sort By')}
@@ -2553,7 +2514,7 @@ export default function AdminDashboard() {
               </div>
 
               <div className="flex items-center gap-2 self-end sm:self-auto">
-                {(storeSearch || storeProvinceFilter || storeDistrictFilter || storeCommuneFilter || storeOwnerFilter !== 'ALL' || storeSoundboxFilter || storeOnlineFilter !== 'ALL' || storeDeviceTypeFilter !== 'ALL' || storeDateFilter || storeSortBy !== 'NEWEST') && (
+                {(storeSearch || storeProvinceFilter || storeDistrictFilter || storeCommuneFilter || storeOwnerFilter !== 'ALL' || storeSoundboxFilter || storeOnlineFilter !== 'ALL' || storeDateFilter || storeSortBy !== 'NEWEST') && (
                   <button
                     type="button"
                     onClick={handleResetStoreFilters}
