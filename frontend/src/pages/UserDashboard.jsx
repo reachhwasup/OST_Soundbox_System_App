@@ -1440,19 +1440,9 @@ export default function UserDashboard() {
                                     <span>{isKhmer ? 'កែសម្រួល' : 'Edit'}</span>
                                   </button>
 
-                                  {/* If device is linked: Test Voice & Unlink */}
+                                  {/* If device is linked: Reboot & Unlink */}
                                   {r.hasDevice && (
                                     <>
-                                      <button
-                                        type="button"
-                                        disabled={isTesting}
-                                        onClick={() => handleTriggerBroadcast(r.device)}
-                                        className="p-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80 rounded-lg transition disabled:opacity-50 cursor-pointer"
-                                        title={isKhmer ? 'សាកល្បងសំឡេង' : 'Test Audio Announcement'}
-                                      >
-                                        <Volume2 className={`w-3.5 h-3.5 ${isTesting ? 'animate-bounce text-indigo-500' : ''}`} />
-                                      </button>
-
                                       <button
                                         type="button"
                                         disabled={isRebooting}
@@ -1465,11 +1455,11 @@ export default function UserDashboard() {
 
                                       <button
                                         type="button"
-                                        onClick={() => handleUnlinkDevice(r.device.id)}
+                                        onClick={() => handleOpenUnlinkDevice(r.device)}
                                         className="p-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200/80 dark:border-rose-800/80 rounded-lg transition cursor-pointer"
-                                        title={isKhmer ? 'ផ្តាច់ឧបករណ៍' : 'Unlink Device'}
+                                        title={isKhmer ? 'ផ្តាច់ឧបករណ៍ Soundbox' : 'Unlink Soundbox'}
                                       >
-                                        <Trash2 className="w-3.5 h-3.5" />
+                                        <Unlink className="w-3.5 h-3.5" />
                                       </button>
                                     </>
                                   )}
