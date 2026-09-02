@@ -199,6 +199,7 @@ export default function UserDashboard() {
           hasDevice: false,
           deviceSn: '',
           deviceModel: '',
+          deviceType: '',
           batteryLevel: null,
           signalStrength: null,
           telegramChatId: '',
@@ -217,6 +218,7 @@ export default function UserDashboard() {
             hasDevice: true,
             deviceSn: d.device_sn || 'Y6B-Soundbox',
             deviceModel: d.device_model || 'Y6B 4G',
+            deviceType: d.device_type || (String(d.device_model || '').includes('Display') ? 'Display Soundbox' : 'Standard Soundbox'),
             batteryLevel: (String(d.status || '').toUpperCase() === 'OFFLINE' || String(d.status || '').toUpperCase() === 'INACTIVE') 
               ? null 
               : (d.battery_level !== undefined ? d.battery_level : 85),
@@ -359,6 +361,7 @@ export default function UserDashboard() {
     storeBranch: true,
     location: true,
     soundboxDevice: true,
+    deviceType: true,
     battery: true,
     signal: true,
     telegram: true,
@@ -1318,6 +1321,7 @@ export default function UserDashboard() {
                           {visibleColumns.storeBranch && <th className="py-3 px-4">{isKhmer ? 'សាខាហាង' : 'Store Branch'}</th>}
                           {visibleColumns.location && <th className="py-3 px-4">{isKhmer ? 'ទីតាំង / អាសយដ្ឋាន' : 'Location / Address'}</th>}
                           {visibleColumns.soundboxDevice && <th className="py-3 px-4">{isKhmer ? 'ឧបករណ៍ Soundbox' : 'Soundbox Device'}</th>}
+                          {visibleColumns.deviceType && <th className="py-3 px-4">{isKhmer ? 'ប្រភេទឧបករណ៍' : 'Device Type'}</th>}
                           {visibleColumns.battery && <th className="py-3 px-4">{isKhmer ? 'ថាមពលថ្ម' : 'Battery Level'}</th>}
                           {visibleColumns.signal && <th className="py-3 px-4">{isKhmer ? 'សេវា 4G' : '4G Signal'}</th>}
                           {visibleColumns.telegram && <th className="py-3 px-4">{isKhmer ? 'Telegram Bot' : 'Telegram Bot'}</th>}
@@ -1394,23 +1398,37 @@ export default function UserDashboard() {
                                 </td>
                               )}
 
-                              {/* Soundbox Device Info */}
+                              {/* Soundbox Device (SN/ID) */}
                               {visibleColumns.soundboxDevice && (
-                                <td className="py-3.5 px-4">
+                                <td className="py-3.5 px-4 font-mono">
                                   {r.hasDevice ? (
                                     <div className="flex items-center gap-2">
                                       <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
                                         <Volume2 className="w-3.5 h-3.5" />
                                       </div>
-                                      <div>
-                                        <div className="font-mono font-bold text-slate-900 dark:text-white text-xs">
-                                          {r.deviceSn}
-                                        </div>
-                                        <span className="inline-block text-[10px] px-1.5 py-0.2 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded font-semibold">
-                                          {r.deviceModel}
-                                        </span>
-                                      </div>
+                                      <span className="font-mono font-bold text-slate-900 dark:text-white text-xs">
+                                        {r.deviceSn}
+                                      </span>
                                     </div>
+                                  ) : (
+                                    <span className="text-slate-400 font-mono">-</span>
+                                  )}
+                                </td>
+                              )}
+
+                              {/* Device Type */}
+                              {visibleColumns.deviceType && (
+                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                  {r.hasDevice ? (
+                                    <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1.5 whitespace-nowrap ${
+                                      (r.deviceType === 'Display Soundbox' || String(r.deviceType || '').toLowerCase().includes('display') || String(r.deviceModel || '').toLowerCase().includes('display'))
+                                        ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                                        : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                                    }`}>
+                                      {(r.deviceType === 'Display Soundbox' || String(r.deviceType || '').toLowerCase().includes('display') || String(r.deviceModel || '').toLowerCase().includes('display'))
+                                        ? '🖥️ Display'
+                                        : '🏷️ Standard'}
+                                    </span>
                                   ) : (
                                     <span className="text-slate-400 font-mono">-</span>
                                   )}
@@ -2730,6 +2748,7 @@ export default function UserDashboard() {
               { key: 'storeBranch', label: isKhmer ? 'សាខាហាង' : 'Store Branch' },
               { key: 'location', label: isKhmer ? 'ទីតាំង / អាសយដ្ឋាន' : 'Location / Address' },
               { key: 'soundboxDevice', label: isKhmer ? 'ឧបករណ៍ Soundbox' : 'Soundbox Device' },
+              { key: 'deviceType', label: isKhmer ? 'ប្រភេទឧបករណ៍' : 'Device Type' },
               { key: 'battery', label: isKhmer ? 'ថាមពលថ្ម' : 'Battery Level' },
               { key: 'signal', label: isKhmer ? 'សេវា 4G' : '4G Signal' },
               { key: 'telegram', label: isKhmer ? 'Telegram Bot' : 'Telegram Bot' },
@@ -2760,6 +2779,7 @@ export default function UserDashboard() {
                   storeBranch: true,
                   location: true,
                   soundboxDevice: true,
+                  deviceType: true,
                   battery: true,
                   signal: true,
                   telegram: true,
@@ -2778,6 +2798,7 @@ export default function UserDashboard() {
                   storeBranch: true,
                   location: true,
                   soundboxDevice: true,
+                  deviceType: true,
                   battery: true,
                   signal: true,
                   telegram: true,
