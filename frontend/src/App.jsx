@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider } from './context/LanguageContext';
+import ErrorBoundary from './components/ErrorBoundary';
 import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 import Login from './pages/Login';
@@ -12,7 +13,39 @@ import { RefreshCw } from 'lucide-react';
 
 function MainLayout() {
   const { user, loading } = useAuth();
-  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
+  const [authMode, setAuthMode] = useState(() => {
+    if (typeof window !== 'undefined' && window.location.pathname === '/register') {
+      return 'register';
+    }
+    return 'login';
+  });
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (window.location.pathname === '/register') {
+        setAuthMode('register');
+      } else if (window.location.pathname === '/login') {
+        setAuthMode('login');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const handleSwitchToRegister = () => {
+    setAuthMode('register');
+    if (window.location.pathname !== '/register') {
+      window.history.pushState(null, '', '/register');
+    }
+  };
+
+  const handleSwitchToLogin = () => {
+    setAuthMode('login');
+    if (window.location.pathname !== '/login') {
+      window.history.pushState(null, '', '/login');
+    }
+  };
+
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem('soundbox_sidebar_collapsed');
@@ -50,9 +83,9 @@ function MainLayout() {
   // Unauthenticated Flow
   if (!user) {
     if (authMode === 'register') {
-      return <Register onSwitchToLogin={() => setAuthMode('login')} />;
+      return <Register onSwitchToLogin={handleSwitchToLogin} />;
     }
-    return <Login onSwitchToRegister={() => setAuthMode('register')} />;
+    return <Login onSwitchToRegister={handleSwitchToRegister} />;
   }
 
   // Authenticated Flow (Case-insensitive role validation)
@@ -95,15 +128,17 @@ import { ToastProvider } from './context/ToastContext';
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <LanguageProvider>
-        <AuthProvider>
-          <ToastProvider>
-            <MainLayout />
-          </ToastProvider>
-        </AuthProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <ToastProvider>
+              <MainLayout />
+            </ToastProvider>
+          </AuthProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 
