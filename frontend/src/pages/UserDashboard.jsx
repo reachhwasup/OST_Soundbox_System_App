@@ -1564,20 +1564,21 @@ export default function UserDashboard() {
                                         setIsEditStoreOpen(true);
                                       }}
                                       className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/80 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
-                                      title={isKhmer ? 'កែសម្រួលព័ត៌មានហាង' : 'Edit Store'}
+                                      title={isKhmer ? 'កែសម្រួលព័ត៌មានអាជីវករ' : 'Edit Merchant'}
                                     >
                                       <Edit3 className="w-3 h-3" />
-                                      <span>{isKhmer ? 'កែសម្រួល' : 'Edit'}</span>
+                                      <span>{isKhmer ? 'កែប្រែអាជីវករ' : 'Edit Merchant'}</span>
                                     </button>
 
                                     {/* Detail Button */}
                                     <button
                                       type="button"
                                       onClick={() => handleOpenDetailModal(r)}
-                                      className="p-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200/80 dark:border-blue-800/80 rounded-lg transition cursor-pointer"
-                                      title={isKhmer ? 'ព័ត៌មានលម្អិត' : 'View Details'}
+                                      className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/80 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+                                      title={isKhmer ? 'ព័ត៌មានលម្អិត' : 'Details'}
                                     >
-                                      <Info className="w-3.5 h-3.5" />
+                                      <Info className="w-3 h-3" />
+                                      <span>{isKhmer ? 'ព័ត៌មានលម្អិត' : 'Details'}</span>
                                     </button>
 
                                     {/* If device is linked: Unlink */}
@@ -1585,10 +1586,11 @@ export default function UserDashboard() {
                                       <button
                                         type="button"
                                         onClick={() => handleOpenUnlinkDevice(r.device)}
-                                        className="p-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200/80 dark:border-rose-800/80 rounded-lg transition cursor-pointer"
-                                        title={isKhmer ? 'ផ្តាច់ឧបករណ៍ Soundbox' : 'Unlink Soundbox'}
+                                        className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200/80 dark:border-rose-800/80 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+                                        title={isKhmer ? 'ផ្តាច់ឧបករណ៍ Soundbox' : 'Unlinked'}
                                       >
-                                        <Unlink className="w-3.5 h-3.5" />
+                                        <Unlink className="w-3 h-3" />
+                                        <span>{isKhmer ? 'ផ្តាច់' : 'Unlinked'}</span>
                                       </button>
                                     )}
 
