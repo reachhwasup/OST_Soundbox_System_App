@@ -201,6 +201,7 @@ export default function UserDashboard() {
           deviceModel: '',
           deviceType: '',
           batteryLevel: null,
+          signal: null,
           signalStrength: null,
           telegramChatId: '',
           status: 'NO_DEVICE'
@@ -222,7 +223,8 @@ export default function UserDashboard() {
             batteryLevel: (String(d.status || '').toUpperCase() === 'OFFLINE' || String(d.status || '').toUpperCase() === 'INACTIVE') 
               ? null 
               : (d.battery_level !== undefined ? d.battery_level : 85),
-            signalStrength: d.signal_strength || '4G',
+            signal: d.signal || d.signal_strength || 'Good',
+            signalStrength: d.signal || d.signal_strength || 'Good',
             telegramChatId: d.telegram_chat_id || '',
             status: (String(d.status || '').toUpperCase() === 'ACTIVE' || String(d.status || '').toUpperCase() === 'ONLINE') ? 'ACTIVE' : 'OFFLINE'
           });
@@ -1323,7 +1325,7 @@ export default function UserDashboard() {
                           {visibleColumns.soundboxDevice && <th className="py-3 px-4">{isKhmer ? 'ឧបករណ៍ Soundbox' : 'Soundbox Device'}</th>}
                           {visibleColumns.deviceType && <th className="py-3 px-4">{isKhmer ? 'ប្រភេទឧបករណ៍' : 'Device Type'}</th>}
                           {visibleColumns.battery && <th className="py-3 px-4">{isKhmer ? 'ថាមពលថ្ម' : 'Battery Level'}</th>}
-                          {visibleColumns.signal && <th className="py-3 px-4">{isKhmer ? 'សេវា 4G' : '4G Signal'}</th>}
+                          {visibleColumns.signal && <th className="py-3 px-4">{isKhmer ? 'កម្រិតសេវា' : 'Signal'}</th>}
                           {visibleColumns.telegram && <th className="py-3 px-4">{isKhmer ? 'Telegram Bot' : 'Telegram Bot'}</th>}
                           {visibleColumns.warranty && <th className="py-3 px-4 text-center">{isKhmer ? 'ការធានា (Warranty)' : 'Warranty (90d)'}</th>}
                           {visibleColumns.status && <th className="py-3 px-4">{isKhmer ? 'ស្ថានភាព' : 'Status'}</th>}
@@ -1449,15 +1451,33 @@ export default function UserDashboard() {
                                 </td>
                               )}
 
-                              {/* 4G Signal */}
+                              {/* Signal Strength (Quality) */}
                               {visibleColumns.signal && (
-                                <td className="py-3.5 px-4">
-                                  {r.hasDevice && isOnline ? (
-                                    <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200">
-                                      <Wifi className="w-3.5 h-3.5 text-indigo-500" />
-                                      <span className="font-mono text-xs">{r.signalStrength || '4G LTE'}</span>
-                                    </div>
-                                  ) : (
+                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                  {r.hasDevice && isOnline ? (() => {
+                                    const sig = String(r.signal || r.signalStrength || 'Good');
+                                    const sigLower = sig.toLowerCase();
+                                    const isExcel = sigLower.includes('excel');
+                                    const isGood = sigLower.includes('good');
+                                    const isFair = sigLower.includes('fair') || sigLower.includes('moderat');
+
+                                    const badgeClass = isExcel
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                                      : isGood
+                                      ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800'
+                                      : isFair
+                                      ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
+                                      : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800';
+
+                                    const labelKh = isExcel ? 'ល្អឥតខ្ចោះ' : isGood ? 'ល្អ' : isFair ? 'មធ្យម' : 'ខ្សោយ';
+
+                                    return (
+                                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${badgeClass}`}>
+                                        <Wifi className="w-3 h-3" />
+                                        <span>{isKhmer ? labelKh : sig}</span>
+                                      </span>
+                                    );
+                                  })() : (
                                     <span className="text-slate-400 font-mono">-</span>
                                   )}
                                 </td>
@@ -2643,12 +2663,12 @@ export default function UserDashboard() {
                       </div>
                     </div>
 
-                    {/* 4G Signal */}
+                    {/* Signal Quality */}
                     <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
-                      <span className="text-[10px] text-slate-400 font-semibold block">{isKhmer ? 'សេវា 4G' : '4G Signal'}</span>
+                      <span className="text-[10px] text-slate-400 font-semibold block">{isKhmer ? 'កម្រិតសេវា (Signal)' : 'Signal Quality'}</span>
                       <div className="flex items-center gap-1.5 mt-0.5 font-semibold text-slate-900 dark:text-white">
                         <Wifi className="w-3.5 h-3.5 text-indigo-500" />
-                        <span>{isOnline ? (r.signalStrength || '4G LTE') : '-'}</span>
+                        <span>{isOnline ? (r.signal || r.signalStrength || 'Good') : '-'}</span>
                       </div>
                     </div>
 
@@ -2750,7 +2770,7 @@ export default function UserDashboard() {
               { key: 'soundboxDevice', label: isKhmer ? 'ឧបករណ៍ Soundbox' : 'Soundbox Device' },
               { key: 'deviceType', label: isKhmer ? 'ប្រភេទឧបករណ៍' : 'Device Type' },
               { key: 'battery', label: isKhmer ? 'ថាមពលថ្ម' : 'Battery Level' },
-              { key: 'signal', label: isKhmer ? 'សេវា 4G' : '4G Signal' },
+              { key: 'signal', label: isKhmer ? 'កម្រិតសេវា (Signal)' : 'Signal Strength' },
               { key: 'telegram', label: isKhmer ? 'Telegram Bot' : 'Telegram Bot' },
               { key: 'warranty', label: isKhmer ? 'ការធានា (90 ថ្ងៃ)' : 'Warranty (90-Day)' },
               { key: 'status', label: isKhmer ? 'ស្ថានភាព' : 'Status' },
