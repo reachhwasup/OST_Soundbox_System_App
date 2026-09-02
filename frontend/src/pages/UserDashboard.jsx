@@ -1341,7 +1341,7 @@ export default function UserDashboard() {
                           {visibleColumns.telegram && <th className="py-3 px-4">{isKhmer ? 'Telegram Bot' : 'Telegram Bot'}</th>}
                           {visibleColumns.warranty && <th className="py-3 px-4 text-center">{isKhmer ? 'ការធានា (Warranty)' : 'Warranty (90d)'}</th>}
                           {visibleColumns.status && <th className="py-3 px-4">{isKhmer ? 'ស្ថានភាព' : 'Status'}</th>}
-                          {visibleColumns.actions && <th className="py-3 px-4 text-right rounded-r-xl">{isKhmer ? 'សកម្មភាព' : 'Actions'}</th>}
+                          {visibleColumns.actions && <th className="py-3 px-4 text-right rounded-r-xl whitespace-nowrap">{isKhmer ? 'សកម្មភាព' : 'Actions'}</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
@@ -1558,9 +1558,9 @@ export default function UserDashboard() {
 
                               {/* Operations / Actions */}
                               {visibleColumns.actions && (
-                                <td className="py-3.5 px-4 text-right">
-                                  <div className="flex items-center justify-end gap-1.5">
-                                    {/* Edit Store Branch */}
+                                <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                                  <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                                    {/* Edit Store Branch / Merchant */}
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -1575,22 +1575,22 @@ export default function UserDashboard() {
                                         setEditStreetOrLandmark(resolved.streetOrLandmark);
                                         setIsEditStoreOpen(true);
                                       }}
-                                      className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/80 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+                                      className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/80 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
                                       title={isKhmer ? 'កែសម្រួលព័ត៌មានអាជីវករ' : 'Edit Merchant'}
                                     >
-                                      <Edit3 className="w-3 h-3" />
-                                      <span>{isKhmer ? 'កែប្រែអាជីវករ' : 'Edit Merchant'}</span>
+                                      <Edit3 className="w-3.5 h-3.5 shrink-0" />
+                                      <span className="whitespace-nowrap">{isKhmer ? 'កែប្រែអាជីវករ' : 'Edit Merchant'}</span>
                                     </button>
 
                                     {/* Detail Button */}
                                     <button
                                       type="button"
                                       onClick={() => handleOpenDetailModal(r)}
-                                      className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/80 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+                                      className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/80 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
                                       title={isKhmer ? 'ព័ត៌មានលម្អិត' : 'Details'}
                                     >
-                                      <Info className="w-3 h-3" />
-                                      <span>{isKhmer ? 'ព័ត៌មានលម្អិត' : 'Details'}</span>
+                                      <Info className="w-3.5 h-3.5 shrink-0" />
+                                      <span className="whitespace-nowrap">{isKhmer ? 'ព័ត៌មានលម្អិត' : 'Details'}</span>
                                     </button>
 
                                     {/* If device is linked: Unlink */}
@@ -1598,11 +1598,11 @@ export default function UserDashboard() {
                                       <button
                                         type="button"
                                         onClick={() => handleOpenUnlinkDevice(r.device)}
-                                        className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200/80 dark:border-rose-800/80 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+                                        className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200/80 dark:border-rose-800/80 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
                                         title={isKhmer ? 'ផ្តាច់ឧបករណ៍ Soundbox' : 'Unlinked'}
                                       >
-                                        <Unlink className="w-3 h-3" />
-                                        <span>{isKhmer ? 'ផ្តាច់' : 'Unlinked'}</span>
+                                        <Unlink className="w-3.5 h-3.5 shrink-0" />
+                                        <span className="whitespace-nowrap">{isKhmer ? 'ផ្តាច់' : 'Unlinked'}</span>
                                       </button>
                                     )}
 
@@ -1614,10 +1614,11 @@ export default function UserDashboard() {
                                           setNewDeviceStoreId(r.storeId);
                                           setIsDeviceModalOpen(true);
                                         }}
-                                        className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+                                        className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+                                        title={isKhmer ? 'ភ្ជាប់ឧបករណ៍ Soundbox' : 'Link'}
                                       >
-                                        <Plus className="w-3.5 h-3.5" />
-                                        <span>{isKhmer ? 'ភ្ជាប់ Soundbox' : 'Link'}</span>
+                                        <Plus className="w-3.5 h-3.5 shrink-0" />
+                                        <span className="whitespace-nowrap">{isKhmer ? 'ភ្ជាប់ Soundbox' : 'Link'}</span>
                                       </button>
                                     )}
                                   </div>
@@ -2045,7 +2046,7 @@ export default function UserDashboard() {
       <Modal 
         isOpen={isEditStoreOpen} 
         onClose={() => setIsEditStoreOpen(false)} 
-        title={`Edit Store: ${activeStore?.name || ''}`}
+        title={isKhmer ? `កែប្រែអាជីវករ: ${activeStore?.name || ''}` : `Edit Merchant: ${activeStore?.name || ''}`}
         maxWidth="max-w-2xl"
       >
         <form onSubmit={handleUpdateStore} className="space-y-4">
