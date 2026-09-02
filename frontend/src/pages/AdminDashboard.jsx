@@ -177,8 +177,11 @@ export default function AdminDashboard() {
 
   // Stock & Inventory Filter & Pagination States
   const [stockSearchTerm, setStockSearchTerm] = useState('');
-  const [stockModelFilter, setStockModelFilter] = useState('ALL');
+  const [stockTypeFilter, setStockTypeFilter] = useState('ALL');
   const [stockBatchFilter, setStockBatchFilter] = useState('ALL');
+  const [stockPriceFilter, setStockPriceFilter] = useState('ALL');
+  const [stockDateFilter, setStockDateFilter] = useState('');
+  const [stockSortBy, setStockSortBy] = useState('NEWEST'); // 'NEWEST' | 'OLDEST' | 'SN_ASC' | 'SN_DESC' | 'PRICE_DESC' | 'PRICE_ASC'
   const [stockPage, setStockPage] = useState(1);
   const [stockPageSize, setStockPageSize] = useState(10);
   const [stockGoToPage, setStockGoToPage] = useState('');
@@ -211,7 +214,6 @@ export default function AdminDashboard() {
   const [singleStoreId, setSingleStoreId] = useState('');
   const [singleNotes, setSingleNotes] = useState('');
   const [singlePrice, setSinglePrice] = useState('39.00');
-  const [stockTypeFilter, setStockTypeFilter] = useState('ALL');
   const [stockSubmitting, setStockSubmitting] = useState(false);
 
   const [isDeviceDetailOpen, setIsDeviceDetailOpen] = useState(false);
@@ -816,6 +818,21 @@ export default function AdminDashboard() {
     setAdminActPage(1);
   }, [adminActivitySearch, adminActivityCategoryFilter]);
 
+  useEffect(() => {
+    setStockPage(1);
+  }, [stockSearchTerm, stockTypeFilter, stockBatchFilter, stockPriceFilter, stockDateFilter, stockSortBy]);
+
+  // Available Stock Batches
+  const availableStockBatches = useMemo(() => {
+    const set = new Set();
+    devices.forEach(d => {
+      if ((!d.merchant_id || String(d.status).toUpperCase() === 'IN_STOCK') && d.batch_no && String(d.batch_no).trim()) {
+        set.add(String(d.batch_no).trim());
+      }
+    });
+    return Array.from(set).sort();
+  }, [devices]);
+
   // Available Provinces for Stores Filter
   // Available Provinces for Stores Filter
   const availableProvinces = useMemo(() => {
@@ -1024,7 +1041,7 @@ export default function AdminDashboard() {
 
   // Warehouse Stock Devices Filtering Logic
   const filteredStockDevices = useMemo(() => {
-    return devices.filter(d => {
+    const list = devices.filter(d => {
       // Must be IN_STOCK and unassigned (not PENDING and not assigned)
       if (d.merchant_id || String(d.status).toUpperCase() !== 'IN_STOCK') return false;
 
@@ -1033,18 +1050,74 @@ export default function AdminDashboard() {
         const sn = String(d.device_sn || d.device_id || '').toLowerCase();
         const dtype = String(d.device_type || '').toLowerCase();
         const notes = String(d.notes || '').toLowerCase();
-        if (!sn.includes(q) && !dtype.includes(q) && !notes.includes(q)) {
+        const batch = String(d.batch_no || '').toLowerCase();
+        if (!sn.includes(q) && !dtype.includes(q) && !notes.includes(q) && !batch.includes(q)) {
           return false;
         }
       }
 
-      if (stockTypeFilter !== 'ALL' && String(d.device_type || 'Display Soundbox').toLowerCase() !== stockTypeFilter.toLowerCase()) {
-        return false;
+      if (stockTypeFilter !== 'ALL') {
+        const targetType = stockTypeFilter.toLowerCase();
+        const dType = String(d.device_type || '').toLowerCase();
+        if (!dType.includes(targetType.includes('display') ? 'display' : 'standard')) {
+          return false;
+        }
+      }
+
+      if (stockBatchFilter !== 'ALL') {
+        if (String(d.batch_no || '').trim() !== stockBatchFilter.trim()) {
+          return false;
+        }
+      }
+
+      if (stockPriceFilter !== 'ALL') {
+        if (Math.round(Number(d.price || 29)) !== Math.round(Number(stockPriceFilter))) {
+          return false;
+        }
+      }
+
+      if (stockDateFilter.trim()) {
+        const dateStr = String(d.created_at || '');
+        if (!dateStr.includes(stockDateFilter.trim())) {
+          return false;
+        }
       }
 
       return true;
     });
-  }, [devices, stockSearchTerm, stockTypeFilter]);
+
+    // Sorting Logic
+    return list.sort((a, b) => {
+      if (stockSortBy === 'OLDEST') {
+        return (new Date(a.created_at || 0) - new Date(b.created_at || 0)) || (a.id - b.id);
+      }
+      if (stockSortBy === 'SN_ASC') {
+        return String(a.device_sn || a.device_id || '').localeCompare(String(b.device_sn || b.device_id || ''));
+      }
+      if (stockSortBy === 'SN_DESC') {
+        return String(b.device_sn || b.device_id || '').localeCompare(String(a.device_sn || a.device_id || ''));
+      }
+      if (stockSortBy === 'PRICE_DESC') {
+        return (Number(b.price || 0) - Number(a.price || 0)) || (b.id - a.id);
+      }
+      if (stockSortBy === 'PRICE_ASC') {
+        return (Number(a.price || 0) - Number(b.price || 0)) || (a.id - b.id);
+      }
+      // Default: NEWEST
+      return (new Date(b.created_at || 0) - new Date(a.created_at || 0)) || (b.id - a.id);
+    });
+  }, [devices, stockSearchTerm, stockTypeFilter, stockBatchFilter, stockPriceFilter, stockDateFilter, stockSortBy]);
+
+  // Reset Stock Filters
+  const handleResetStockFilters = () => {
+    setStockSearchTerm('');
+    setStockTypeFilter('ALL');
+    setStockBatchFilter('ALL');
+    setStockPriceFilter('ALL');
+    setStockDateFilter('');
+    setStockSortBy('NEWEST');
+    setStockPage(1);
+  };
 
   // Stock Export CSV
   const handleExportStockCSV = () => {
@@ -3263,10 +3336,12 @@ export default function AdminDashboard() {
           </div>
 
           {/* 1. Warehouse Stock Search & Filter Toolbar */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-3.5">
+            
+            {/* Filter Grid Row 1: Search, Device Type, Batch / Lot No */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3">
               
-              {/* Search by SN / Notes */}
+              {/* 1. Search by SN / Notes / Location */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('searchStock', 'Search Stock')}
@@ -3276,21 +3351,21 @@ export default function AdminDashboard() {
                   <input
                     type="text"
                     value={stockSearchTerm}
-                    onChange={(e) => { setStockSearchTerm(e.target.value); setStockPage(1); }}
+                    onChange={(e) => setStockSearchTerm(e.target.value)}
                     placeholder={t('searchStockPlaceholder', 'Search Serial Number, Location, or Notes...')}
                     className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
                   />
                 </div>
               </div>
 
-              {/* Device Type Filter */}
+              {/* 2. Device Type Filter */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('deviceType', 'Device Type')}
                 </label>
                 <select
                   value={stockTypeFilter}
-                  onChange={(e) => { setStockTypeFilter(e.target.value); setStockPage(1); }}
+                  onChange={(e) => setStockTypeFilter(e.target.value)}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
                 >
                   <option value="ALL">{t('allDeviceTypes', 'All Device Types')}</option>
@@ -3299,11 +3374,92 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
+              {/* 3. Batch / Lot Number Filter */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('batchNo', 'Batch / Lot No')}
+                </label>
+                <select
+                  value={stockBatchFilter}
+                  onChange={(e) => setStockBatchFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
+                >
+                  <option value="ALL">{t('allBatches', 'All Shipment Batches')}</option>
+                  {availableStockBatches.map(b => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+              </div>
+
             </div>
 
-            {/* Toolbar Buttons */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
-              <div className="flex flex-wrap items-center gap-2">
+            {/* Filter Grid Row 2: Price Tier, Intake Date, Sort By */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 pt-1">
+
+              {/* 4. Price Tier */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('priceTier', 'Price Tier')}
+                </label>
+                <select
+                  value={stockPriceFilter}
+                  onChange={(e) => setStockPriceFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
+                >
+                  <option value="ALL">{t('allPrices', 'All Price Tiers')}</option>
+                  <option value="29">🏷️ $29.00 (Standard Audio)</option>
+                  <option value="39">🖥️ $39.00 (Display Screen)</option>
+                </select>
+              </div>
+
+              {/* 5. Intake / Registration Date */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('intakeDate', 'Intake Date')}
+                </label>
+                <input
+                  type="date"
+                  value={stockDateFilter}
+                  onChange={(e) => setStockDateFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
+                />
+              </div>
+
+              {/* 6. Sort By Selector */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('sortBy', 'Sort By')}
+                </label>
+                <select
+                  value={stockSortBy}
+                  onChange={(e) => setStockSortBy(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer font-medium"
+                >
+                  <option value="NEWEST">✨ {t('sortNewest', 'Newest Intake')}</option>
+                  <option value="OLDEST">⏳ {t('sortOldest', 'Oldest Intake')}</option>
+                  <option value="SN_ASC">🔤 {t('sortSnAsc', 'Serial Number (A → Z)')}</option>
+                  <option value="SN_DESC">🔤 {t('sortSnDesc', 'Serial Number (Z → A)')}</option>
+                  <option value="PRICE_DESC">💰 {t('sortPriceDesc', 'Price (Highest First)')}</option>
+                  <option value="PRICE_ASC">💵 {t('sortPriceAsc', 'Price (Lowest First)')}</option>
+                </select>
+              </div>
+
+            </div>
+
+            {/* Bottom Row: Results Counter & Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                <span>
+                  Showing <strong className="text-slate-900 dark:text-white font-mono">{filteredStockDevices.length}</strong> of <strong className="text-slate-900 dark:text-white font-mono">{devices.filter(d => !d.merchant_id || String(d.status).toUpperCase() === 'IN_STOCK').length}</strong> available stock units
+                </span>
+                {filteredStockDevices.length < devices.filter(d => !d.merchant_id || String(d.status).toUpperCase() === 'IN_STOCK').length && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                    Filtered
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
                 <button
                   type="button"
                   onClick={() => setIsStockModalOpen(true)}
@@ -3312,21 +3468,18 @@ export default function AdminDashboard() {
                   <PackagePlus className="w-4 h-4" />
                   <span>{t('addStockDevice', '+ Add Stock Device')}</span>
                 </button>
-              </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStockSearchTerm('');
-                    setStockTypeFilter('ALL');
-                    setStockPage(1);
-                  }}
-                  className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
-                >
-                  <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{t('reset', 'Reset')}</span>
-                </button>
+                {(stockSearchTerm || stockTypeFilter !== 'ALL' || stockBatchFilter !== 'ALL' || stockPriceFilter !== 'ALL' || stockDateFilter || stockSortBy !== 'NEWEST') && (
+                  <button
+                    type="button"
+                    onClick={handleResetStockFilters}
+                    className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                    title="Reset Filters"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{t('reset', 'Reset')}</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
