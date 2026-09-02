@@ -1145,12 +1145,11 @@ export default function UserDashboard() {
                             )}
                           </button>
                         </th>
-                        <th className="py-3 px-4">Branch Name</th>
-                        <th className="py-3 px-4">Location / Address</th>
-                        <th className="py-3 px-4">Owner Phone</th>
-                        <th className="py-3 px-4">Connected Devices</th>
-                        <th className="py-3 px-4">Status</th>
-                        <th className="py-3 px-4 text-right rounded-r-xl">Actions</th>
+                        <th className="py-3 px-4">{isKhmer ? 'ឈ្មោះសាខា' : 'Branch Name'}</th>
+                        <th className="py-3 px-4">{isKhmer ? 'ទីតាំង / អាសយដ្ឋាន' : 'Location / Address'}</th>
+                        <th className="py-3 px-4">{isKhmer ? 'ឧបករណ៍ភ្ជាប់' : 'Connected Devices'}</th>
+                        <th className="py-3 px-4">{isKhmer ? 'ស្ថានភាព' : 'Status'}</th>
+                        <th className="py-3 px-4 text-right rounded-r-xl">{isKhmer ? 'សកម្មភាព' : 'Actions'}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
@@ -1200,9 +1199,6 @@ export default function UserDashboard() {
                               </div>
                             </td>
 
-                            <td className="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-400">
-                              {s.owner_phone || user?.phone_number || '-'}
-                            </td>
 
                             <td className="py-3.5 px-4">
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
