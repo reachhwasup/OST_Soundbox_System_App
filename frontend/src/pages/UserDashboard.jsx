@@ -1611,7 +1611,9 @@ export default function UserDashboard() {
                                       <button
                                         type="button"
                                         onClick={() => {
-                                          setNewDeviceStoreId(r.storeId);
+                                          setTargetStoreIdForNewDevice(r.storeId);
+                                          setDeviceSn('');
+                                          setTelegramChatId('');
                                           setIsDeviceModalOpen(true);
                                         }}
                                         className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
@@ -2723,7 +2725,9 @@ export default function UserDashboard() {
                     type="button"
                     onClick={() => {
                       setIsDetailModalOpen(false);
-                      setNewDeviceStoreId(r.storeId);
+                      setTargetStoreIdForNewDevice(r.storeId);
+                      setDeviceSn('');
+                      setTelegramChatId('');
                       setIsDeviceModalOpen(true);
                     }}
                     className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition inline-flex items-center gap-1.5 cursor-pointer"
