@@ -1047,81 +1047,8 @@ export default function UserDashboard() {
 
                 {/* Store Search & Filter Toolbar */}
                 <div className="bg-slate-50/70 dark:bg-slate-800/50 rounded-2xl border border-slate-200/70 dark:border-slate-800 p-3.5 sm:p-4 space-y-3">
-                  
-                  {/* Quick Presets Bar */}
-                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mr-1 shrink-0 flex items-center gap-1">
-                      <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>{isKhmer ? 'ជម្រើសរហ័ស' : 'Presets'}:</span>
-                    </span>
-
-                    {/* All Branches */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStoreSpeakerFilter('ALL');
-                        setStoreProvinceFilter('ALL');
-                      }}
-                      className={`px-3 py-1 rounded-xl font-bold transition shrink-0 cursor-pointer text-xs ${
-                        storeSpeakerFilter === 'ALL' && storeProvinceFilter === 'ALL'
-                          ? 'bg-emerald-600 text-white shadow-2xs'
-                          : 'bg-white hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700/80'
-                      }`}
-                    >
-                      {isKhmer ? 'សាខាទាំងអស់' : 'All Branches'} ({stores.length})
-                    </button>
-
-                    {/* With Speakers */}
-                    <button
-                      type="button"
-                      onClick={() => setStoreSpeakerFilter('WITH_DEVICE')}
-                      className={`px-3 py-1 rounded-xl font-bold transition shrink-0 cursor-pointer text-xs flex items-center gap-1 ${
-                        storeSpeakerFilter === 'WITH_DEVICE'
-                          ? 'bg-blue-600 text-white shadow-2xs'
-                          : 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60'
-                      }`}
-                    >
-                      <span>📱 {isKhmer ? 'មាន Soundbox (≥1)' : 'With Soundbox (≥1)'}</span>
-                      <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">
-                        {stores.filter(s => (s.devices?.length || 0) > 0).length}
-                      </span>
-                    </button>
-
-                    {/* Unlinked / No Speaker */}
-                    <button
-                      type="button"
-                      onClick={() => setStoreSpeakerFilter('NO_DEVICE')}
-                      className={`px-3 py-1 rounded-xl font-bold transition shrink-0 cursor-pointer text-xs flex items-center gap-1 ${
-                        storeSpeakerFilter === 'NO_DEVICE'
-                          ? 'bg-amber-600 text-white shadow-2xs'
-                          : 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60'
-                      }`}
-                    >
-                      <span>⚠️ {isKhmer ? 'គ្មាន Soundbox' : 'Unlinked (0)'}</span>
-                      <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">
-                        {stores.filter(s => (s.devices?.length || 0) === 0).length}
-                      </span>
-                    </button>
-
-                    {/* Multiple Speakers */}
-                    <button
-                      type="button"
-                      onClick={() => setStoreSpeakerFilter('MULTI_DEVICE')}
-                      className={`px-3 py-1 rounded-xl font-bold transition shrink-0 cursor-pointer text-xs flex items-center gap-1 ${
-                        storeSpeakerFilter === 'MULTI_DEVICE'
-                          ? 'bg-indigo-600 text-white shadow-2xs'
-                          : 'bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60'
-                      }`}
-                    >
-                      <span>⚡ {isKhmer ? 'ឧបករណ៍ច្រើន (≥2)' : 'Multi-Device (≥2)'}</span>
-                      <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">
-                        {stores.filter(s => (s.devices?.length || 0) >= 2).length}
-                      </span>
-                    </button>
-                  </div>
-
                   {/* Filter Inputs Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                     
                     {/* Search */}
                     <div>
