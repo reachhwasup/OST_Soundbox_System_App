@@ -140,11 +140,9 @@ export default function AdminDashboard() {
   const [storeProvinceFilter, setStoreProvinceFilter] = useState('');
   const [storeDistrictFilter, setStoreDistrictFilter] = useState('');
   const [storeCommuneFilter, setStoreCommuneFilter] = useState('');
-  const [storeSoundboxFilter, setStoreSoundboxFilter] = useState(''); // '' | 'WITH_DEVICE' | 'MULTI_DEVICE' | 'NO_DEVICE'
-  const [storeOnlineFilter, setStoreOnlineFilter] = useState('ALL'); // 'ALL' | 'ONLINE' | 'OFFLINE' | 'NO_DEVICE'
   const [storeOwnerFilter, setStoreOwnerFilter] = useState('ALL');
   const [storeDateFilter, setStoreDateFilter] = useState('');
-  const [storeSortBy, setStoreSortBy] = useState('NEWEST'); // 'NEWEST' | 'OLDEST' | 'NAME_ASC' | 'NAME_DESC' | 'DEVICES_DESC' | 'DEVICES_ASC'
+  const [storeSortBy, setStoreSortBy] = useState('NEWEST'); // 'NEWEST' | 'OLDEST' | 'NAME_ASC' | 'NAME_DESC'
 
   // Cloud Speaker Device Manager Filter States
   const [devFilterId, setDevFilterId] = useState('');
@@ -808,7 +806,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     setStorePage(1);
-  }, [storeSearch, storeProvinceFilter, storeDistrictFilter, storeCommuneFilter, storeOwnerFilter, storeSoundboxFilter, storeOnlineFilter, storeDateFilter, storeSortBy]);
+  }, [storeSearch, storeProvinceFilter, storeDistrictFilter, storeCommuneFilter, storeOwnerFilter, storeDateFilter, storeSortBy]);
 
   useEffect(() => {
     setUserActPage(1);
@@ -914,33 +912,6 @@ export default function AdminDashboard() {
         if (o !== storeOwnerFilter) return false;
       }
 
-      if (storeSoundboxFilter === 'WITH_DEVICE') {
-        if (!s.device_count || s.device_count <= 0) return false;
-      } else if (storeSoundboxFilter === 'MULTI_DEVICE') {
-        if (!s.device_count || s.device_count < 2) return false;
-      } else if (storeSoundboxFilter === 'NO_DEVICE') {
-        if (s.device_count && s.device_count > 0) return false;
-      }
-
-      // Online Connection Status Filter
-      if (storeOnlineFilter !== 'ALL') {
-        const storeDevs = (s.devices && s.devices.length > 0)
-          ? s.devices
-          : devices.filter(dev => Number(dev.merchant_id) === Number(s.id));
-        
-        const hasOnlineDev = storeDevs.some(dev => 
-          String(dev.status || '').toUpperCase() === 'ACTIVE' || String(dev.status || '').toLowerCase() === 'online'
-        );
-
-        if (storeOnlineFilter === 'ONLINE') {
-          if (!hasOnlineDev) return false;
-        } else if (storeOnlineFilter === 'OFFLINE') {
-          if (storeDevs.length === 0 || hasOnlineDev) return false;
-        } else if (storeOnlineFilter === 'NO_DEVICE') {
-          if (storeDevs.length > 0) return false;
-        }
-      }
-
       if (storeDateFilter.trim()) {
         const dateStr = String(s.created_at || '');
         if (!dateStr.includes(storeDateFilter.trim())) return false;
@@ -960,16 +931,10 @@ export default function AdminDashboard() {
       if (storeSortBy === 'NAME_DESC') {
         return (b.name || '').localeCompare(a.name || '');
       }
-      if (storeSortBy === 'DEVICES_DESC') {
-        return ((b.device_count || 0) - (a.device_count || 0)) || (b.id - a.id);
-      }
-      if (storeSortBy === 'DEVICES_ASC') {
-        return ((a.device_count || 0) - (b.device_count || 0)) || (a.id - b.id);
-      }
       // Default: NEWEST
       return (new Date(b.created_at || 0) - new Date(a.created_at || 0)) || (b.id - a.id);
     });
-  }, [stores, devices, storeSearch, storeProvinceFilter, storeDistrictFilter, storeCommuneFilter, storeOwnerFilter, storeSoundboxFilter, storeOnlineFilter, storeDateFilter, storeSortBy]);
+  }, [stores, storeSearch, storeProvinceFilter, storeDistrictFilter, storeCommuneFilter, storeOwnerFilter, storeDateFilter, storeSortBy]);
 
   // Reset Store Filters
   const handleResetStoreFilters = () => {
@@ -977,8 +942,6 @@ export default function AdminDashboard() {
     setStoreProvinceFilter('');
     setStoreDistrictFilter('');
     setStoreCommuneFilter('');
-    setStoreSoundboxFilter('');
-    setStoreOnlineFilter('ALL');
     setStoreOwnerFilter('ALL');
     setStoreDateFilter('');
     setStoreSortBy('NEWEST');
@@ -2332,8 +2295,8 @@ export default function AdminDashboard() {
 
           {/* Stores Search & Filter Toolbar */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-3.5">
-            {/* Filter Grid Row 1: Search, Province, District, Commune, Owner */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            {/* Filter Grid Row 1: Search, Province, District, Commune */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-3">
               
               {/* 1. Store Search Input */}
               <div>
@@ -2412,6 +2375,11 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
+            </div>
+
+            {/* Filter Grid Row 2: Merchant Owner, Registration Date, Sort By */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 gap-3 pt-1">
+
               {/* 5. Merchant / Owner */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
@@ -2429,46 +2397,7 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-            </div>
-
-            {/* Filter Grid Row 2: Hardware Status, Online Status, Date, Sort By */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-3 pt-1">
-
-              {/* 6. Soundbox Hardware Quantity */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('soundboxHardware', 'Soundbox Hardware')}
-                </label>
-                <select
-                  value={storeSoundboxFilter}
-                  onChange={(e) => setStoreSoundboxFilter(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
-                >
-                  <option value="">{t('allSoundboxes', 'All Soundbox Statuses')}</option>
-                  <option value="WITH_DEVICE">{t('withSoundbox', '📱 With Soundbox (Assigned ≥1)')}</option>
-                  <option value="MULTI_DEVICE">{t('multipleSoundboxes', '⚡ Multiple Soundboxes (≥2)')}</option>
-                  <option value="NO_DEVICE">{t('noSoundbox', '⚠️ No Soundbox (Unlinked 0)')}</option>
-                </select>
-              </div>
-
-              {/* 7. Online Connection Status */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('onlineConnectionStatus', 'Connection Status')}
-                </label>
-                <select
-                  value={storeOnlineFilter}
-                  onChange={(e) => setStoreOnlineFilter(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
-                >
-                  <option value="ALL">{t('allOnlineStatuses', 'All Connection Statuses')}</option>
-                  <option value="ONLINE">{t('storeOnlineOption', '🟢 Soundbox Online / Broadcasting')}</option>
-                  <option value="OFFLINE">{t('storeOfflineOption', '⚪ Soundbox Offline / Standby')}</option>
-                  <option value="NO_DEVICE">{t('noSoundbox', '⚠️ No Soundbox Linked')}</option>
-                </select>
-              </div>
-
-              {/* 8. Registration Date */}
+              {/* 6. Registration Date */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('storeRegDate', 'Registration Date')}
@@ -2481,7 +2410,7 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              {/* 9. Sort By Selector */}
+              {/* 7. Sort By Selector */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('sortBy', 'Sort By')}
@@ -2495,8 +2424,6 @@ export default function AdminDashboard() {
                   <option value="OLDEST">⏳ {t('sortOldest', 'Oldest Registered')}</option>
                   <option value="NAME_ASC">🔤 {t('sortNameAsc', 'Store Name (A → Z)')}</option>
                   <option value="NAME_DESC">🔤 {t('sortNameDesc', 'Store Name (Z → A)')}</option>
-                  <option value="DEVICES_DESC">🔊 {t('sortDevicesDesc', 'Most Soundboxes (Highest)')}</option>
-                  <option value="DEVICES_ASC">🔈 {t('sortDevicesAsc', 'Fewest Soundboxes (Lowest)')}</option>
                 </select>
               </div>
 
@@ -2514,7 +2441,7 @@ export default function AdminDashboard() {
               </div>
 
               <div className="flex items-center gap-2 self-end sm:self-auto">
-                {(storeSearch || storeProvinceFilter || storeDistrictFilter || storeCommuneFilter || storeOwnerFilter !== 'ALL' || storeSoundboxFilter || storeOnlineFilter !== 'ALL' || storeDateFilter || storeSortBy !== 'NEWEST') && (
+                {(storeSearch || storeProvinceFilter || storeDistrictFilter || storeCommuneFilter || storeOwnerFilter !== 'ALL' || storeDateFilter || storeSortBy !== 'NEWEST') && (
                   <button
                     type="button"
                     onClick={handleResetStoreFilters}
