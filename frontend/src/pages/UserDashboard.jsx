@@ -1184,13 +1184,13 @@ export default function UserDashboard() {
             <div className="space-y-5 sm:space-y-6">
 
               {/* Combined Store & Soundbox Fleet Table Card */}
-              <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
+              <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-4 sm:p-6 space-y-4">
                 
                 {/* Header with Title and Action Buttons */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
                   <div>
                     <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      <Store className="w-5 h-5 text-emerald-600" />
+                      <Store className="w-5 h-5 text-emerald-600 shrink-0" />
                       <span>{isKhmer ? 'បញ្ជីហាង និងឧបករណ៍ Soundbox' : 'Stores & Soundbox Devices'}</span>
                     </h3>
                     <p className="text-xs text-slate-400 mt-0.5">
@@ -1198,11 +1198,11 @@ export default function UserDashboard() {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
                     <button
                       type="button"
                       onClick={() => setIsColumnsModalOpen(true)}
-                      className="px-3 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                      className="flex-1 sm:flex-none justify-center px-3 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
                       title={isKhmer ? 'កំណត់ជួរឈរតារាង' : 'Customize Table Columns'}
                     >
                       <Columns className="w-3.5 h-3.5 text-slate-400" />
@@ -1215,7 +1215,7 @@ export default function UserDashboard() {
                         resetRegisterForm();
                         setIsRegisterStoreOpen(true);
                       }}
-                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap shadow-xs cursor-pointer"
+                      className="flex-1 sm:flex-none justify-center px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap shadow-xs cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>{isKhmer ? 'បន្ថែមសាខា' : 'Add Branch'}</span>
@@ -1224,7 +1224,7 @@ export default function UserDashboard() {
                     <button
                       type="button"
                       onClick={() => fetchStoresData(true)}
-                      className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition cursor-pointer"
+                      className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition cursor-pointer shrink-0"
                       title={isKhmer ? 'ផ្ទុកទិន្នន័យឡើងវិញ' : 'Refresh'}
                     >
                       <RefreshCw className="w-4 h-4" />
@@ -1233,16 +1233,16 @@ export default function UserDashboard() {
                 </div>
 
                 {/* Multi-Filter Toolbar Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
                   {/* Search Input */}
-                  <div className="relative lg:col-span-2">
+                  <div className="relative col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-2">
                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="text"
                       value={unifiedSearch}
                       onChange={(e) => setUnifiedSearch(e.target.value)}
                       placeholder={isKhmer ? "ស្វែងរកហាង, អាសយដ្ឋាន, SN ឧបករណ៍..." : "Search store, address, SN, Telegram..."}
-                      className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
 
@@ -1250,7 +1250,7 @@ export default function UserDashboard() {
                   <select
                     value={unifiedStoreFilter}
                     onChange={(e) => setUnifiedStoreFilter(e.target.value)}
-                    className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                   >
                     <option value="ALL">{isKhmer ? 'សាខាហាងទាំងអស់' : 'All Branches'}</option>
                     {stores.map(s => (
@@ -1262,7 +1262,7 @@ export default function UserDashboard() {
                   <select
                     value={unifiedStatusFilter}
                     onChange={(e) => setUnifiedStatusFilter(e.target.value)}
-                    className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                   >
                     <option value="ALL">{isKhmer ? 'ស្ថានភាពទាំងអស់' : 'All Statuses'}</option>
                     <option value="ACTIVE">{isKhmer ? '🟢 សកម្ម' : '🟢 Active'}</option>
@@ -1274,7 +1274,7 @@ export default function UserDashboard() {
                   <select
                     value={unifiedProvinceFilter}
                     onChange={(e) => setUnifiedProvinceFilter(e.target.value)}
-                    className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                   >
                     <option value="ALL">{isKhmer ? 'ខេត្ត/រាជធានីទាំងអស់' : 'All Provinces'}</option>
                     {availableStoreProvinces.map(p => (
@@ -1303,8 +1303,20 @@ export default function UserDashboard() {
 
                 {/* The Single Unified Table */}
                 {filteredUnifiedRows.length > 0 ? (
-                  <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800">
-                    <table className="w-full text-left text-sm min-w-[950px]">
+                  <div className="overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
+                    {/* Tablet & Mobile Horizontal Scroll Helper */}
+                    <div className="xl:hidden flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 bg-slate-50/90 dark:bg-slate-800/70 px-3.5 py-1.5 border-b border-slate-200 dark:border-slate-800">
+                      <span className="flex items-center gap-1.5 font-medium">
+                        <span className="animate-pulse">↔️</span>
+                        <span>{isKhmer ? 'អូសទៅឆ្វេង/ស្តាំដើម្បីមើលតារាងពេញលេញ' : 'Swipe horizontally to view all fields'}</span>
+                      </span>
+                      <span className="font-mono text-[10px] text-slate-400">
+                        {filteredUnifiedRows.length} {isKhmer ? 'សាខា' : 'branches'}
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm min-w-[1080px]">
                       <thead>
                         <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-500 uppercase tracking-wider">
                           <th className="py-3 px-3.5 w-10 text-center">
@@ -1616,6 +1628,7 @@ export default function UserDashboard() {
                         })}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 ) : (
                   <div className="text-center py-14 px-4 space-y-3">
@@ -2621,7 +2634,7 @@ export default function UserDashboard() {
                       <span>{isKhmer ? 'លក្ខណៈបច្ចេកទេសឧបករណ៍ (Hardware Specs)' : 'Hardware Specifications'}</span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       {/* Hardware Model */}
                       <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
                         <span className="text-[10px] text-slate-400 font-semibold block">{isKhmer ? 'ម៉ូឌែលឧបករណ៍' : 'Hardware Model'}</span>
@@ -2679,7 +2692,7 @@ export default function UserDashboard() {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
                         <span className="text-[10px] text-slate-400 font-semibold block">{isKhmer ? 'ថ្ងៃចាប់ផ្តើមការធានា' : 'Warranty Start Date'}</span>
                         <span className="font-mono font-semibold text-slate-900 dark:text-white text-xs mt-0.5 block">{dev?.warranty_start_date ? new Date(dev.warranty_start_date).toLocaleDateString() : dev?.created_at ? new Date(dev.created_at).toLocaleDateString() : '—'}</span>
