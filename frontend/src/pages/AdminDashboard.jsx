@@ -162,18 +162,37 @@ export default function AdminDashboard() {
   const [userActSelectedIds, setUserActSelectedIds] = useState([]);
   const [adminActSelectedIds, setAdminActSelectedIds] = useState([]);
 
-  // Cloud Speaker Device Table Pagination & Selection States
+  // Table Pagination & Selection States for Admin
   const [devSelectedIds, setDevSelectedIds] = useState([]);
   const [devPage, setDevPage] = useState(1);
   const [devPageSize, setDevPageSize] = useState(10);
   const [devGoToPage, setDevGoToPage] = useState('');
 
-  // Dedicated Stock & Inventory Filter & Pagination States
+  // User Accounts Pagination
+  const [userPage, setUserPage] = useState(1);
+  const [userPageSize, setUserPageSize] = useState(10);
+  const [userGoToPage, setUserGoToPage] = useState('');
+
+  // Store & Branch Pagination
+  const [storePage, setStorePage] = useState(1);
+  const [storePageSize, setStorePageSize] = useState(10);
+  const [storeGoToPage, setStoreGoToPage] = useState('');
+
+  // Stock & Inventory Filter & Pagination States
   const [stockSearchTerm, setStockSearchTerm] = useState('');
   const [stockModelFilter, setStockModelFilter] = useState('ALL');
   const [stockBatchFilter, setStockBatchFilter] = useState('ALL');
   const [stockPage, setStockPage] = useState(1);
   const [stockPageSize, setStockPageSize] = useState(10);
+  const [stockGoToPage, setStockGoToPage] = useState('');
+
+  // User Activity & Admin Activity Logs Pagination
+  const [userActPage, setUserActPage] = useState(1);
+  const [userActPageSize, setUserActPageSize] = useState(10);
+  const [userActGoToPage, setUserActGoToPage] = useState('');
+  const [adminActPage, setAdminActPage] = useState(1);
+  const [adminActPageSize, setAdminActPageSize] = useState(10);
+  const [adminActGoToPage, setAdminActGoToPage] = useState('');
 
   // Cloud Speaker Device Modals State
   const [isDeviceCommandOpen, setIsDeviceCommandOpen] = useState(false);
@@ -783,6 +802,23 @@ export default function AdminDashboard() {
     });
   }, [users, searchTerm, roleFilter, statusFilter]);
 
+  // Reset page numerations when search or filter states change
+  useEffect(() => {
+    setUserPage(1);
+  }, [searchTerm, roleFilter, statusFilter]);
+
+  useEffect(() => {
+    setStorePage(1);
+  }, [storeSearchTerm, storeProvinceFilter, storeDistrictFilter, storeCommuneFilter, storeOwnerFilter, storeSoundboxFilter, storeOnlineFilter, storeDeviceTypeFilter, storeDateFilter, storeSortBy]);
+
+  useEffect(() => {
+    setUserActPage(1);
+  }, [userActivitySearch, userActivityCategoryFilter]);
+
+  useEffect(() => {
+    setAdminActPage(1);
+  }, [adminActivitySearch, adminActivityCategoryFilter]);
+
   // Available Provinces for Stores Filter
   // Available Provinces for Stores Filter
   const availableProvinces = useMemo(() => {
@@ -1244,6 +1280,20 @@ export default function AdminDashboard() {
     return list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }, [devices, logs, users]);
 
+  // Paginated Users Logic
+  const totalUserPages = Math.max(1, Math.ceil(filteredUsers.length / userPageSize));
+  const paginatedUsers = useMemo(() => {
+    const start = (userPage - 1) * userPageSize;
+    return filteredUsers.slice(start, start + userPageSize);
+  }, [filteredUsers, userPage, userPageSize]);
+
+  // Paginated Stores Logic
+  const totalStorePages = Math.max(1, Math.ceil(filteredStores.length / storePageSize));
+  const paginatedStores = useMemo(() => {
+    const start = (storePage - 1) * storePageSize;
+    return filteredStores.slice(start, start + storePageSize);
+  }, [filteredStores, storePage, storePageSize]);
+
   // Paginated Device Items (Deployed)
   const totalDevPages = Math.max(1, Math.ceil(filteredDevices.length / devPageSize));
   const paginatedDevices = useMemo(() => {
@@ -1257,6 +1307,152 @@ export default function AdminDashboard() {
     const start = (stockPage - 1) * stockPageSize;
     return filteredStockDevices.slice(start, start + stockPageSize);
   }, [filteredStockDevices, stockPage, stockPageSize]);
+
+  // Reusable Page Numeration Component for Admin Tables
+  const renderPaginationNumeration = ({
+    currentPage,
+    totalPages,
+    totalItems,
+    pageSize,
+    onPageChange,
+    onPageSizeChange,
+    goToPageVal,
+    setGoToPageVal
+  }) => {
+    if (totalItems === 0) return null;
+
+    const startItem = (currentPage - 1) * pageSize + 1;
+    const endItem = Math.min(totalItems, currentPage * pageSize);
+
+    // Dynamic page numbers calculation with ellipsis
+    const pages = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage <= 4) {
+        for (let i = 1; i <= 5; i++) pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 3) {
+        pages.push(1);
+        pages.push('...');
+        for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('...');
+        pages.push(currentPage - 1);
+        pages.push(currentPage);
+        pages.push(currentPage + 1);
+        pages.push('...');
+        pages.push(totalPages);
+      }
+    }
+
+    return (
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3.5 bg-slate-50/75 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 select-none">
+        <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+          <span>{isKhmer ? 'បង្ហាញ' : 'Showing'}</span>
+          <strong className="text-slate-900 dark:text-white font-bold">{startItem}-{endItem}</strong>
+          <span>{isKhmer ? 'នៃសរុប' : 'of'}</span>
+          <strong className="text-slate-900 dark:text-white font-bold">{totalItems}</strong>
+          <span>{isKhmer ? 'ជួរ' : 'records'}</span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+          {/* Rows per page */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-400 text-[11px] hidden sm:inline">{isKhmer ? 'ជួរក្នុងមួយទំព័រ' : 'Rows'}:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                onPageSizeChange(Number(e.target.value));
+                onPageChange(1);
+              }}
+              className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+            >
+              <option value={10}>10 / page</option>
+              <option value={20}>20 / page</option>
+              <option value={50}>50 / page</option>
+              <option value={100}>100 / page</option>
+            </select>
+          </div>
+
+          {/* Page Numeration Buttons */}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              disabled={currentPage <= 1}
+              onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+              className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700/60 transition cursor-pointer flex items-center gap-0.5"
+              title={isKhmer ? 'ទំព័រមុន' : 'Previous Page'}
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              <span className="hidden md:inline text-[11px] font-medium">{isKhmer ? 'មុន' : 'Prev'}</span>
+            </button>
+
+            {pages.map((p, idx) => {
+              if (p === '...') {
+                return (
+                  <span key={`ellipsis-${idx}`} className="px-1 text-slate-400 font-bold">
+                    …
+                  </span>
+                );
+              }
+              const isActive = p === currentPage;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => onPageChange(p)}
+                  className={`min-w-[28px] h-7 px-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center justify-center ${
+                    isActive
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60'
+                  }`}
+                >
+                  {p}
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              disabled={currentPage >= totalPages}
+              onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+              className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700/60 transition cursor-pointer flex items-center gap-0.5"
+              title={isKhmer ? 'ទំព័របន្ទាប់' : 'Next Page'}
+            >
+              <span className="hidden md:inline text-[11px] font-medium">{isKhmer ? 'បន្ទាប់' : 'Next'}</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Jump To Page */}
+          {totalPages > 4 && setGoToPageVal && (
+            <div className="hidden lg:flex items-center gap-1.5 pl-1.5 border-l border-slate-200 dark:border-slate-700">
+              <span className="text-slate-400 text-[11px]">{isKhmer ? 'ទៅទំព័រ' : 'Go to'}:</span>
+              <input
+                type="number"
+                min={1}
+                max={totalPages}
+                value={goToPageVal || ''}
+                onChange={(e) => setGoToPageVal(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && goToPageVal) {
+                    const target = Math.max(1, Math.min(totalPages, Number(goToPageVal)));
+                    onPageChange(target);
+                    setGoToPageVal('');
+                  }
+                }}
+                placeholder={String(currentPage)}
+                className="w-12 px-1.5 py-1 text-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   // Handle Bulk Import Stock
   const handleBulkImportStock = async (e) => {
@@ -1421,10 +1617,10 @@ export default function AdminDashboard() {
     setUserSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
   const toggleSelectAllUsers = () => {
-    if (userSelectedIds.length === filteredUsers.length && filteredUsers.length > 0) {
+    if (userSelectedIds.length === paginatedUsers.length && paginatedUsers.length > 0) {
       setUserSelectedIds([]);
     } else {
-      setUserSelectedIds(filteredUsers.map(u => u.id));
+      setUserSelectedIds(paginatedUsers.map(u => u.id));
     }
   };
 
@@ -1432,10 +1628,10 @@ export default function AdminDashboard() {
     setStoreSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
   const toggleSelectAllStores = () => {
-    if (storeSelectedIds.length === filteredStores.length && filteredStores.length > 0) {
+    if (storeSelectedIds.length === paginatedStores.length && paginatedStores.length > 0) {
       setStoreSelectedIds([]);
     } else {
-      setStoreSelectedIds(filteredStores.map(s => s.id));
+      setStoreSelectedIds(paginatedStores.map(s => s.id));
     }
   };
 
@@ -1767,8 +1963,8 @@ export default function AdminDashboard() {
           
           {/* Mobile User Cards (< md) */}
           <div className="md:hidden space-y-3">
-            {filteredUsers.length > 0 ? (
-              filteredUsers.map((u) => (
+            {paginatedUsers.length > 0 ? (
+              paginatedUsers.map((u) => (
                 <div key={u.id} className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200 dark:border-slate-800 p-4 space-y-3">
                   
                   {/* Phone and Name */}
@@ -1888,9 +2084,23 @@ export default function AdminDashboard() {
             )}
           </div>
 
+          {/* Mobile User Pagination */}
+          <div className="md:hidden">
+            {renderPaginationNumeration({
+              currentPage: userPage,
+              totalPages: totalUserPages,
+              totalItems: filteredUsers.length,
+              pageSize: userPageSize,
+              onPageChange: setUserPage,
+              onPageSizeChange: setUserPageSize,
+              goToPageVal: userGoToPage,
+              setGoToPageVal: setUserGoToPage
+            })}
+          </div>
+
           {/* Desktop User Table (>= md) */}
-          <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-6">
-            <div className="overflow-x-auto">
+          <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="overflow-x-auto p-6 pb-0">
               <table className="w-full text-left text-sm min-w-[680px]">
                 <thead>
 
@@ -1901,7 +2111,7 @@ export default function AdminDashboard() {
                         onClick={toggleSelectAllUsers}
                         className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
                       >
-                        {userSelectedIds.length === filteredUsers.length && filteredUsers.length > 0 ? (
+                        {userSelectedIds.length === paginatedUsers.length && paginatedUsers.length > 0 ? (
                           <CheckSquare className="w-4 h-4 text-emerald-600" />
                         ) : (
                           <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
@@ -1918,8 +2128,8 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {filteredUsers.length > 0 ? (
-                    filteredUsers.map((u) => (
+                  {paginatedUsers.length > 0 ? (
+                    paginatedUsers.map((u) => (
                       <tr 
                         key={u.id} 
                         className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition ${
@@ -2068,6 +2278,18 @@ export default function AdminDashboard() {
               </tbody>
             </table>
           </div>
+
+          {/* Desktop Users Pagination */}
+          {renderPaginationNumeration({
+            currentPage: userPage,
+            totalPages: totalUserPages,
+            totalItems: filteredUsers.length,
+            pageSize: userPageSize,
+            onPageChange: setUserPage,
+            onPageSizeChange: setUserPageSize,
+            goToPageVal: userGoToPage,
+            setGoToPageVal: setUserGoToPage
+          })}
         </div>
       </div>
       )}
@@ -2358,8 +2580,8 @@ export default function AdminDashboard() {
           
           {/* Mobile Store Cards (< md) */}
           <div className="md:hidden space-y-3">
-            {filteredStores.length > 0 ? (
-              filteredStores.map((s) => (
+            {paginatedStores.length > 0 ? (
+              paginatedStores.map((s) => (
                 <div 
                   key={s.id}
                   onClick={() => {
@@ -2427,15 +2649,27 @@ export default function AdminDashboard() {
             )}
           </div>
 
+          {/* Mobile Store Pagination */}
+          <div className="md:hidden">
+            {renderPaginationNumeration({
+              currentPage: storePage,
+              totalPages: totalStorePages,
+              totalItems: filteredStores.length,
+              pageSize: storePageSize,
+              onPageChange: setStorePage,
+              onPageSizeChange: setStorePageSize,
+              goToPageVal: storeGoToPage,
+              setGoToPageVal: setStoreGoToPage
+            })}
+          </div>
+
           {/* Desktop Store Table (>= md) */}
           <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-6 space-y-4">
             <div className="flex items-center justify-between mb-2">
               <div>
                 <h3 className="text-base font-semibold text-slate-900 dark:text-white">{t('storeManagement', 'Stores & Locations')}</h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  {isKhmer 
-                    ? 'ចុចលើជួរដេក ឬប៊ូតុង ដើម្បីមើលព័ត៌មានលម្អិតទីតាំងរដ្ឋបាល (ខេត្ត, ស្រុក, ឃុំ, ភូមិ)' 
-                    : 'Click on any store to view full administrative location hierarchy'}
+                  {t('storeManagementSubtitle', 'Complete registry of all registered branches, merchant profiles, and deployed soundbox equipment.')}
                 </p>
               </div>
               <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg">
@@ -2454,7 +2688,7 @@ export default function AdminDashboard() {
                         onClick={toggleSelectAllStores}
                         className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
                       >
-                        {storeSelectedIds.length === filteredStores.length && filteredStores.length > 0 ? (
+                        {storeSelectedIds.length === paginatedStores.length && paginatedStores.length > 0 ? (
                           <CheckSquare className="w-4 h-4 text-emerald-600" />
                         ) : (
                           <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
@@ -2469,8 +2703,8 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {filteredStores.length > 0 ? (
-                    filteredStores.map((s) => (
+                  {paginatedStores.length > 0 ? (
+                    paginatedStores.map((s) => (
                       <tr 
                         key={s.id} 
                         onClick={() => {
@@ -2581,6 +2815,18 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+
+            {/* Desktop Store Pagination */}
+            {renderPaginationNumeration({
+              currentPage: storePage,
+              totalPages: totalStorePages,
+              totalItems: filteredStores.length,
+              pageSize: storePageSize,
+              onPageChange: setStorePage,
+              onPageSizeChange: setStorePageSize,
+              goToPageVal: storeGoToPage,
+              setGoToPageVal: setStoreGoToPage
+            })}
           </div>
         </div>
       )}
@@ -3059,70 +3305,16 @@ export default function AdminDashboard() {
             </div>
 
             {/* 4. Bottom Pagination Controls */}
-            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-slate-50/75 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300">
-              <div>
-                Total <span className="font-bold text-slate-900 dark:text-white">{filteredDevices.length}</span>
-              </div>
-
-              <div className="flex items-center gap-3">
-                {/* Page Size */}
-                <select
-                  value={devPageSize}
-                  onChange={(e) => { setDevPageSize(Number(e.target.value)); setDevPage(1); }}
-                  className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-200 focus:outline-none"
-                >
-                  <option value={10}>10 / page</option>
-                  <option value={20}>20 / page</option>
-                  <option value={50}>50 / page</option>
-                </select>
-
-                {/* Page Buttons */}
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    disabled={devPage <= 1}
-                    onClick={() => setDevPage(p => Math.max(1, p - 1))}
-                    className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer"
-                  >
-                    <ChevronLeft className="w-3.5 h-3.5" />
-                  </button>
-
-                  <span className="px-2.5 py-0.5 rounded-lg bg-blue-600 text-white font-bold text-xs">
-                    {devPage}
-                  </span>
-
-                  <button
-                    type="button"
-                    disabled={devPage >= totalDevPages}
-                    onClick={() => setDevPage(p => Math.min(totalDevPages, p + 1))}
-                    className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer"
-                  >
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* Go To Page */}
-                <div className="flex items-center gap-1.5">
-                  <span>Go to</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={totalDevPages}
-                    value={devGoToPage}
-                    onChange={(e) => setDevGoToPage(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && devGoToPage) {
-                        const target = Math.max(1, Math.min(totalDevPages, Number(devGoToPage)));
-                        setDevPage(target);
-                        setDevGoToPage('');
-                      }
-                    }}
-                    placeholder="1"
-                    className="w-12 px-1.5 py-1 text-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono focus:outline-none"
-                  />
-                </div>
-              </div>
-            </div>
+            {renderPaginationNumeration({
+              currentPage: devPage,
+              totalPages: totalDevPages,
+              totalItems: filteredDevices.length,
+              pageSize: devPageSize,
+              onPageChange: setDevPage,
+              onPageSizeChange: setDevPageSize,
+              goToPageVal: devGoToPage,
+              setGoToPageVal: setDevGoToPage
+            })}
 
           </div>
 
@@ -3405,47 +3597,16 @@ export default function AdminDashboard() {
             </div>
 
             {/* Bottom Pagination Controls */}
-            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-slate-50/75 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300">
-              <div>
-                Total In Stock: <span className="font-bold text-slate-900 dark:text-white">{filteredStockDevices.length}</span>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <select
-                  value={stockPageSize}
-                  onChange={(e) => { setStockPageSize(Number(e.target.value)); setStockPage(1); }}
-                  className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-200 focus:outline-none"
-                >
-                  <option value={10}>10 / page</option>
-                  <option value={20}>20 / page</option>
-                  <option value={50}>50 / page</option>
-                </select>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    disabled={stockPage <= 1}
-                    onClick={() => setStockPage(p => Math.max(1, p - 1))}
-                    className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer"
-                  >
-                    <ChevronLeft className="w-3.5 h-3.5" />
-                  </button>
-
-                  <span className="px-2.5 py-0.5 rounded-lg bg-amber-600 text-white font-bold text-xs">
-                    {stockPage}
-                  </span>
-
-                  <button
-                    type="button"
-                    disabled={stockPage >= totalStockPages}
-                    onClick={() => setStockPage(p => Math.min(totalStockPages, p + 1))}
-                    className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer"
-                  >
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
+            {renderPaginationNumeration({
+              currentPage: stockPage,
+              totalPages: totalStockPages,
+              totalItems: filteredStockDevices.length,
+              pageSize: stockPageSize,
+              onPageChange: setStockPage,
+              onPageSizeChange: setStockPageSize,
+              goToPageVal: stockGoToPage,
+              setGoToPageVal: setStockGoToPage
+            })}
 
           </div>
 
@@ -3607,34 +3768,39 @@ export default function AdminDashboard() {
                 );
               }
 
+              const totalUserActPages = Math.max(1, Math.ceil(filteredList.length / userActPageSize));
+              const startUserActIdx = (userActPage - 1) * userActPageSize;
+              const paginatedUserActs = filteredList.slice(startUserActIdx, startUserActIdx + userActPageSize);
+
               return (
-                <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800">
-                  <table className="w-full text-left border-collapse min-w-[850px]">
-                    <thead>
-                      <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                        <th className="py-3 px-3.5 w-10 text-center">
-                          <button
-                            type="button"
-                            onClick={() => toggleSelectAllUserAct(filteredList)}
-                            className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
-                          >
-                            {userActSelectedIds.length === filteredList.length && filteredList.length > 0 ? (
-                              <CheckSquare className="w-4 h-4 text-emerald-600" />
-                            ) : (
-                              <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                            )}
-                          </button>
-                        </th>
-                        <th className="py-3 px-4">User / Merchant</th>
-                        <th className="py-3 px-4">Action / Activity</th>
-                        <th className="py-3 px-4">Target Entity</th>
-                        <th className="py-3 px-4">Source / Platform</th>
-                        <th className="py-3 px-4">Status</th>
-                        <th className="py-3 px-4">Timestamp</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-                      {filteredList.map((act) => (
+                <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[850px]">
+                      <thead>
+                        <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                          <th className="py-3 px-3.5 w-10 text-center">
+                            <button
+                              type="button"
+                              onClick={() => toggleSelectAllUserAct(paginatedUserActs)}
+                              className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                            >
+                              {userActSelectedIds.length === paginatedUserActs.length && paginatedUserActs.length > 0 ? (
+                                <CheckSquare className="w-4 h-4 text-emerald-600" />
+                              ) : (
+                                <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                              )}
+                            </button>
+                          </th>
+                          <th className="py-3 px-4">User / Merchant</th>
+                          <th className="py-3 px-4">Action / Activity</th>
+                          <th className="py-3 px-4">Target Entity</th>
+                          <th className="py-3 px-4">Source / Platform</th>
+                          <th className="py-3 px-4">Status</th>
+                          <th className="py-3 px-4">Timestamp</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                        {paginatedUserActs.map((act) => (
                         <tr 
                           key={act.id} 
                           className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition ${
@@ -3653,10 +3819,6 @@ export default function AdminDashboard() {
                                 <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
                               )}
                             </button>
-                          </td>
-                          <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
-                            <div>{act.user_name}</div>
-                            <div className="text-[10px] text-slate-400 font-mono font-normal">{act.user_phone}</div>
                           </td>
                           <td className="py-3.5 px-4">
                             <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full ${
@@ -3697,8 +3859,21 @@ export default function AdminDashboard() {
                     </tbody>
                   </table>
                 </div>
-              );
-            })()}
+
+                {/* User Activity Pagination */}
+                {renderPaginationNumeration({
+                  currentPage: userActPage,
+                  totalPages: totalUserActPages,
+                  totalItems: filteredList.length,
+                  pageSize: userActPageSize,
+                  onPageChange: setUserActPage,
+                  onPageSizeChange: setUserActPageSize,
+                  goToPageVal: userActGoToPage,
+                  setGoToPageVal: setUserActGoToPage
+                })}
+              </div>
+            );
+          })()}
 
           </div>
 
@@ -3858,93 +4033,111 @@ export default function AdminDashboard() {
                 );
               }
 
+              const totalAdminActPages = Math.max(1, Math.ceil(filteredList.length / adminActPageSize));
+              const startAdminActIdx = (adminActPage - 1) * adminActPageSize;
+              const paginatedAdminActs = filteredList.slice(startAdminActIdx, startAdminActIdx + adminActPageSize);
+
               return (
-                <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800">
-                  <table className="w-full text-left border-collapse min-w-[850px]">
-                    <thead>
-                      <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                        <th className="py-3 px-3.5 w-10 text-center">
-                          <button
-                            type="button"
-                            onClick={() => toggleSelectAllAdminAct(filteredList)}
-                            className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
-                          >
-                            {adminActSelectedIds.length === filteredList.length && filteredList.length > 0 ? (
-                              <CheckSquare className="w-4 h-4 text-emerald-600" />
-                            ) : (
-                              <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                            )}
-                          </button>
-                        </th>
-                        <th className="py-3 px-4">Admin Operator</th>
-                        <th className="py-3 px-4">Action Type</th>
-                        <th className="py-3 px-4">Target Resource</th>
-                        <th className="py-3 px-4">Operation Summary</th>
-                        <th className="py-3 px-4">Status</th>
-                        <th className="py-3 px-4">Timestamp</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-                      {filteredList.map((act) => (
-                        <tr 
-                          key={act.id} 
-                          className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition ${
-                            adminActSelectedIds.includes(act.id) ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : ''
-                          }`}
-                        >
-                          <td className="py-3.5 px-3.5 text-center">
+                <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[850px]">
+                      <thead>
+                        <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                          <th className="py-3 px-3.5 w-10 text-center">
                             <button
                               type="button"
-                              onClick={() => toggleAdminActSelection(act.id)}
+                              onClick={() => toggleSelectAllAdminAct(paginatedAdminActs)}
                               className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
                             >
-                              {adminActSelectedIds.includes(act.id) ? (
+                              {adminActSelectedIds.length === paginatedAdminActs.length && paginatedAdminActs.length > 0 ? (
                                 <CheckSquare className="w-4 h-4 text-emerald-600" />
                               ) : (
                                 <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
                               )}
                             </button>
-                          </td>
-                          <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
-                            <div>{act.operator}</div>
-                            <div className="text-[10px] text-slate-400 font-mono font-normal">SuperAdmin Role</div>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full ${
-                              act.category === 'STOCK_INTAKE'
-                                ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60'
-                                : act.category === 'SALE_DEPLOY'
-                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60'
-                                : act.category === 'VOICE_BROADCAST' || act.category === 'SET_VOLUME'
-                                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60'
-                                : 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/60'
-                            }`}>
-                              {act.category === 'STOCK_INTAKE' && <Warehouse className="w-3 h-3" />}
-                              {act.category === 'SALE_DEPLOY' && <ShoppingBag className="w-3 h-3" />}
-                              {(act.category === 'VOICE_BROADCAST' || act.category === 'SET_VOLUME') && <Volume2 className="w-3 h-3" />}
-                              {act.category === 'USER_MANAGEMENT' && <Users className="w-3 h-3" />}
-                              <span>{act.action_label}</span>
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white">
-                            {act.target_name}
-                          </td>
-                          <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400 max-w-sm">
-                            {act.details}
-                          </td>
-                          <td className="py-3.5 px-4 whitespace-nowrap">
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                              <CheckCircle2 className="w-3 h-3" />
-                              <span>{act.status}</span>
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 whitespace-nowrap text-slate-400 font-mono text-[11px]">
-                            {new Date(act.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </td>
+                          </th>
+                          <th className="py-3 px-4">Admin Operator</th>
+                          <th className="py-3 px-4">Action Type</th>
+                          <th className="py-3 px-4">Target Resource</th>
+                          <th className="py-3 px-4">Operation Summary</th>
+                          <th className="py-3 px-4">Status</th>
+                          <th className="py-3 px-4">Timestamp</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                        {paginatedAdminActs.map((act) => (
+                          <tr 
+                            key={act.id} 
+                            className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition ${
+                              adminActSelectedIds.includes(act.id) ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : ''
+                            }`}
+                          >
+                            <td className="py-3.5 px-3.5 text-center">
+                              <button
+                                type="button"
+                                onClick={() => toggleAdminActSelection(act.id)}
+                                className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                              >
+                                {adminActSelectedIds.includes(act.id) ? (
+                                  <CheckSquare className="w-4 h-4 text-emerald-600" />
+                                ) : (
+                                  <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                                )}
+                              </button>
+                            </td>
+                            <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+                              <div>{act.operator}</div>
+                              <div className="text-[10px] text-slate-400 font-mono font-normal">SuperAdmin Role</div>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                                act.category === 'STOCK_INTAKE'
+                                  ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60'
+                                  : act.category === 'SALE_DEPLOY'
+                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60'
+                                  : act.category === 'VOICE_BROADCAST' || act.category === 'SET_VOLUME'
+                                  ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60'
+                                  : 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/60'
+                              }`}>
+                                {act.category === 'STOCK_INTAKE' && <Warehouse className="w-3 h-3" />}
+                                {act.category === 'SALE_DEPLOY' && <ShoppingBag className="w-3 h-3" />}
+                                {(act.category === 'VOICE_BROADCAST' || act.category === 'SET_VOLUME') && <Volume2 className="w-3 h-3" />}
+                                {act.category === 'USER_MANAGEMENT' && <Users className="w-3 h-3" />}
+                                <span>{act.action_label}</span>
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white">
+                              {act.target_name}
+                            </td>
+                            <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400 max-w-sm">
+                              {act.details}
+                            </td>
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>{act.status}</span>
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 whitespace-nowrap text-slate-400 font-mono text-[11px]">
+                              {new Date(act.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Admin Activity Pagination */}
+                  {renderPaginationNumeration({
+                    currentPage: adminActPage,
+                    totalPages: totalAdminActPages,
+                    totalItems: filteredList.length,
+                    pageSize: adminActPageSize,
+                    onPageChange: setAdminActPage,
+                    onPageSizeChange: setAdminActPageSize,
+                    goToPageVal: adminActGoToPage,
+                    setGoToPageVal: setAdminActGoToPage
+                  })}
                 </div>
               );
             })()}
