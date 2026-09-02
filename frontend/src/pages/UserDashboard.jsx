@@ -1285,7 +1285,8 @@ export default function UserDashboard() {
                           <th className="py-3 px-4">{isKhmer ? 'សាខាហាង' : 'Store Branch'}</th>
                           <th className="py-3 px-4">{isKhmer ? 'ទីតាំង / អាសយដ្ឋាន' : 'Location / Address'}</th>
                           <th className="py-3 px-4">{isKhmer ? 'ឧបករណ៍ Soundbox' : 'Soundbox Device'}</th>
-                          <th className="py-3 px-4">{isKhmer ? 'ថាមពលថ្ម & សេវា' : 'Battery & 4G'}</th>
+                          <th className="py-3 px-4">{isKhmer ? 'ថាមពលថ្ម' : 'Battery Level'}</th>
+                          <th className="py-3 px-4">{isKhmer ? 'សេវា 4G' : '4G Signal'}</th>
                           <th className="py-3 px-4">{isKhmer ? 'Telegram Bot' : 'Telegram Bot'}</th>
                           <th className="py-3 px-4">{isKhmer ? 'ស្ថានភាព' : 'Status'}</th>
                           <th className="py-3 px-4 text-right rounded-r-xl">{isKhmer ? 'សកម្មភាព' : 'Actions'}</th>
@@ -1365,19 +1366,24 @@ export default function UserDashboard() {
                                 )}
                               </td>
 
-                              {/* Battery & 4G */}
+                              {/* Battery Level */}
                               <td className="py-3.5 px-4">
                                 {r.hasDevice && isOnline ? (
-                                  <div className="flex items-center gap-2">
-                                    <div className="flex items-center gap-1 text-slate-700 dark:text-slate-300">
-                                      <Battery className={`w-3.5 h-3.5 ${battery > 40 ? 'text-emerald-600' : battery > 20 ? 'text-amber-500' : 'text-rose-500'}`} />
-                                      <span className="font-mono text-xs font-semibold">{battery}%</span>
-                                    </div>
-                                    <span className="text-slate-300 dark:text-slate-700">|</span>
-                                    <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400 text-xs">
-                                      <Wifi className="w-3.5 h-3.5 text-indigo-500" />
-                                      <span className="font-mono text-[11px]">{r.signalStrength || '4G'}</span>
-                                    </div>
+                                  <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                                    <Battery className={`w-3.5 h-3.5 ${battery > 40 ? 'text-emerald-600' : battery > 20 ? 'text-amber-500' : 'text-rose-500'}`} />
+                                    <span className="font-mono text-xs">{battery}%</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400 font-mono">-</span>
+                                )}
+                              </td>
+
+                              {/* 4G Signal */}
+                              <td className="py-3.5 px-4">
+                                {r.hasDevice && isOnline ? (
+                                  <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200">
+                                    <Wifi className="w-3.5 h-3.5 text-indigo-500" />
+                                    <span className="font-mono text-xs">{r.signalStrength || '4G LTE'}</span>
                                   </div>
                                 ) : (
                                   <span className="text-slate-400 font-mono">-</span>
