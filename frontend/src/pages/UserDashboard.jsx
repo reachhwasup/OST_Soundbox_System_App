@@ -216,7 +216,9 @@ export default function UserDashboard() {
             hasDevice: true,
             deviceSn: d.device_sn || 'Y6B-Soundbox',
             deviceModel: d.device_model || 'Y6B 4G',
-            batteryLevel: d.battery_level !== undefined ? d.battery_level : 85,
+            batteryLevel: (String(d.status || '').toUpperCase() === 'OFFLINE' || String(d.status || '').toUpperCase() === 'INACTIVE') 
+              ? null 
+              : (d.battery_level !== undefined ? d.battery_level : 85),
             signalStrength: d.signal_strength || '4G',
             telegramChatId: d.telegram_chat_id || '',
             status: String(d.status || 'ACTIVE').toUpperCase()
@@ -1295,7 +1297,7 @@ export default function UserDashboard() {
                           const isOnline = r.hasDevice && (r.status === 'ACTIVE' || r.status === 'ONLINE');
                           const isTesting = r.device && testingDeviceId === r.device.id;
                           const isRebooting = r.device && rebootingDeviceId === r.device.id;
-                          const battery = r.batteryLevel !== null ? r.batteryLevel : 85;
+                          const battery = isOnline ? (r.batteryLevel !== null && r.batteryLevel !== undefined ? r.batteryLevel : 85) : null;
 
                           return (
                             <tr
@@ -1379,7 +1381,7 @@ export default function UserDashboard() {
 
                               {/* Battery & 4G */}
                               <td className="py-3.5 px-4">
-                                {r.hasDevice ? (
+                                {r.hasDevice && isOnline ? (
                                   <div className="flex items-center gap-2">
                                     <div className="flex items-center gap-1 text-slate-700 dark:text-slate-300">
                                       <Battery className={`w-3.5 h-3.5 ${battery > 40 ? 'text-emerald-600' : battery > 20 ? 'text-amber-500' : 'text-rose-500'}`} />
@@ -1388,7 +1390,7 @@ export default function UserDashboard() {
                                     <span className="text-slate-300 dark:text-slate-700">|</span>
                                     <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400 text-xs">
                                       <Wifi className="w-3.5 h-3.5 text-indigo-500" />
-                                      <span className="font-mono text-[11px]">{r.signalStrength}</span>
+                                      <span className="font-mono text-[11px]">{r.signalStrength || '4G'}</span>
                                     </div>
                                   </div>
                                 ) : (

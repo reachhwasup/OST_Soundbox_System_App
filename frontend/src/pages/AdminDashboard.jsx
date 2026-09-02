@@ -2980,10 +2980,14 @@ export default function AdminDashboard() {
                           {/* Battery */}
                           {visibleColumns.battery && (
                             <td className="py-3.5 px-3 text-center">
-                              <span className="inline-flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
-                                <Battery className="w-3.5 h-3.5 text-emerald-500" />
-                                {d.battery || '100%'}
-                              </span>
+                              {String(d.status || '').toUpperCase() === 'ACTIVE' || String(d.status || '').toUpperCase() === 'ONLINE' ? (
+                                <span className="inline-flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
+                                  <Battery className="w-3.5 h-3.5 text-emerald-500" />
+                                  {d.battery || '100%'}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 font-mono">-</span>
+                              )}
                             </td>
                           )}
 
