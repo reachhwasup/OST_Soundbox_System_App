@@ -15,7 +15,9 @@ function MainLayout() {
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    return localStorage.getItem('soundbox_sidebar_collapsed') === 'true';
+    const saved = localStorage.getItem('soundbox_sidebar_collapsed');
+    if (saved !== null) return saved === 'true';
+    return typeof window !== 'undefined' && window.innerWidth >= 768 && window.innerWidth < 1024;
   });
   const [activeTab, setActiveTab] = useState(() => {
     return localStorage.getItem('soundbox_active_tab') || 'user';

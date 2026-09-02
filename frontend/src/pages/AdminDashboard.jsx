@@ -2996,7 +2996,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* 3. Cloud Speaker Data Table */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
+          <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs min-w-[1100px]">
                 <thead>
@@ -3279,6 +3279,158 @@ export default function AdminDashboard() {
 
           </div>
 
+          {/* Mobile Device Cards (< md) */}
+          <div className="md:hidden space-y-3">
+            {paginatedDevices.length > 0 ? (
+              paginatedDevices.map((d) => {
+                const isSelected = devSelectedIds.includes(d.id || d.device_id || d.device_sn);
+                const isOnline = String(d.status || '').toUpperCase() === 'ACTIVE' || String(d.status || '').toLowerCase() === 'online';
+                const isDisplay = d.device_type === 'Display' || String(d.device_type || '').includes('Display');
+                const wInfo = calculateWarrantyCountdown(d);
+
+                return (
+                  <div 
+                    key={d.id || d.device_id || d.device_sn}
+                    className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3 shadow-2xs ${
+                      isSelected ? 'border-emerald-500/60 bg-emerald-50/20 dark:bg-emerald-950/20' : ''
+                    }`}
+                  >
+                    {/* Header: SN + Online Status */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          isOnline ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                        }`}>
+                          <Smartphone className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="font-mono font-bold text-xs text-slate-900 dark:text-white block">
+                            {d.device_sn || d.device_id}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">ID: #{d.id}</span>
+                        </div>
+                      </div>
+
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1.5 ${
+                        isOnline
+                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                          : String(d.status).toUpperCase() === 'PENDING'
+                            ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                            : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
+                        <span>{isOnline ? t('online', 'Online') : String(d.status).toUpperCase() === 'PENDING' ? t('waitingForRegistration', 'Pending') : t('offline', 'Offline')}</span>
+                      </span>
+                    </div>
+
+                    {/* Store & Hardware Type */}
+                    <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 truncate max-w-[180px]">
+                        <Store className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span className="truncate font-semibold">{d.store_name || d.owner_name || t('unassigned', 'Unassigned')}</span>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        isDisplay
+                          ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300'
+                          : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
+                      }`}>
+                        {isDisplay ? '🖥️ Display' : '🏷️ Standard'}
+                      </span>
+                    </div>
+
+                    {/* Telemetry: Battery, Signal & Warranty */}
+                    <div className="flex items-center justify-between text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center gap-3">
+                        <span className="inline-flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
+                          <Battery className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>{d.battery || '100%'}</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-[11px]">
+                          <Signal className="w-3 h-3 text-emerald-500" />
+                          <span>{d.signal || 'Good'}</span>
+                        </span>
+                      </div>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                        wInfo.status === 'EXPIRED' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' : 'bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
+                      }`}>
+                        {wInfo.text}
+                      </span>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => openDeviceCommandModal(d, 'VOICE_BROADCAST')}
+                        className="p-2 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 rounded-xl hover:bg-emerald-100 transition cursor-pointer"
+                        title="Voice Broadcast"
+                      >
+                        <Radio className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openDeviceCommandModal(d, 'SET_VOLUME')}
+                        className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-200 transition cursor-pointer"
+                        title="Volume"
+                      >
+                        <Volume2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSendDeviceCommand(d.id, 'REBOOT')}
+                        className="p-2 bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 rounded-xl hover:bg-amber-100 transition cursor-pointer"
+                        title="Reboot"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedDeviceForMerchant(d);
+                          setTargetMerchantStoreId(d.merchant_id ? String(d.merchant_id) : '');
+                          setIsEditMerchantOpen(true);
+                        }}
+                        className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-200 transition cursor-pointer"
+                        title="Reassign Store"
+                      >
+                        <Store className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedDeviceDetail(d);
+                          setIsDeviceDetailOpen(true);
+                        }}
+                        className="py-1.5 px-3 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50 transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-blue-500" />
+                        <span>{t('detail', 'Detail')}</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center py-10 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
+                {t('noDevicesFound', 'No soundbox devices match the specified filters.')}
+              </div>
+            )}
+          </div>
+
+          {/* Mobile Device Pagination */}
+          <div className="md:hidden">
+            {renderPaginationNumeration({
+              currentPage: devPage,
+              totalPages: totalDevPages,
+              totalItems: filteredDevices.length,
+              pageSize: devPageSize,
+              onPageChange: setDevPage,
+              onPageSizeChange: setDevPageSize,
+              goToPageVal: devGoToPage,
+              setGoToPageVal: setDevGoToPage
+            })}
+          </div>
+
         </div>
       )}
 
@@ -3503,7 +3655,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* 2. Warehouse Stock Table Card */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
+          <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs min-w-[760px]">
                 <thead>
@@ -3649,6 +3801,90 @@ export default function AdminDashboard() {
               setGoToPageVal: setStockGoToPage
             })}
 
+          </div>
+
+          {/* Mobile Stock Cards (< md) */}
+          <div className="md:hidden space-y-3">
+            {paginatedStockDevices.length > 0 ? (
+              paginatedStockDevices.map((d) => (
+                <div 
+                  key={d.id || d.device_sn}
+                  className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3 shadow-2xs"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center shrink-0">
+                        <Smartphone className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="font-mono font-bold text-xs text-slate-900 dark:text-white block">
+                          {d.device_sn || d.device_id}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">Batch: {d.batch_no || 'BATCH-STD'}</span>
+                      </div>
+                    </div>
+
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                      (d.device_type === 'Display Soundbox' || String(d.device_type || '').toLowerCase().includes('display'))
+                        ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                        : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                    }`}>
+                      {(d.device_type === 'Display Soundbox' || String(d.device_type || '').toLowerCase().includes('display'))
+                        ? '🖥️ Display'
+                        : '🏷️ Standard'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <span className="truncate">{d.notes || 'Warehouse Shelf (Available)'}</span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white shrink-0 ml-2">
+                      ${Number(d.price || 29).toFixed(2)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800">
+                    <span>Reg: {d.created_at ? new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Aug 30, 2026'}</span>
+                    
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => openSellModal(d)}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1"
+                      >
+                        <DollarSign className="w-3 h-3" />
+                        <span>{t('sell', 'Sell')}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openEditDeviceModal(d)}
+                        className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1"
+                      >
+                        <Edit className="w-3 h-3 text-slate-400" />
+                        <span>{t('edit', 'Edit')}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-10 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
+                No warehouse stock devices match the specified filters.
+              </div>
+            )}
+          </div>
+
+          {/* Mobile Stock Pagination */}
+          <div className="md:hidden">
+            {renderPaginationNumeration({
+              currentPage: stockPage,
+              totalPages: totalStockPages,
+              totalItems: filteredStockDevices.length,
+              pageSize: stockPageSize,
+              onPageChange: setStockPage,
+              onPageSizeChange: setStockPageSize,
+              goToPageVal: stockGoToPage,
+              setGoToPageVal: setStockGoToPage
+            })}
           </div>
 
         </div>
