@@ -809,7 +809,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     setStorePage(1);
-  }, [storeSearchTerm, storeProvinceFilter, storeDistrictFilter, storeCommuneFilter, storeOwnerFilter, storeSoundboxFilter, storeOnlineFilter, storeDeviceTypeFilter, storeDateFilter, storeSortBy]);
+  }, [storeSearch, storeProvinceFilter, storeDistrictFilter, storeCommuneFilter, storeOwnerFilter, storeSoundboxFilter, storeOnlineFilter, storeDeviceTypeFilter, storeDateFilter, storeSortBy]);
 
   useEffect(() => {
     setUserActPage(1);
