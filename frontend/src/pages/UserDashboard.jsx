@@ -1378,7 +1378,6 @@ export default function UserDashboard() {
                           </th>
                           <th className="py-3 px-4">{isKhmer ? 'ឧបករណ៍ Soundbox (SN)' : 'Soundbox Device (SN)'}</th>
                           <th className="py-3 px-4">{isKhmer ? 'សាខាហាង' : 'Assigned Store'}</th>
-                          <th className="py-3 px-4 text-center">{isKhmer ? 'តម្លៃឧបករណ៍' : 'Unit Price'}</th>
                           <th className="py-3 px-4 text-center">{isKhmer ? 'ការធានា (Warranty)' : 'Warranty (90d)'}</th>
                           <th className="py-3 px-4">{isKhmer ? 'ស្ថានភាព' : 'Status'}</th>
                           <th className="py-3 px-4">{isKhmer ? 'សកម្មភាពចុងក្រោយ' : 'Last Active'}</th>
@@ -1453,23 +1452,6 @@ export default function UserDashboard() {
                                 </div>
                               </td>
 
-                              {/* Column 3: Unit Price & Discount */}
-                              <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                                {Number(device.discount_amount) > 0 || Number(device.discount_percent) > 0 ? (
-                                  <div>
-                                    <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                                      ${Number(device.final_price || device.price).toFixed(2)}
-                                    </span>
-                                    <span className="text-[10px] text-slate-400 line-through ml-1.5 font-mono">
-                                      ${Number(device.price || 29).toFixed(2)}
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <span className="font-mono text-xs font-bold text-slate-900 dark:text-white">
-                                    ${Number(device.price || 29).toFixed(2)}
-                                  </span>
-                                )}
-                              </td>
 
                               {/* Column 4: 90-Day Warranty Live Countdown */}
                               <td className="py-3.5 px-4 text-center whitespace-nowrap">
