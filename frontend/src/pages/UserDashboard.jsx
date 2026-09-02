@@ -1155,7 +1155,6 @@ export default function UserDashboard() {
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
                       {filteredStoresList.map((s) => {
-                        const isCurrentStore = activeStore?.id === s.id;
                         const isRowChecked = selectedStoreIds.includes(s.id);
                         const devCount = s.devices?.length || 0;
                         return (
@@ -1164,9 +1163,7 @@ export default function UserDashboard() {
                             className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition ${
                               isRowChecked 
                                 ? 'bg-emerald-50/60 dark:bg-emerald-950/30' 
-                                : isCurrentStore 
-                                  ? 'bg-emerald-50/30 dark:bg-emerald-950/15' 
-                                  : ''
+                                : ''
                             }`}
                           >
                             <td className="py-3.5 px-3.5 text-center">
@@ -1184,21 +1181,12 @@ export default function UserDashboard() {
                             </td>
                             <td className="py-3.5 px-4">
                               <div className="flex items-center gap-2.5">
-                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                                  isCurrentStore 
-                                    ? 'bg-emerald-600 text-white shadow-xs' 
-                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                                }`}>
+                                <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                                   <Store className="w-4 h-4" />
                                 </div>
                                 <div>
                                   <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                                     <span>{s.name}</span>
-                                    {isCurrentStore && (
-                                      <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-1.5 py-0.2 rounded font-bold">
-                                        Current
-                                      </span>
-                                    )}
                                   </div>
                                   <span className="text-[10px] text-slate-400 font-mono">ID: #{s.id}</span>
                                 </div>
@@ -1232,26 +1220,6 @@ export default function UserDashboard() {
 
                             <td className="py-3.5 px-4 text-right">
                               <div className="flex items-center justify-end gap-1.5">
-                                {!isCurrentStore && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const storeIdx = stores.findIndex(item => item.id === s.id);
-                                      if (storeIdx !== -1) {
-                                        setSelectedStoreIndex(storeIdx);
-                                        setEditName(s.name);
-                                        showToast({
-                                          type: 'success',
-                                          title: isKhmer ? 'ប្តូរសាខាជោគជ័យ' : 'Active Store Switched',
-                                          message: isKhmer ? `បានប្តូរទៅកាន់សាខា "${s.name}"` : `Switched active branch to "${s.name}"`
-                                        });
-                                      }
-                                    }}
-                                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer"
-                                  >
-                                    Select
-                                  </button>
-                                )}
                                 <button
                                   type="button"
                                   onClick={() => {
