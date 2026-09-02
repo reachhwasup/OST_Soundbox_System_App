@@ -53,7 +53,9 @@ import {
   Clock,
   Info,
   Square,
-  CheckSquare
+  CheckSquare,
+  Battery,
+  Wifi
 } from 'lucide-react';
 
 export default function UserDashboard() {
@@ -177,6 +179,127 @@ export default function UserDashboard() {
   };
   const toggleStoreSelection = (id) => {
     setSelectedStoreIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  // Unified Single Table: Stores & Connected Devices
+  const unifiedStoreDeviceRows = useMemo(() => {
+    const rows = [];
+    stores.forEach((s) => {
+      const devices = s.devices || [];
+      if (devices.length === 0) {
+        rows.push({
+          rowId: `store-${s.id}`,
+          store: s,
+          device: null,
+          storeName: s.name || 'Store Branch',
+          storeId: s.id,
+          location: s.location || s.place || 'Phnom Penh, Cambodia',
+          province: s.province || '',
+          hasDevice: false,
+          deviceSn: '',
+          deviceModel: '',
+          batteryLevel: null,
+          signalStrength: null,
+          telegramChatId: '',
+          status: 'NO_DEVICE'
+        });
+      } else {
+        devices.forEach((d, idx) => {
+          rows.push({
+            rowId: `dev-${d.id || d.device_sn || idx}-${s.id}`,
+            store: s,
+            device: d,
+            storeName: s.name || 'Store Branch',
+            storeId: s.id,
+            location: s.location || s.place || 'Phnom Penh, Cambodia',
+            province: s.province || '',
+            hasDevice: true,
+            deviceSn: d.device_sn || 'Y6B-Soundbox',
+            deviceModel: d.device_model || 'Y6B 4G',
+            batteryLevel: d.battery_level !== undefined ? d.battery_level : 85,
+            signalStrength: d.signal_strength || '4G',
+            telegramChatId: d.telegram_chat_id || '',
+            status: String(d.status || 'ACTIVE').toUpperCase()
+          });
+        });
+      }
+    });
+    return rows;
+  }, [stores]);
+
+  // Unified Filter States
+  const [unifiedSearch, setUnifiedSearch] = useState('');
+  const [unifiedStoreFilter, setUnifiedStoreFilter] = useState('ALL');
+  const [unifiedStatusFilter, setUnifiedStatusFilter] = useState('ALL');
+  const [unifiedProvinceFilter, setUnifiedProvinceFilter] = useState('ALL');
+  const [unifiedSortBy, setUnifiedSortBy] = useState('DEFAULT');
+
+  const filteredUnifiedRows = useMemo(() => {
+    let result = [...unifiedStoreDeviceRows];
+
+    if (unifiedSearch.trim()) {
+      const q = unifiedSearch.toLowerCase().trim();
+      result = result.filter(r => 
+        String(r.storeName || '').toLowerCase().includes(q) ||
+        String(r.location || '').toLowerCase().includes(q) ||
+        String(r.deviceSn || '').toLowerCase().includes(q) ||
+        String(r.deviceModel || '').toLowerCase().includes(q) ||
+        String(r.telegramChatId || '').toLowerCase().includes(q) ||
+        String(r.storeId || '').includes(q)
+      );
+    }
+
+    if (unifiedStoreFilter !== 'ALL') {
+      result = result.filter(r => String(r.storeId) === String(unifiedStoreFilter));
+    }
+
+    if (unifiedStatusFilter !== 'ALL') {
+      if (unifiedStatusFilter === 'ACTIVE') {
+        result = result.filter(r => r.hasDevice && (r.status === 'ACTIVE' || r.status === 'ONLINE'));
+      } else if (unifiedStatusFilter === 'OFFLINE') {
+        result = result.filter(r => r.hasDevice && r.status === 'OFFLINE');
+      } else if (unifiedStatusFilter === 'NO_DEVICE') {
+        result = result.filter(r => !r.hasDevice);
+      }
+    }
+
+    if (unifiedProvinceFilter !== 'ALL') {
+      result = result.filter(r => 
+        String(r.province || '').toLowerCase().includes(unifiedProvinceFilter.toLowerCase()) ||
+        String(r.location || '').toLowerCase().includes(unifiedProvinceFilter.toLowerCase())
+      );
+    }
+
+    result.sort((a, b) => {
+      if (unifiedSortBy === 'NAME_ASC') return a.storeName.localeCompare(b.storeName);
+      if (unifiedSortBy === 'NAME_DESC') return b.storeName.localeCompare(a.storeName);
+      if (unifiedSortBy === 'BATTERY_DESC') return (b.batteryLevel || 0) - (a.batteryLevel || 0);
+      if (unifiedSortBy === 'OLDEST') return a.storeId - b.storeId;
+      return b.storeId - a.storeId;
+    });
+
+    return result;
+  }, [unifiedStoreDeviceRows, unifiedSearch, unifiedStoreFilter, unifiedStatusFilter, unifiedProvinceFilter, unifiedSortBy]);
+
+  const handleResetUnifiedFilters = () => {
+    setUnifiedSearch('');
+    setUnifiedStoreFilter('ALL');
+    setUnifiedStatusFilter('ALL');
+    setUnifiedProvinceFilter('ALL');
+    setUnifiedSortBy('DEFAULT');
+  };
+
+  // Unified Table Selection
+  const [selectedUnifiedRowIds, setSelectedUnifiedRowIds] = useState([]);
+  const toggleSelectAllUnified = () => {
+    if (selectedUnifiedRowIds.length === filteredUnifiedRows.length && filteredUnifiedRows.length > 0) {
+      setSelectedUnifiedRowIds([]);
+    } else {
+      setSelectedUnifiedRowIds(filteredUnifiedRows.map(r => r.rowId));
+    }
+  };
+  const toggleUnifiedRowSelection = (rowId) => {
+    setSelectedUnifiedRowIds(prev => prev.includes(rowId) ? prev.filter(x => x !== rowId) : [...prev, rowId]);
   };
 
   const toggleSelectAllDevices = () => {
@@ -1025,111 +1148,23 @@ export default function UserDashboard() {
         <div className="space-y-5 sm:space-y-6">
 
           {/* ======================================================== */}
-          {/* ======================================================== */}
-          {/* TAB 1: COMBINED STORES & DEVICES DIRECTORY               */}
+          {/* TAB 1: SINGLE UNIFIED TABLE (STORES & SOUNDBOX HARDWARE)  */}
           {/* ======================================================== */}
           {(merchantTab === 'stores' || merchantTab === 'devices') && (
             <div className="space-y-5 sm:space-y-6">
 
-              {/* Segmented Sub-Tab Switcher Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
-                {/* Segmented Control */}
-                <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/90 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
-                  <button
-                    type="button"
-                    onClick={() => handleSubTabChange('stores')}
-                    className={`px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
-                      storeDeviceSubTab === 'stores'
-                        ? 'bg-emerald-600 text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                  >
-                    <Store className="w-4 h-4" />
-                    <span>{isKhmer ? 'សាខាហាង' : 'Store Branches'}</span>
-                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                      storeDeviceSubTab === 'stores'
-                        ? 'bg-white/25 text-white'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
-                    }`}>
-                      {stores.length}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleSubTabChange('devices')}
-                    className={`px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
-                      storeDeviceSubTab === 'devices'
-                        ? 'bg-emerald-600 text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                  >
-                    <Volume2 className="w-4 h-4" />
-                    <span>{isKhmer ? 'ឧបករណ៍ Soundbox' : 'Soundbox Devices'}</span>
-                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                      storeDeviceSubTab === 'devices'
-                        ? 'bg-white/25 text-white'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
-                    }`}>
-                      {allUserDevices.length}
-                    </span>
-                  </button>
-                </div>
-
-                {/* Quick Action Button for current active sub-tab */}
-                <div className="flex items-center gap-2">
-                  {storeDeviceSubTab === 'stores' ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        resetRegisterForm();
-                        setIsRegisterStoreOpen(true);
-                      }}
-                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap shadow-xs cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>{isKhmer ? 'បន្ថែមសាខា' : 'Add Branch'}</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveCameraField(null);
-                        setScanFeedback({ field: '', message: '', isError: false });
-                        setIsDeviceModalOpen(true);
-                      }}
-                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap shadow-xs cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>{isKhmer ? 'ភ្ជាប់ឧបករណ៍' : 'Link Soundbox'}</span>
-                    </button>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => fetchStoresData(true)}
-                    className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition cursor-pointer"
-                    title={isKhmer ? 'ផ្ទុកទិន្នន័យឡើងវិញ' : 'Refresh Data'}
-                  >
-                    <RefreshCw className="w-4 h-4 text-slate-500" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Sub-View 1: Stores Directory */}
-              {storeDeviceSubTab === 'stores' && (
-                <div className="space-y-5 sm:space-y-6">
-
-              {/* All Store Branches Table */}
+              {/* Combined Store & Soundbox Fleet Table Card */}
               <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
+                
+                {/* Header with Title and Action Buttons */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
                   <div>
                     <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                       <Store className="w-5 h-5 text-emerald-600" />
-                      <span>{isKhmer ? 'បញ្ជីសាខាហាងទាំងអស់' : 'Store Branches & Locations Directory'}</span>
+                      <span>{isKhmer ? 'បញ្ជីហាង និងឧបករណ៍ Soundbox' : 'Stores & Soundbox Devices'}</span>
                     </h3>
-                    <p className="text-xs text-slate-400">
-                      Manage all your merchant store branches, operational addresses, and contact phone numbers.
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {isKhmer ? 'គ្រប់គ្រងសាខាហាង អាសយដ្ឋានទីតាំង និងឧបករណ៍ Soundbox ក្នុងតារាងតែមួយ' : 'Manage your store branches, operational locations, and connected soundbox hardware in one unified table.'}
                     </p>
                   </div>
 
@@ -1140,7 +1175,7 @@ export default function UserDashboard() {
                         resetRegisterForm();
                         setIsRegisterStoreOpen(true);
                       }}
-                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap shrink-0 shadow-xs cursor-pointer"
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap shadow-xs cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>{isKhmer ? 'បន្ថែមសាខា' : 'Add Branch'}</span>
@@ -1148,282 +1183,49 @@ export default function UserDashboard() {
 
                     <button
                       type="button"
-                      onClick={() => fetchStoresData(true)}
-                      className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition cursor-pointer"
-                      title="Refresh Store List"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Store Search & Filter Toolbar */}
-                <div className="bg-slate-50/70 dark:bg-slate-800/50 rounded-2xl border border-slate-200/70 dark:border-slate-800 p-3.5 sm:p-4 space-y-3">
-                  {/* Filter Inputs Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                    
-                    {/* Search */}
-                    <div>
-                      <div className="relative">
-                        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                        <input
-                          type="text"
-                          placeholder={isKhmer ? 'ស្វែងរកសាខា អាសយដ្ឋាន លេខទូរស័ព្ទ...' : 'Search branch, address, phone...'}
-                          value={storeSearch}
-                          onChange={(e) => setStoreSearch(e.target.value)}
-                          className="w-full pl-9 pr-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Province / City */}
-                    <div>
-                      <select
-                        value={storeProvinceFilter}
-                        onChange={(e) => setStoreProvinceFilter(e.target.value)}
-                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
-                      >
-                        <option value="ALL">{isKhmer ? 'គ្រប់ខេត្ត / រាជធានី' : 'All Provinces / Cities'}</option>
-                        {availableStoreProvinces.map(p => (
-                          <option key={p} value={p}>{p}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Speaker Hardware */}
-                    <div>
-                      <select
-                        value={storeSpeakerFilter}
-                        onChange={(e) => setStoreSpeakerFilter(e.target.value)}
-                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
-                      >
-                        <option value="ALL">{isKhmer ? 'គ្រប់ឧបករណ៍ Soundbox' : 'All Soundbox Status'}</option>
-                        <option value="WITH_DEVICE">{isKhmer ? '📱 មានភ្ជាប់ Soundbox (≥1)' : '📱 With Soundbox (≥1)'}</option>
-                        <option value="NO_DEVICE">{isKhmer ? '⚠️ គ្មាន Soundbox (0)' : '⚠️ No Soundbox (0)'}</option>
-                        <option value="MULTI_DEVICE">{isKhmer ? '⚡ Soundbox ច្រើន (≥2)' : '⚡ Multi-Device (≥2)'}</option>
-                      </select>
-                    </div>
-
-                    {/* Sort By */}
-                    <div>
-                      <select
-                        value={storeSortBy}
-                        onChange={(e) => setStoreSortBy(e.target.value)}
-                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer font-medium"
-                      >
-                        <option value="DEFAULT">✨ {isKhmer ? 'ចុះឈ្មោះថ្មីបំផុត' : 'Newest First'}</option>
-                        <option value="OLDEST">⏳ {isKhmer ? 'ចុះឈ្មោះមុនគេ' : 'Oldest First'}</option>
-                        <option value="NAME_ASC">🔤 {isKhmer ? 'ឈ្មោះសាខា (A → Z)' : 'Branch Name (A → Z)'}</option>
-                        <option value="NAME_DESC">🔤 {isKhmer ? 'ឈ្មោះសាខា (Z → A)' : 'Branch Name (Z → A)'}</option>
-                        <option value="SPEAKERS_DESC">🔊 {isKhmer ? 'Soundbox ច្រើនជាងគេ' : 'Most Speakers'}</option>
-                      </select>
-                    </div>
-
-                  </div>
-
-                  {/* Filter Status Summary & Reset */}
-                  {(storeSearch || storeProvinceFilter !== 'ALL' || storeSpeakerFilter !== 'ALL' || storeSortBy !== 'DEFAULT') && (
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-xs">
-                      <span className="text-slate-500 dark:text-slate-400">
-                        {isKhmer ? 'បង្ហាញ' : 'Showing'} <strong className="text-slate-900 dark:text-white font-mono">{filteredStoresList.length}</strong> {isKhmer ? 'នៃ' : 'of'} <strong className="text-slate-900 dark:text-white font-mono">{stores.length}</strong> {isKhmer ? 'សាខា' : 'store branches'}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleResetStoreFilters}
-                        className="px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white bg-white dark:bg-slate-900 hover:bg-slate-100 rounded-lg transition flex items-center gap-1 cursor-pointer border border-slate-200 dark:border-slate-700"
-                      >
-                        <RotateCcw className="w-3 h-3 text-slate-400" />
-                        <span>{isKhmer ? 'កំណត់ឡើងវិញ' : 'Reset Filters'}</span>
-                      </button>
-                    </div>
-                  )}
-
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse min-w-[700px]">
-                    <thead>
-                      <tr className="border-b border-slate-200 dark:border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50/50 dark:bg-slate-800/40">
-                        <th className="py-3 px-3.5 w-10 text-center rounded-l-xl">
-                          <button
-                            type="button"
-                            onClick={toggleSelectAllStores}
-                            className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
-                          >
-                            {selectedStoreIds.length === stores.length && stores.length > 0 ? (
-                              <CheckSquare className="w-4 h-4 text-emerald-600" />
-                            ) : (
-                              <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                            )}
-                          </button>
-                        </th>
-                        <th className="py-3 px-4">{isKhmer ? 'ឈ្មោះសាខា' : 'Branch Name'}</th>
-                        <th className="py-3 px-4">{isKhmer ? 'ទីតាំង / អាសយដ្ឋាន' : 'Location / Address'}</th>
-                        <th className="py-3 px-4">{isKhmer ? 'ឧបករណ៍ភ្ជាប់' : 'Connected Devices'}</th>
-                        <th className="py-3 px-4">{isKhmer ? 'ស្ថានភាព' : 'Status'}</th>
-                        <th className="py-3 px-4 text-right rounded-r-xl">{isKhmer ? 'សកម្មភាព' : 'Actions'}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-                      {filteredStoresList.map((s) => {
-                        const isRowChecked = selectedStoreIds.includes(s.id);
-                        const devCount = s.devices?.length || 0;
-                        return (
-                          <tr 
-                            key={s.id}
-                            className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition ${
-                              isRowChecked 
-                                ? 'bg-emerald-50/60 dark:bg-emerald-950/30' 
-                                : ''
-                            }`}
-                          >
-                            <td className="py-3.5 px-3.5 text-center">
-                              <button
-                                type="button"
-                                onClick={() => toggleStoreSelection(s.id)}
-                                className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
-                              >
-                                {isRowChecked ? (
-                                  <CheckSquare className="w-4 h-4 text-emerald-600" />
-                                ) : (
-                                  <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                                )}
-                              </button>
-                            </td>
-                            <td className="py-3.5 px-4">
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                                  <Store className="w-4 h-4" />
-                                </div>
-                                <div>
-                                  <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                                    <span>{s.name}</span>
-                                  </div>
-                                  <span className="text-[10px] text-slate-400 font-mono">ID: #{s.id}</span>
-                                </div>
-                              </div>
-                            </td>
-
-                            <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 max-w-xs">
-                              <div className="flex items-center gap-1.5">
-                                <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                <span className="truncate">{s.location || s.place || 'Phnom Penh, Cambodia'}</span>
-                              </div>
-                            </td>
-
-
-                            <td className="py-3.5 px-4">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
-                                <Volume2 className="w-3.5 h-3.5 text-indigo-600" />
-                                <span>{devCount} {devCount === 1 ? 'Speaker' : 'Speakers'}</span>
-                              </span>
-                            </td>
-
-                            <td className="py-3.5 px-4">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                ACTIVE
-                              </span>
-                            </td>
-
-                            <td className="py-3.5 px-4 text-right">
-                              <div className="flex items-center justify-end gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const storeIdx = stores.findIndex(item => item.id === s.id);
-                                    if (storeIdx !== -1) setSelectedStoreIndex(storeIdx);
-                                    setEditName(s.name || '');
-                                    const resolved = resolveStoreLocationCodes(s);
-                                    setEditProvinceId(resolved.provinceId);
-                                    setEditDistrictId(resolved.districtId);
-                                    setEditCommuneId(resolved.communeId);
-                                    setEditVillageId(resolved.villageId);
-                                    setEditStreetOrLandmark(resolved.streetOrLandmark);
-                                    setIsEditStoreOpen(true);
-                                  }}
-                                  className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/80 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
-                                >
-                                  <Edit3 className="w-3 h-3" />
-                                  <span>Edit</span>
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-              {/* Sub-View 2: Soundbox Devices */}
-              {storeDeviceSubTab === 'devices' && (
-                <div className="space-y-5 sm:space-y-6">
-
-              {/* Device Table & Filter Toolbar Card */}
-              <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
-                
-                {/* Top Actions Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100 dark:border-slate-800">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      <Volume2 className="w-5 h-5 text-indigo-600" />
-                      <span>{isKhmer ? 'បញ្ជីឧបករណ៍ Soundbox' : 'Soundbox Hardware & Device Telemetry'}</span>
-                    </h3>
-                    <p className="text-xs text-slate-400">
-                      Monitor live battery health, 4G cellular signal strength, store assignment, and audio test broadcasts.
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
                       onClick={() => {
                         setActiveCameraField(null);
                         setScanFeedback({ field: '', message: '', isError: false });
                         setIsDeviceModalOpen(true);
                       }}
-                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+                      className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap shadow-xs cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>{isKhmer ? 'ភ្ជាប់ Soundbox' : 'Link Soundbox'}</span>
+                      <span>{isKhmer ? 'ភ្ជាប់ឧបករណ៍' : 'Link Soundbox'}</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => fetchStoresData(true)}
                       className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition cursor-pointer"
-                      title="Refresh fleet telemetry"
+                      title={isKhmer ? 'ផ្ទុកទិន្នន័យឡើងវិញ' : 'Refresh'}
                     >
                       <RefreshCw className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
 
-                {/* Filter Toolbar */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                  {/* Search */}
-                  <div className="relative">
+                {/* Multi-Filter Toolbar Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                  {/* Search Input */}
+                  <div className="relative lg:col-span-2">
                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="text"
-                      value={deviceSearchTerm}
-                      onChange={(e) => setDeviceSearchTerm(e.target.value)}
-                      placeholder="Search SN, store, Telegram ID..."
-                      className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      value={unifiedSearch}
+                      onChange={(e) => setUnifiedSearch(e.target.value)}
+                      placeholder={isKhmer ? "ស្វែងរកហាង, អាសយដ្ឋាន, SN ឧបករណ៍..." : "Search store, address, SN, Telegram..."}
+                      className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
 
                   {/* Store Filter */}
                   <select
-                    value={deviceStoreFilter}
-                    onChange={(e) => setDeviceStoreFilter(e.target.value)}
-                    className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                    value={unifiedStoreFilter}
+                    onChange={(e) => setUnifiedStoreFilter(e.target.value)}
+                    className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                   >
-                    <option value="ALL">{isKhmer ? 'សាខាហាងទាំងអស់' : 'All Store Branches'}</option>
+                    <option value="ALL">{isKhmer ? 'សាខាហាងទាំងអស់' : 'All Branches'}</option>
                     {stores.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
@@ -1431,228 +1233,288 @@ export default function UserDashboard() {
 
                   {/* Status Filter */}
                   <select
-                    value={deviceStatusFilter}
-                    onChange={(e) => setDeviceStatusFilter(e.target.value)}
-                    className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                    value={unifiedStatusFilter}
+                    onChange={(e) => setUnifiedStatusFilter(e.target.value)}
+                    className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                   >
-                    <option value="ALL">{isKhmer ? 'ស្ថានភាពឧបករណ៍ទាំងអស់' : 'All Device Statuses'}</option>
-                    <option value="ACTIVE">{isKhmer ? '🟢 សកម្ម / អនឡាញ' : '🟢 Active / Online'}</option>
-                    <option value="IN_STOCK">{isKhmer ? '📦 ក្នុងស្តុក' : '📦 In Stock'}</option>
+                    <option value="ALL">{isKhmer ? 'ស្ថានភាពទាំងអស់' : 'All Statuses'}</option>
+                    <option value="ACTIVE">{isKhmer ? '🟢 អនឡាញ / សកម្ម' : '🟢 Online / Active'}</option>
                     <option value="OFFLINE">{isKhmer ? '⚪ ក្រៅបណ្តាញ' : '⚪ Offline'}</option>
+                    <option value="NO_DEVICE">{isKhmer ? '⚠️ មិនទាន់មាន Soundbox' : '⚠️ No Soundbox'}</option>
+                  </select>
+
+                  {/* Province Filter */}
+                  <select
+                    value={unifiedProvinceFilter}
+                    onChange={(e) => setUnifiedProvinceFilter(e.target.value)}
+                    className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                  >
+                    <option value="ALL">{isKhmer ? 'ខេត្ត/រាជធានីទាំងអស់' : 'All Provinces'}</option>
+                    {availableStoreProvinces.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
                   </select>
                 </div>
 
-                {/* Device Info Table */}
-                {filteredDevices.length > 0 ? (
+                {/* Bulk Selection Bar */}
+                {selectedUnifiedRowIds.length > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-emerald-50/80 dark:bg-emerald-950/40 rounded-xl border border-emerald-200/80 dark:border-emerald-800/80 text-xs text-emerald-900 dark:text-emerald-200">
+                    <div className="flex items-center gap-2">
+                      <CheckSquare className="w-4 h-4 text-emerald-600" />
+                      <span className="font-bold">{selectedUnifiedRowIds.length}</span>
+                      <span>{isKhmer ? 'ជួរដែលបានជ្រើសរើស' : 'items selected'}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedUnifiedRowIds([])}
+                      className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg font-semibold transition cursor-pointer"
+                    >
+                      {isKhmer ? 'ដោះការជ្រើសរើស' : 'Deselect All'}
+                    </button>
+                  </div>
+                )}
+
+                {/* The Single Unified Table */}
+                {filteredUnifiedRows.length > 0 ? (
                   <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800">
-                    <table className="w-full text-left text-sm min-w-[850px]">
+                    <table className="w-full text-left text-sm min-w-[950px]">
                       <thead>
                         <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-500 uppercase tracking-wider">
                           <th className="py-3 px-3.5 w-10 text-center">
                             <button
                               type="button"
-                              onClick={toggleSelectAllDevices}
+                              onClick={toggleSelectAllUnified}
                               className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
                             >
-                              {selectedDeviceIds.length === filteredDevices.length && filteredDevices.length > 0 ? (
+                              {selectedUnifiedRowIds.length === filteredUnifiedRows.length && filteredUnifiedRows.length > 0 ? (
                                 <CheckSquare className="w-4 h-4 text-emerald-600" />
                               ) : (
                                 <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
                               )}
                             </button>
                           </th>
-                          <th className="py-3 px-4">{isKhmer ? 'ឧបករណ៍ Soundbox (SN)' : 'Soundbox Device (SN)'}</th>
-                          <th className="py-3 px-4">{isKhmer ? 'សាខាហាង' : 'Assigned Store'}</th>
-                          <th className="py-3 px-4 text-center">{isKhmer ? 'ការធានា (Warranty)' : 'Warranty (90d)'}</th>
+                          <th className="py-3 px-4">{isKhmer ? 'សាខាហាង' : 'Store Branch'}</th>
+                          <th className="py-3 px-4">{isKhmer ? 'ទីតាំង / អាសយដ្ឋាន' : 'Location / Address'}</th>
+                          <th className="py-3 px-4">{isKhmer ? 'ឧបករណ៍ Soundbox' : 'Soundbox Device'}</th>
+                          <th className="py-3 px-4">{isKhmer ? 'ថាមពលថ្ម & សេវា' : 'Battery & 4G'}</th>
+                          <th className="py-3 px-4">{isKhmer ? 'Telegram Bot' : 'Telegram Bot'}</th>
                           <th className="py-3 px-4">{isKhmer ? 'ស្ថានភាព' : 'Status'}</th>
-                          <th className="py-3 px-4">{isKhmer ? 'សកម្មភាពចុងក្រោយ' : 'Last Active'}</th>
-                          <th className="py-3 px-4">{isKhmer ? 'ថាមពលថ្ម' : 'Battery Level'}</th>
-                          <th className="py-3 px-4">{isKhmer ? 'សេវា 4G' : '4G Signal'}</th>
-                          <th className="py-3 px-4">{isKhmer ? 'Telegram Bot' : 'Telegram Verification'}</th>
-                          <th className="py-3 px-4 text-center">{isKhmer ? 'សកម្មភាព' : 'Operations'}</th>
+                          <th className="py-3 px-4 text-right rounded-r-xl">{isKhmer ? 'សកម្មភាព' : 'Actions'}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-                        {filteredDevices.map((device) => {
-                          const isOnline = String(device.status).toUpperCase() === 'ACTIVE' || String(device.status).toUpperCase() === 'ONLINE';
-                          const isTesting = testingDeviceId === device.id;
-                          const isRebooting = rebootingDeviceId === device.id;
-                          const lastActiveRaw = device.last_active || device.last_time || device.last_online || device.last_heartbeat || device.updated_at || device.created_at;
-
-                          // Compute warranty countdown
-                          const now = new Date();
-                          const durationDays = Number(device.warranty_days) || 90;
-                          let endDate = device.warranty_end_date ? new Date(device.warranty_end_date) : null;
-                          if (!endDate && device.warranty_start_date) {
-                            endDate = new Date(new Date(device.warranty_start_date).getTime() + durationDays * 86400000);
-                          }
-                          if (!endDate && device.created_at) {
-                            endDate = new Date(new Date(device.created_at).getTime() + durationDays * 86400000);
-                          }
-                          const daysLeft = endDate ? Math.ceil((endDate.getTime() - now.getTime()) / 86400000) : 0;
+                        {filteredUnifiedRows.map((r) => {
+                          const isRowChecked = selectedUnifiedRowIds.includes(r.rowId);
+                          const isOnline = r.hasDevice && (r.status === 'ACTIVE' || r.status === 'ONLINE');
+                          const isTesting = r.device && testingDeviceId === r.device.id;
+                          const isRebooting = r.device && rebootingDeviceId === r.device.id;
+                          const battery = r.batteryLevel !== null ? r.batteryLevel : 85;
 
                           return (
-                            <tr 
-                              key={device.id}
-                              className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition group ${
-                                selectedDeviceIds.includes(device.id) ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : ''
+                            <tr
+                              key={r.rowId}
+                              className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition ${
+                                isRowChecked ? 'bg-emerald-50/60 dark:bg-emerald-950/30' : ''
                               }`}
                             >
+                              {/* Checkbox */}
                               <td className="py-3.5 px-3.5 text-center">
                                 <button
                                   type="button"
-                                  onClick={() => toggleDeviceSelection(device.id)}
+                                  onClick={() => toggleUnifiedRowSelection(r.rowId)}
                                   className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
                                 >
-                                  {selectedDeviceIds.includes(device.id) ? (
+                                  {isRowChecked ? (
                                     <CheckSquare className="w-4 h-4 text-emerald-600" />
                                   ) : (
                                     <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
                                   )}
                                 </button>
                               </td>
-                              {/* Column 1: SN & Model */}
+
+                              {/* Store / Branch Name */}
                               <td className="py-3.5 px-4">
-                                <div className="space-y-0.5">
-                                  <div className="font-mono font-bold text-slate-900 dark:text-white flex items-center gap-1.5 text-xs">
-                                    <Smartphone className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                                    <span>{device.device_sn}</span>
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
+                                    <Store className="w-4 h-4" />
                                   </div>
-                                  <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-medium">
-                                    {device.device_type || 'Standard Soundbox'}
-                                  </span>
+                                  <div>
+                                    <div className="font-bold text-slate-900 dark:text-white">
+                                      {r.storeName}
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-mono">ID: #{r.storeId}</span>
+                                  </div>
                                 </div>
                               </td>
 
-                              {/* Column 2: Assigned Store */}
-                              <td className="py-3.5 px-4">
-                                <div className="space-y-0.5">
-                                  <div className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1">
-                                    <Store className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                    <span>{device.storeName}</span>
-                                  </div>
-                                  <span className="text-[10px] text-slate-400 truncate max-w-[160px] block">
-                                    {device.storeLocation || 'Phnom Penh'}
-                                  </span>
+                              {/* Location / Address */}
+                              <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 max-w-[220px]">
+                                <div className="flex items-center gap-1.5">
+                                  <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  <span className="truncate" title={r.location}>{r.location}</span>
                                 </div>
                               </td>
 
+                              {/* Soundbox Device Info */}
+                              <td className="py-3.5 px-4">
+                                {r.hasDevice ? (
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
+                                      <Volume2 className="w-3.5 h-3.5" />
+                                    </div>
+                                    <div>
+                                      <div className="font-mono font-bold text-slate-900 dark:text-white text-xs">
+                                        {r.deviceSn}
+                                      </div>
+                                      <span className="inline-block text-[10px] px-1.5 py-0.2 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded font-semibold">
+                                        {r.deviceModel}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-slate-400 text-xs italic">
+                                      {isKhmer ? 'មិនទាន់មានឧបករណ៍' : 'No soundbox'}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setNewDeviceStoreId(r.storeId);
+                                        setIsDeviceModalOpen(true);
+                                      }}
+                                      className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold underline cursor-pointer"
+                                    >
+                                      {isKhmer ? '+ ភ្ជាប់' : '+ Link'}
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
 
-                              {/* Column 4: 90-Day Warranty Live Countdown */}
-                              <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                                {daysLeft <= 0 ? (
-                                  <span className="px-2.5 py-1 bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
-                                    {isKhmer ? 'ផុតកំណត់' : 'Expired'}
-                                  </span>
-                                ) : daysLeft <= 15 ? (
-                                  <span className="px-2.5 py-1 bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                                    {daysLeft} {isKhmer ? 'ថ្ងៃនៅសល់' : 'days left'}
+                              {/* Battery & 4G */}
+                              <td className="py-3.5 px-4">
+                                {r.hasDevice ? (
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1 text-slate-700 dark:text-slate-300">
+                                      <Battery className={`w-3.5 h-3.5 ${battery > 40 ? 'text-emerald-600' : battery > 20 ? 'text-amber-500' : 'text-rose-500'}`} />
+                                      <span className="font-mono text-xs font-semibold">{battery}%</span>
+                                    </div>
+                                    <span className="text-slate-300 dark:text-slate-700">|</span>
+                                    <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400 text-xs">
+                                      <Wifi className="w-3.5 h-3.5 text-indigo-500" />
+                                      <span className="font-mono text-[11px]">{r.signalStrength}</span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400 font-mono">-</span>
+                                )}
+                              </td>
+
+                              {/* Telegram Bot */}
+                              <td className="py-3.5 px-4">
+                                {r.telegramChatId ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200/60 dark:border-sky-800/60">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+                                    @{r.telegramChatId}
                                   </span>
                                 ) : (
-                                  <span className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
-                                    <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                                    {daysLeft} {isKhmer ? 'ថ្ងៃនៅសល់' : 'days left'}
+                                  <span className="text-slate-400 text-[11px]">{isKhmer ? 'មិនទាន់ភ្ជាប់' : 'Not set'}</span>
+                                )}
+                              </td>
+
+                              {/* Status */}
+                              <td className="py-3.5 px-4">
+                                {r.hasDevice ? (
+                                  isOnline ? (
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                      ACTIVE
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                      OFFLINE
+                                    </span>
+                                  )
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60">
+                                    UNLINKED
                                   </span>
                                 )}
                               </td>
 
-                              {/* Column 5: Status */}
-                              <td className="py-3.5 px-4">
-                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                                  isOnline
-                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60'
-                                    : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
-                                }`}>
-                                  <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
-                                  <span>{device.status || 'ACTIVE'}</span>
-                                </span>
-                              </td>
-
-                              {/* Column 4: Last Active */}
-                              <td className="py-3.5 px-4 whitespace-nowrap">
-                                <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
-                                  <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                  <span className="font-mono text-xs font-semibold">
-                                    {(() => {
-                                      if (!lastActiveRaw) return isKhmer ? 'មិនទាន់មាន' : 'Never';
-                                      const d = new Date(lastActiveRaw);
-                                      if (isNaN(d.getTime())) return isKhmer ? 'មិនទាន់មាន' : 'Never';
-                                      const dateStr = d.toLocaleDateString(isKhmer ? 'km-KH' : 'en-US', { month: 'short', day: 'numeric' });
-                                      const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                                      return `${dateStr}, ${timeStr}`;
-                                    })()}
-                                  </span>
-                                </div>
-                              </td>
-
-                              {/* Column 5: Battery Level */}
-                              <td className="py-3.5 px-4 whitespace-nowrap">
-                                <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
-                                  <BatteryCharging className="w-4 h-4 text-emerald-500 shrink-0" />
-                                  <span className="font-mono text-xs">
-                                    {device.battery ? (String(device.battery).includes('%') ? device.battery : `${device.battery}%`) : '100%'}
-                                  </span>
-                                </div>
-                              </td>
-
-                              {/* Column 6: 4G Cellular Signal */}
-                              <td className="py-3.5 px-4 whitespace-nowrap">
-                                <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200">
-                                  <Signal className="w-4 h-4 text-blue-500 shrink-0" />
-                                  <span className="text-xs">{device.signal || '4G LTE'}</span>
-                                </div>
-                              </td>
-
-                              {/* Column 7: Telegram Code */}
-                              <td className="py-3.5 px-4">
-                                {device.telegram_chat_id ? (
-                                  <div className="flex flex-wrap gap-1">
-                                    {device.telegram_chat_id.split(',').map((id, idx) => (
-                                      <code key={idx} className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                                        {id.trim()}
-                                      </code>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <span className="text-slate-400 italic text-[11px]">Unbound</span>
-                                )}
-                              </td>
-
-                              {/* Column 7: Operations */}
-                              <td className="py-3.5 px-4 text-center">
-                                <div className="flex items-center justify-center gap-1.5">
-                                  {/* Reboot */}
+                              {/* Operations / Actions */}
+                              <td className="py-3.5 px-4 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {/* Edit Store Branch */}
                                   <button
                                     type="button"
-                                    onClick={() => handleTriggerReboot(device)}
-                                    disabled={isRebooting}
-                                    className="p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                                    title="Reboot soundbox"
+                                    onClick={() => {
+                                      const storeIdx = stores.findIndex(item => item.id === r.storeId);
+                                      if (storeIdx !== -1) setSelectedStoreIndex(storeIdx);
+                                      setEditName(r.store.name || '');
+                                      const resolved = resolveStoreLocationCodes(r.store);
+                                      setEditProvinceId(resolved.provinceId);
+                                      setEditDistrictId(resolved.districtId);
+                                      setEditCommuneId(resolved.communeId);
+                                      setEditVillageId(resolved.villageId);
+                                      setEditStreetOrLandmark(resolved.streetOrLandmark);
+                                      setIsEditStoreOpen(true);
+                                    }}
+                                    className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/80 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+                                    title={isKhmer ? 'កែសម្រួលព័ត៌មានហាង' : 'Edit Store'}
                                   >
-                                    <RotateCcw className={`w-3.5 h-3.5 ${isRebooting ? 'animate-spin text-amber-500' : ''}`} />
+                                    <Edit3 className="w-3 h-3" />
+                                    <span>{isKhmer ? 'កែសម្រួល' : 'Edit'}</span>
                                   </button>
 
-                                  {/* Edit Pairing */}
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenEditDevice(device)}
-                                    className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                                    title="Edit pairing & Telegram ID"
-                                  >
-                                    <Edit3 className="w-3.5 h-3.5" />
-                                  </button>
+                                  {/* If device is linked: Test Voice & Unlink */}
+                                  {r.hasDevice && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        disabled={isTesting}
+                                        onClick={() => handleTriggerBroadcast(r.device)}
+                                        className="p-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80 rounded-lg transition disabled:opacity-50 cursor-pointer"
+                                        title={isKhmer ? 'សាកល្បងសំឡេង' : 'Test Audio Announcement'}
+                                      >
+                                        <Volume2 className={`w-3.5 h-3.5 ${isTesting ? 'animate-bounce text-indigo-500' : ''}`} />
+                                      </button>
 
-                                  {/* Unlink */}
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenUnlinkDevice(device)}
-                                    className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition cursor-pointer"
-                                    title="Unlink soundbox from store"
-                                  >
-                                    <Unlink className="w-3.5 h-3.5" />
-                                  </button>
+                                      <button
+                                        type="button"
+                                        disabled={isRebooting}
+                                        onClick={() => handleTriggerReboot(r.device)}
+                                        className="p-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg transition disabled:opacity-50 cursor-pointer"
+                                        title={isKhmer ? 'ចាប់ផ្តើមឡើងវិញ' : 'Reboot Device'}
+                                      >
+                                        <RefreshCw className={`w-3.5 h-3.5 ${isRebooting ? 'animate-spin text-emerald-500' : ''}`} />
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUnlinkDevice(r.device.id)}
+                                        className="p-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200/80 dark:border-rose-800/80 rounded-lg transition cursor-pointer"
+                                        title={isKhmer ? 'ផ្តាច់ឧបករណ៍' : 'Unlink Device'}
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </>
+                                  )}
+
+                                  {/* If no device: quick link button */}
+                                  {!r.hasDevice && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setNewDeviceStoreId(r.storeId);
+                                        setIsDeviceModalOpen(true);
+                                      }}
+                                      className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                      <span>{isKhmer ? 'ភ្ជាប់ Soundbox' : 'Link'}</span>
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -1661,34 +1523,6 @@ export default function UserDashboard() {
                       </tbody>
                     </table>
                   </div>
-                ) : allUserDevices.length === 0 ? (
-                  <div className="text-center py-16 px-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl space-y-4 max-w-md mx-auto my-4">
-                    <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto shadow-xs">
-                      <Volume2 className="w-7 h-7" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <h4 className="text-base font-bold text-slate-900 dark:text-white">
-                        {isKhmer ? 'មិនទាន់មានឧបករណ៍ Soundbox ភ្ជាប់នៅឡើយទេ' : 'No Soundbox Devices Linked Yet'}
-                      </h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                        {isKhmer 
-                          ? 'សូមភ្ជាប់ឧបករណ៍ 4G Cloud Soundbox ទៅកាន់សាខាហាងរបស់អ្នក ដើម្បីចាប់ផ្តើមទទួលការផ្សាយសំឡេងទូទាត់ប្រាក់ភ្លាមៗ។'
-                          : 'Link a 4G Cloud Soundbox speaker to your store branch to start receiving real-time voice payment announcements.'}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveCameraField(null);
-                        setScanFeedback({ field: '', message: '', isError: false });
-                        setIsDeviceModalOpen(true);
-                      }}
-                      className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-xs transition inline-flex items-center gap-2 whitespace-nowrap cursor-pointer"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>{isKhmer ? 'ភ្ជាប់ឧបករណ៍ Soundbox' : 'Link Soundbox Device'}</span>
-                    </button>
-                  </div>
                 ) : (
                   <div className="text-center py-14 px-4 space-y-3">
                     <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
@@ -1696,19 +1530,15 @@ export default function UserDashboard() {
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                        {isKhmer ? 'រកមិនឃើញឧបករណ៍ត្រូវនឹងពាក្យស្វែងរកទេ' : 'No Soundbox devices matched your filters'}
+                        {isKhmer ? 'រកមិនឃើញទិន្នន័យត្រូវនឹងការស្វែងរកទេ' : 'No records matched your search filters'}
                       </p>
                       <p className="text-xs text-slate-400">
-                        {isKhmer ? 'សូមសាកល្បងផ្លាស់ប្តូរពាក្យគន្លឹះ ឬជ្រើសរើសសាខាផ្សេង' : 'Try adjusting your search keyword or clearing the status/branch filter.'}
+                        {isKhmer ? 'សូមសាកល្បងផ្លាស់ប្តូរពាក្យគន្លឹះ ឬសម្អាតការស្វែងរក' : 'Try adjusting your search keyword or clearing the filters.'}
                       </p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => {
-                        setDeviceSearchTerm('');
-                        setDeviceStoreFilter('ALL');
-                        setDeviceStatusFilter('ALL');
-                      }}
+                      onClick={handleResetUnifiedFilters}
                       className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition cursor-pointer"
                     >
                       {isKhmer ? 'សម្អាតការស្វែងរក' : 'Clear Filters'}
@@ -1720,9 +1550,6 @@ export default function UserDashboard() {
 
             </div>
           )}
-
-        </div>
-      )}
 
           {/* ======================================================== */}
           {/* TAB 3: DEDICATED TRANSACTION HISTORY & STATEMENT          */}
