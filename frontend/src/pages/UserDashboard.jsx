@@ -344,6 +344,14 @@ export default function UserDashboard() {
   const [targetVolumeDevice, setTargetVolumeDevice] = useState(null);
   const [deviceVolume, setDeviceVolume] = useState(80);
 
+  // Detail Modal State
+  const [selectedDetailRow, setSelectedDetailRow] = useState(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const handleOpenDetailModal = (row) => {
+    setSelectedDetailRow(row);
+    setIsDetailModalOpen(true);
+  };
+
   // Transaction Receipt / Slip Modal State
   const [selectedTxSlip, setSelectedTxSlip] = useState(null);
   const [isTxSlipOpen, setIsTxSlipOpen] = useState(false);
@@ -1446,28 +1454,26 @@ export default function UserDashboard() {
                                     <span>{isKhmer ? 'កែសម្រួល' : 'Edit'}</span>
                                   </button>
 
-                                  {/* If device is linked: Reboot & Unlink */}
-                                  {r.hasDevice && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        disabled={isRebooting}
-                                        onClick={() => handleTriggerReboot(r.device)}
-                                        className="p-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg transition disabled:opacity-50 cursor-pointer"
-                                        title={isKhmer ? 'ចាប់ផ្តើមឡើងវិញ' : 'Reboot Device'}
-                                      >
-                                        <RefreshCw className={`w-3.5 h-3.5 ${isRebooting ? 'animate-spin text-emerald-500' : ''}`} />
-                                      </button>
+                                  {/* Detail Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenDetailModal(r)}
+                                    className="p-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200/80 dark:border-blue-800/80 rounded-lg transition cursor-pointer"
+                                    title={isKhmer ? 'ព័ត៌មានលម្អិត' : 'View Details'}
+                                  >
+                                    <Info className="w-3.5 h-3.5" />
+                                  </button>
 
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOpenUnlinkDevice(r.device)}
-                                        className="p-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200/80 dark:border-rose-800/80 rounded-lg transition cursor-pointer"
-                                        title={isKhmer ? 'ផ្តាច់ឧបករណ៍ Soundbox' : 'Unlink Soundbox'}
-                                      >
-                                        <Unlink className="w-3.5 h-3.5" />
-                                      </button>
-                                    </>
+                                  {/* If device is linked: Unlink */}
+                                  {r.hasDevice && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenUnlinkDevice(r.device)}
+                                      className="p-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200/80 dark:border-rose-800/80 rounded-lg transition cursor-pointer"
+                                      title={isKhmer ? 'ផ្តាច់ឧបករណ៍ Soundbox' : 'Unlink Soundbox'}
+                                    >
+                                      <Unlink className="w-3.5 h-3.5" />
+                                    </button>
                                   )}
 
                                   {/* If no device: quick link button */}
@@ -2431,6 +2437,198 @@ export default function UserDashboard() {
             </button>
           </div>
         </div>
+      </Modal>
+
+      {/* ======================================================== */}
+      {/* STORE & SOUNDBOX DEVICE DETAILS MODAL                     */}
+      {/* ======================================================== */}
+      <Modal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        title={isKhmer ? 'ព័ត៌មានលម្អិតសាខាហាង និងឧបករណ៍' : 'Store & Soundbox Details'}
+      >
+        {selectedDetailRow && (() => {
+          const r = selectedDetailRow;
+          const dev = r.device;
+          const isOnline = r.hasDevice && (r.status === 'ACTIVE' || r.status === 'ONLINE');
+
+          // Warranty calculation
+          const now = new Date();
+          const durationDays = Number(dev?.warranty_days) || 90;
+          let endDate = dev?.warranty_end_date ? new Date(dev.warranty_end_date) : null;
+          if (!endDate && dev?.warranty_start_date) {
+            endDate = new Date(new Date(dev.warranty_start_date).getTime() + durationDays * 86400000);
+          }
+          if (!endDate && dev?.created_at) {
+            endDate = new Date(new Date(dev.created_at).getTime() + durationDays * 86400000);
+          }
+          const daysLeft = endDate ? Math.ceil((endDate.getTime() - now.getTime()) / 86400000) : 0;
+
+          return (
+            <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-1 text-xs">
+              {/* Store Branch Information Card */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-700 pb-2">
+                  <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2 text-sm">
+                    <Store className="w-4 h-4 text-emerald-600" />
+                    <span>{r.storeName}</span>
+                    <span className="text-[10px] font-mono text-slate-400 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">ID: #{r.storeId}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDetailModalOpen(false);
+                      const storeIdx = stores.findIndex(item => item.id === r.storeId);
+                      if (storeIdx !== -1) setSelectedStoreIndex(storeIdx);
+                      setEditName(r.store?.name || '');
+                      const resolved = resolveStoreLocationCodes(r.store);
+                      setEditProvinceId(resolved.provinceId);
+                      setEditDistrictId(resolved.districtId);
+                      setEditCommuneId(resolved.communeId);
+                      setEditVillageId(resolved.villageId);
+                      setEditStreetOrLandmark(resolved.streetOrLandmark);
+                      setIsEditStoreOpen(true);
+                    }}
+                    className="text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Edit3 className="w-3 h-3" />
+                    <span>{isKhmer ? 'កែសម្រួល' : 'Edit'}</span>
+                  </button>
+                </div>
+
+                <div className="space-y-1 text-slate-600 dark:text-slate-300">
+                  <div className="flex items-start gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-semibold text-slate-900 dark:text-white">{isKhmer ? 'អាសយដ្ឋានពេញលេញ:' : 'Full Address:'}</span>
+                      <p className="text-slate-500 dark:text-slate-400 mt-0.5">{r.location}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Soundbox Device Hardware Details */}
+              {r.hasDevice ? (
+                <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                    <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <Volume2 className="w-4 h-4 text-indigo-600" />
+                      <span>{isKhmer ? 'ឧបករណ៍ Soundbox ដែលបានភ្ជាប់' : 'Linked Soundbox Speaker'}</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      isOnline 
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' 
+                        : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                    }`}>
+                      {isOnline ? '🟢 ACTIVE' : '⚪ OFFLINE'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {/* SN */}
+                    <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                      <span className="text-[10px] text-slate-400 font-semibold block">{isKhmer ? 'លេខស៊េរី (Serial Number)' : 'Serial Number (SN)'}</span>
+                      <span className="font-mono font-bold text-slate-900 dark:text-white text-xs mt-0.5 block">{r.deviceSn}</span>
+                    </div>
+
+                    {/* Model */}
+                    <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                      <span className="text-[10px] text-slate-400 font-semibold block">{isKhmer ? 'ម៉ូឌែលឧបករណ៍' : 'Hardware Model'}</span>
+                      <span className="font-bold text-slate-900 dark:text-white text-xs mt-0.5 block">{r.deviceModel || 'Y6B 4G Cloud'}</span>
+                    </div>
+
+                    {/* Battery */}
+                    <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                      <span className="text-[10px] text-slate-400 font-semibold block">{isKhmer ? 'កម្រិតថ្ម' : 'Battery Level'}</span>
+                      <div className="flex items-center gap-1.5 mt-0.5 font-bold text-slate-900 dark:text-white">
+                        <Battery className={`w-3.5 h-3.5 ${r.batteryLevel > 40 ? 'text-emerald-600' : 'text-amber-500'}`} />
+                        <span>{isOnline ? `${r.batteryLevel || 85}%` : '-'}</span>
+                      </div>
+                    </div>
+
+                    {/* 4G Signal */}
+                    <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                      <span className="text-[10px] text-slate-400 font-semibold block">{isKhmer ? 'សេវា 4G' : '4G Signal'}</span>
+                      <div className="flex items-center gap-1.5 mt-0.5 font-semibold text-slate-900 dark:text-white">
+                        <Wifi className="w-3.5 h-3.5 text-indigo-500" />
+                        <span>{isOnline ? (r.signalStrength || '4G LTE') : '-'}</span>
+                      </div>
+                    </div>
+
+                    {/* Telegram Bot */}
+                    <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                      <span className="text-[10px] text-slate-400 font-semibold block">Telegram Bot Chat ID</span>
+                      <span className="font-mono text-xs text-sky-600 dark:text-sky-400 mt-0.5 block">
+                        {r.telegramChatId ? `@${r.telegramChatId}` : '-'}
+                      </span>
+                    </div>
+
+                    {/* Warranty */}
+                    <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                      <span className="text-[10px] text-slate-400 font-semibold block">{isKhmer ? 'ការធានា (Warranty)' : '90-Day Warranty'}</span>
+                      <div className="flex items-center gap-1 mt-0.5 font-bold text-emerald-600 dark:text-emerald-400">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>{daysLeft > 0 ? `${daysLeft} days left` : 'Expired'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Modal Hardware Actions */}
+                  <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDetailModalOpen(false);
+                        handleOpenUnlinkDevice(dev);
+                      }}
+                      className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200/80 dark:border-rose-800/80 rounded-xl font-bold flex items-center gap-1.5 transition cursor-pointer"
+                    >
+                      <Unlink className="w-3.5 h-3.5" />
+                      <span>{isKhmer ? 'ផ្តាច់ឧបករណ៍ Soundbox' : 'Unlink Soundbox'}</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-6 bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-300 dark:border-slate-700 rounded-2xl text-center space-y-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
+                    <Volume2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-slate-800 dark:text-slate-200 text-sm">
+                      {isKhmer ? 'មិនទាន់មានឧបករណ៍ Soundbox ភ្ជាប់' : 'No Soundbox Linked to this Branch'}
+                    </h5>
+                    <p className="text-slate-400 text-xs mt-0.5 max-w-xs mx-auto">
+                      {isKhmer ? 'ភ្ជាប់ឧបករណ៍ដើម្បីទទួលការប្រកាសសំឡេងទូទាត់ប្រាក់ភ្លាមៗ។' : 'Connect a 4G Cloud Soundbox to start receiving live voice announcements.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDetailModalOpen(false);
+                      setNewDeviceStoreId(r.storeId);
+                      setIsDeviceModalOpen(true);
+                    }}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>{isKhmer ? 'ភ្ជាប់ Soundbox ឥឡូវនេះ' : 'Link Soundbox Now'}</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Close Footer */}
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsDetailModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold transition cursor-pointer"
+                >
+                  {isKhmer ? 'បិទ' : 'Close'}
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </Modal>
 
     </div>
