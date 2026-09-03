@@ -1096,7 +1096,7 @@ export default function UserDashboard() {
   const hasAnyStore = stores.length > 0;
 
   return (
-    <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-5 sm:space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-10 py-6 sm:py-10 space-y-6 sm:space-y-8">
       
       {/* Case 1: USER HAS NOT REGISTERED ANY STORE YET */}
       {!hasAnyStore ? (
@@ -1185,7 +1185,7 @@ export default function UserDashboard() {
             <div className="space-y-5 sm:space-y-6">
 
               {/* Combined Store & Soundbox Fleet Table Card */}
-              <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-4 sm:p-6 space-y-4">
+              <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-7 lg:p-8 space-y-6">
                 
                 {/* Header with Title and Action Buttons */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -1305,7 +1305,7 @@ export default function UserDashboard() {
                 {/* The Single Unified Table */}
                 {filteredUnifiedRows.length > 0 ? (
                   <>
-                    <div className="hidden md:block overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
+                    <div className="hidden md:block mt-6 mb-3 overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
                       {/* Tablet & Mobile Horizontal Scroll Helper */}
                     <div className="xl:hidden flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 bg-slate-50/90 dark:bg-slate-800/70 px-3.5 py-1.5 border-b border-slate-200 dark:border-slate-800">
                       <span className="flex items-center gap-1.5 font-medium">
@@ -1321,7 +1321,7 @@ export default function UserDashboard() {
                       <table className="w-full text-left text-sm min-w-[1080px]">
                       <thead>
                         <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          <th className="py-3 px-3.5 w-10 text-center">
+                          <th className="py-4 px-4 w-12 text-center">
                             <button
                               type="button"
                               onClick={toggleSelectAllUnified}
@@ -1334,16 +1334,16 @@ export default function UserDashboard() {
                               )}
                             </button>
                           </th>
-                          {visibleColumns.storeBranch && <th className="py-3 px-4">{isKhmer ? 'សាខាហាង' : 'Store Branch'}</th>}
-                          {visibleColumns.location && <th className="py-3 px-4">{isKhmer ? 'ទីតាំង / អាសយដ្ឋាន' : 'Location / Address'}</th>}
-                          {visibleColumns.soundboxDevice && <th className="py-3 px-4">{isKhmer ? 'ឧបករណ៍ Soundbox' : 'Soundbox Device'}</th>}
-                          {visibleColumns.deviceType && <th className="py-3 px-4">{isKhmer ? 'ប្រភេទឧបករណ៍' : 'Device Type'}</th>}
-                          {visibleColumns.battery && <th className="py-3 px-4">{isKhmer ? 'ថាមពលថ្ម' : 'Battery Level'}</th>}
-                          {visibleColumns.signal && <th className="py-3 px-4">{isKhmer ? 'កម្រិតសេវា' : 'Signal'}</th>}
-                          {visibleColumns.telegram && <th className="py-3 px-4">{isKhmer ? 'Telegram Bot' : 'Telegram Bot'}</th>}
-                          {visibleColumns.warranty && <th className="py-3 px-4 text-center">{isKhmer ? 'ការធានា (Warranty)' : 'Warranty (90d)'}</th>}
-                          {visibleColumns.status && <th className="py-3 px-4">{isKhmer ? 'ស្ថានភាព' : 'Status'}</th>}
-                          {visibleColumns.actions && <th className="py-3 px-4 text-right rounded-r-xl whitespace-nowrap">{isKhmer ? 'សកម្មភាព' : 'Actions'}</th>}
+                          {visibleColumns.storeBranch && <th className="py-4 px-5">{isKhmer ? 'សាខាហាង' : 'Store Branch'}</th>}
+                          {visibleColumns.location && <th className="py-4 px-5">{isKhmer ? 'ទីតាំង / អាសយដ្ឋាន' : 'Location / Address'}</th>}
+                          {visibleColumns.soundboxDevice && <th className="py-4 px-5">{isKhmer ? 'ឧបករណ៍ Soundbox' : 'Soundbox Device'}</th>}
+                          {visibleColumns.deviceType && <th className="py-4 px-5">{isKhmer ? 'ប្រភេទឧបករណ៍' : 'Device Type'}</th>}
+                          {visibleColumns.battery && <th className="py-4 px-5">{isKhmer ? 'ថាមពលថ្ម' : 'Battery Level'}</th>}
+                          {visibleColumns.signal && <th className="py-4 px-5">{isKhmer ? 'កម្រិតសេវា' : 'Signal'}</th>}
+                          {visibleColumns.telegram && <th className="py-4 px-5">{isKhmer ? 'Telegram Bot' : 'Telegram Bot'}</th>}
+                          {visibleColumns.warranty && <th className="py-4 px-5 text-center">{isKhmer ? 'ការធានា (Warranty)' : 'Warranty (90d)'}</th>}
+                          {visibleColumns.status && <th className="py-4 px-5">{isKhmer ? 'ស្ថានភាព' : 'Status'}</th>}
+                          {visibleColumns.actions && <th className="py-4 px-5 text-right rounded-r-xl whitespace-nowrap">{isKhmer ? 'សកម្មភាព' : 'Actions'}</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
@@ -1373,7 +1373,7 @@ export default function UserDashboard() {
                               }`}
                             >
                               {/* Checkbox */}
-                              <td className="py-3.5 px-3.5 text-center">
+                              <td className="py-4 sm:py-4.5 px-4 text-center">
                                 <button
                                   type="button"
                                   onClick={() => toggleUnifiedRowSelection(r.rowId)}
@@ -1389,7 +1389,7 @@ export default function UserDashboard() {
 
                               {/* Store / Branch Name */}
                               {visibleColumns.storeBranch && (
-                                <td className="py-3.5 px-4">
+                                <td className="py-4 sm:py-4.5 px-5">
                                   <div className="flex items-center gap-2.5">
                                     <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
                                       <Store className="w-4 h-4" />
@@ -1406,7 +1406,7 @@ export default function UserDashboard() {
 
                               {/* Location / Address */}
                               {visibleColumns.location && (
-                                <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 max-w-[220px]">
+                                <td className="py-4 sm:py-4.5 px-5 text-slate-600 dark:text-slate-300 max-w-[220px]">
                                   <div className="flex items-center gap-1.5">
                                     <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                                     <span className="truncate" title={r.location}>{r.location}</span>
@@ -1416,7 +1416,7 @@ export default function UserDashboard() {
 
                               {/* Soundbox Device (SN/ID) */}
                               {visibleColumns.soundboxDevice && (
-                                <td className="py-3.5 px-4 font-mono">
+                                <td className="py-4 sm:py-4.5 px-5 font-mono">
                                   {r.hasDevice ? (
                                     <div className="flex items-center gap-2">
                                       <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
@@ -1434,7 +1434,7 @@ export default function UserDashboard() {
 
                               {/* Device Type */}
                               {visibleColumns.deviceType && (
-                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                <td className="py-4 sm:py-4.5 px-5 whitespace-nowrap">
                                   {r.hasDevice ? (
                                     <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1.5 whitespace-nowrap ${
                                       (r.deviceType === 'Display Soundbox' || String(r.deviceType || '').toLowerCase().includes('display') || String(r.deviceModel || '').toLowerCase().includes('display'))
@@ -1453,7 +1453,7 @@ export default function UserDashboard() {
 
                               {/* Battery Level */}
                               {visibleColumns.battery && (
-                                <td className="py-3.5 px-4">
+                                <td className="py-4 sm:py-4.5 px-5">
                                   {r.hasDevice && isOnline ? (
                                     <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
                                       <Battery className={`w-3.5 h-3.5 ${battery > 40 ? 'text-emerald-600' : battery > 20 ? 'text-amber-500' : 'text-rose-500'}`} />
@@ -1467,7 +1467,7 @@ export default function UserDashboard() {
 
                               {/* Signal Strength (Quality) */}
                               {visibleColumns.signal && (
-                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                <td className="py-4 sm:py-4.5 px-5 whitespace-nowrap">
                                   {r.hasDevice && isOnline ? (() => {
                                     const sig = String(r.signal || r.signalStrength || 'Good');
                                     const sigLower = sig.toLowerCase();
@@ -1499,7 +1499,7 @@ export default function UserDashboard() {
 
                               {/* Telegram Bot */}
                               {visibleColumns.telegram && (
-                                <td className="py-3.5 px-4">
+                                <td className="py-4 sm:py-4.5 px-5">
                                   {r.telegramChatId ? (
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200/60 dark:border-sky-800/60">
                                       <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
@@ -1513,7 +1513,7 @@ export default function UserDashboard() {
 
                               {/* Warranty (Optional) */}
                               {visibleColumns.warranty && (
-                                <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                                <td className="py-4 sm:py-4.5 px-5 text-center whitespace-nowrap">
                                   {r.hasDevice ? (
                                     daysLeft <= 0 ? (
                                       <span className="px-2 py-0.5 bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
@@ -1539,7 +1539,7 @@ export default function UserDashboard() {
 
                               {/* Status */}
                               {visibleColumns.status && (
-                                <td className="py-3.5 px-4">
+                                <td className="py-4 sm:py-4.5 px-5">
                                   {r.hasDevice ? (
                                     isOnline ? (
                                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
@@ -1560,7 +1560,7 @@ export default function UserDashboard() {
 
                               {/* Operations / Actions */}
                               {visibleColumns.actions && (
-                                <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                                <td className="py-4 sm:py-4.5 px-5 text-right whitespace-nowrap">
                                   <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                                     {/* Edit Store Branch / Merchant */}
                                     <button
@@ -1636,8 +1636,8 @@ export default function UserDashboard() {
                     </div>
                   </div>
 
-                  {/* Mobile Card Feed (< md) */}
-                  <div className="md:hidden space-y-3.5">
+                  {/* Mobile Store Cards (< md) */}
+                  <div className="md:hidden space-y-6 mt-8">
                     {filteredUnifiedRows.map((r) => {
                       const isOnline = r.hasDevice && (r.status === 'ACTIVE' || r.status === 'ONLINE');
                       const isTesting = r.device && testingDeviceId === r.device.id;
@@ -1825,7 +1825,7 @@ export default function UserDashboard() {
             <div className="space-y-5 sm:space-y-6">
 
               {/* Transactions Table & Advanced Filters */}
-              <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
+              <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-7 lg:p-8 space-y-6">
                 
                 {/* Header & Export Actions */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100 dark:border-slate-800">
@@ -1912,11 +1912,11 @@ export default function UserDashboard() {
                 {/* Transactions Table */}
                 {filteredTransactions.length > 0 ? (
                   <>
-                    <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800">
+                    <div className="hidden md:block mt-6 mb-3 overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800">
                     <table className="w-full text-left text-sm min-w-[700px]">
                       <thead>
                         <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          <th className="py-3 px-3.5 w-10 text-center">
+                          <th className="py-4 px-4 w-12 text-center">
                             <button
                               type="button"
                               onClick={toggleSelectAllTxs}
@@ -1929,14 +1929,14 @@ export default function UserDashboard() {
                               )}
                             </button>
                           </th>
-                          <th className="py-3 px-4">{t('bank', 'Bank / Source')}</th>
-                          <th className="py-3 px-4">{t('amount', 'Amount')}</th>
-                          <th className="py-3 px-4">{t('payer', 'Customer / Payer')}</th>
-                          <th className="py-3 px-4">{t('txId', 'Bank Reference ID')}</th>
-                          <th className="py-3 px-4">Store Branch</th>
-                          <th className="py-3 px-4">{t('device', 'Soundbox SN')}</th>
-                          <th className="py-3 px-4">Date & Time</th>
-                          <th className="py-3 px-4 text-right">Receipt</th>
+                          <th className="py-4 px-5">{t('bank', 'Bank / Source')}</th>
+                          <th className="py-4 px-5">{t('amount', 'Amount')}</th>
+                          <th className="py-4 px-5">{t('payer', 'Customer / Payer')}</th>
+                          <th className="py-4 px-5">{t('txId', 'Bank Reference ID')}</th>
+                          <th className="py-4 px-5">Store Branch</th>
+                          <th className="py-4 px-5">{t('device', 'Soundbox SN')}</th>
+                          <th className="py-4 px-5">Date & Time</th>
+                          <th className="py-4 px-5 text-right">Receipt</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
@@ -1964,29 +1964,29 @@ export default function UserDashboard() {
                                 )}
                               </button>
                             </td>
-                            <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            <td className="py-4 sm:py-4.5 px-5 font-bold text-slate-900 dark:text-white flex items-center gap-2">
                               <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                               <span>{tx.bank_name || 'Bakong'}</span>
                             </td>
-                            <td className="py-3.5 px-4 font-black text-emerald-600 dark:text-emerald-400 font-mono text-sm">
+                            <td className="py-4 sm:py-4.5 px-5 font-black text-emerald-600 dark:text-emerald-400 font-mono text-sm">
                               +{tx.currency === 'USD' ? `$${Number(tx.amount).toFixed(2)}` : `៛${Number(tx.amount).toLocaleString()}`}
                             </td>
-                            <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 font-medium">
+                            <td className="py-4 sm:py-4.5 px-5 text-slate-700 dark:text-slate-300 font-medium">
                               {tx.payer_name || t('customer', 'Customer')}
                             </td>
-                            <td className="py-3.5 px-4 font-mono text-slate-400">
+                            <td className="py-4 sm:py-4.5 px-5 font-mono text-slate-400">
                               {tx.bank_tx_id || tx.id}
                             </td>
-                            <td className="py-3.5 px-4 font-medium text-slate-800 dark:text-slate-200">
+                            <td className="py-4 sm:py-4.5 px-5 font-medium text-slate-800 dark:text-slate-200">
                               {tx.storeName || activeStore?.name}
                             </td>
-                            <td className="py-3.5 px-4 font-mono text-slate-500">
+                            <td className="py-4 sm:py-4.5 px-5 font-mono text-slate-500">
                               {tx.device_sn}
                             </td>
-                            <td className="py-3.5 px-4 text-slate-400">
+                            <td className="py-4 sm:py-4.5 px-5 text-slate-400">
                               {tx.created_at ? new Date(tx.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : ''}
                             </td>
-                            <td className="py-3.5 px-4 text-right">
+                            <td className="py-4 sm:py-4.5 px-5 text-right">
                               <span className="text-blue-600 dark:text-blue-400 font-bold group-hover:underline flex items-center justify-end gap-1">
                                 <span>Slip</span>
                                 <ExternalLink className="w-3 h-3" />
@@ -1999,7 +1999,7 @@ export default function UserDashboard() {
                   </div>
 
                   {/* Mobile Transaction Cards (< md) */}
-                  <div className="md:hidden space-y-3">
+                  <div className="md:hidden space-y-4 mt-6">
                     {filteredTransactions.map((tx) => (
                       <div 
                         key={tx.id}

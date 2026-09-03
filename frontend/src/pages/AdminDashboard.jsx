@@ -1826,7 +1826,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-4 sm:space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-10 py-6 sm:py-10 space-y-6 sm:space-y-8">
       
       {/* Top Banner Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
@@ -2112,13 +2112,13 @@ export default function AdminDashboard() {
           </div>
 
           {/* Desktop User Table (>= md) */}
-          <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
-            <div className="overflow-x-auto p-6 pb-0">
+          <div className="hidden md:block mt-6 mb-4 bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="overflow-x-auto p-6 sm:p-8 pb-4">
               <table className="w-full text-left text-sm min-w-[680px]">
                 <thead>
 
                   <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    <th className="pb-3 w-10 text-center">
+                    <th className="py-4 px-4 w-12 text-center">
                       <button
                         type="button"
                         onClick={toggleSelectAllUsers}
@@ -2131,13 +2131,13 @@ export default function AdminDashboard() {
                         )}
                       </button>
                     </th>
-                    <th className="pb-3 font-medium">{t('phoneNumber', 'Phone Number')}</th>
-                    <th className="pb-3 font-medium">{t('fullName', 'Full Name')}</th>
-                    <th className="pb-3 font-medium">{t('role', 'Role')}</th>
-                    <th className="pb-3 font-medium">{t('status', 'Status')}</th>
-                    <th className="pb-3 font-medium">{t('storeBranches', 'Owned Stores')}</th>
-                    <th className="pb-3 font-medium">{t('time', 'Last Login')}</th>
-                    <th className="pb-3 font-medium text-right">{t('actions', 'Actions')}</th>
+                    <th className="py-4 px-5 font-semibold">{t('phoneNumber', 'Phone Number')}</th>
+                    <th className="py-4 px-5 font-semibold">{t('fullName', 'Full Name')}</th>
+                    <th className="py-4 px-5 font-semibold">{t('role', 'Role')}</th>
+                    <th className="py-4 px-5 font-semibold">{t('status', 'Status')}</th>
+                    <th className="py-4 px-5 font-semibold">{t('storeBranches', 'Owned Stores')}</th>
+                    <th className="py-4 px-5 font-semibold">{t('time', 'Last Login')}</th>
+                    <th className="py-4 px-5 font-semibold text-right">{t('actions', 'Actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -2625,7 +2625,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Desktop Store Table (>= md) */}
-          <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+          <div className="hidden md:block mt-6 mb-4 bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-6">
             <div className="flex items-center justify-between mb-2">
               <div>
                 <h3 className="text-base font-semibold text-slate-900 dark:text-white">{t('storeManagement', 'Stores & Locations')}</h3>
@@ -2643,7 +2643,7 @@ export default function AdminDashboard() {
                 <thead>
 
                   <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    <th className="pb-3 w-10 text-center">
+                    <th className="py-4 px-4 w-12 text-center">
                       <button
                         type="button"
                         onClick={toggleSelectAllStores}
@@ -2656,11 +2656,11 @@ export default function AdminDashboard() {
                         )}
                       </button>
                     </th>
-                    <th className="pb-3 font-medium">{t('storeName', 'Store Name')}</th>
-                    <th className="pb-3 font-medium">{t('owner', 'Merchant / Owner')}</th>
-                    <th className="pb-3 font-medium">{t('location', 'Location (Province / District)')}</th>
-                    <th className="pb-3 font-medium">{t('connectedSoundboxes', 'Soundboxes')}</th>
-                    <th className="pb-3 font-medium text-right">{t('actions', 'Details')}</th>
+                    <th className="py-4 px-5 font-semibold">{t('storeName', 'Store Name')}</th>
+                    <th className="py-4 px-5 font-semibold">{t('owner', 'Merchant / Owner')}</th>
+                    <th className="py-4 px-5 font-semibold">{t('location', 'Location (Province / District)')}</th>
+                    <th className="py-4 px-5 font-semibold">{t('connectedSoundboxes', 'Soundboxes')}</th>
+                    <th className="py-4 px-5 font-semibold text-right">{t('actions', 'Details')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -2677,7 +2677,7 @@ export default function AdminDashboard() {
                         }`}
                       >
                         {/* Selection Checkbox */}
-                        <td className="py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                        <td className="py-4 sm:py-4.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
                             onClick={() => toggleStoreSelection(s.id)}
@@ -2692,7 +2692,7 @@ export default function AdminDashboard() {
                         </td>
                         
                         {/* Store Name */}
-                        <td className="py-3.5">
+                        <td className="py-4 sm:py-4.5 px-5">
                           <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold shrink-0">
                               <Store className="w-4 h-4" />
@@ -2996,12 +2996,12 @@ export default function AdminDashboard() {
           </div>
 
           {/* 3. Cloud Speaker Data Table */}
-          <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
+          <div className="hidden md:block mt-6 mb-4 bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs min-w-[1100px]">
                 <thead>
                   <tr className="bg-slate-50/75 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-semibold select-none whitespace-nowrap">
-                    <th className="py-3 px-4 w-10 text-center">
+                    <th className="py-4 px-4 w-12 text-center">
                       <button
                         type="button"
                         onClick={toggleSelectAllDevices}
@@ -3014,18 +3014,18 @@ export default function AdminDashboard() {
                         )}
                       </button>
                     </th>
-                    {visibleColumns.deviceId && <th className="py-3 px-3 font-semibold min-w-[160px]">{t('deviceId', 'Device ID')}</th>}
-                    {visibleColumns.deviceType && <th className="py-3 px-3 font-semibold min-w-[190px]">{t('deviceType', 'Device Type')}</th>}
-                    {visibleColumns.merchantId && <th className="py-3 px-3 font-semibold min-w-[180px]">{t('merchantStore', 'Assigned Store')}</th>}
-                    {visibleColumns.status && <th className="py-3 px-3 font-semibold text-center min-w-[110px]">{t('status', 'Status')}</th>}
-                    {visibleColumns.price && <th className="py-3 px-3 font-semibold text-center min-w-[110px]">{t('price', 'Price')}</th>}
-                    {visibleColumns.warranty && <th className="py-3 px-3 font-semibold text-center min-w-[140px]">{t('warranty', 'Warranty (90d)')}</th>}
-                    {visibleColumns.battery && <th className="py-3 px-3 font-semibold text-center min-w-[95px]">{t('battery', 'Battery')}</th>}
-                    {visibleColumns.signal && <th className="py-3 px-3 font-semibold text-center min-w-[95px]">{t('signal', 'Signal')}</th>}
-                    {visibleColumns.version4g && <th className="py-3 px-3 font-semibold min-w-[150px]">{t('version4G', '4G Version')}</th>}
-                    {visibleColumns.versionWifi && <th className="py-3 px-3 font-semibold min-w-[150px]">{t('versionWifi', 'WiFi Version')}</th>}
-                    {visibleColumns.lastTime && <th className="py-3 px-3 font-semibold min-w-[140px]">{t('lastTime', 'Last Time')}</th>}
-                    {visibleColumns.operation && <th className="py-3 px-4 font-semibold text-center min-w-[160px]">{t('operation', 'Operation')}</th>}
+                    {visibleColumns.deviceId && <th className="py-4 px-4 font-semibold min-w-[160px]">{t('deviceId', 'Device ID')}</th>}
+                    {visibleColumns.deviceType && <th className="py-4 px-4 font-semibold min-w-[190px]">{t('deviceType', 'Device Type')}</th>}
+                    {visibleColumns.merchantId && <th className="py-4 px-4 font-semibold min-w-[180px]">{t('merchantStore', 'Assigned Store')}</th>}
+                    {visibleColumns.status && <th className="py-4 px-4 font-semibold text-center min-w-[110px]">{t('status', 'Status')}</th>}
+                    {visibleColumns.price && <th className="py-4 px-4 font-semibold text-center min-w-[110px]">{t('price', 'Price')}</th>}
+                    {visibleColumns.warranty && <th className="py-4 px-4 font-semibold text-center min-w-[140px]">{t('warranty', 'Warranty (90d)')}</th>}
+                    {visibleColumns.battery && <th className="py-4 px-4 font-semibold text-center min-w-[95px]">{t('battery', 'Battery')}</th>}
+                    {visibleColumns.signal && <th className="py-4 px-4 font-semibold text-center min-w-[95px]">{t('signal', 'Signal')}</th>}
+                    {visibleColumns.version4g && <th className="py-4 px-4 font-semibold min-w-[150px]">{t('version4G', '4G Version')}</th>}
+                    {visibleColumns.versionWifi && <th className="py-4 px-4 font-semibold min-w-[150px]">{t('versionWifi', 'WiFi Version')}</th>}
+                    {visibleColumns.lastTime && <th className="py-4 px-4 font-semibold min-w-[140px]">{t('lastTime', 'Last Time')}</th>}
+                    {visibleColumns.operation && <th className="py-4 px-5 font-semibold text-center min-w-[160px]">{t('operation', 'Operation')}</th>}
                   </tr>
                 </thead>
 
@@ -3655,12 +3655,12 @@ export default function AdminDashboard() {
           </div>
 
           {/* 2. Warehouse Stock Table Card */}
-          <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
+          <div className="hidden md:block mt-6 mb-4 bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs min-w-[760px]">
                 <thead>
                   <tr className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 text-xs font-semibold select-none whitespace-nowrap">
-                    <th className="py-3 px-3.5 w-10 text-center">
+                    <th className="py-4 px-4 w-12 text-center">
                       <button
                         type="button"
                         onClick={toggleSelectAllStock}
@@ -3673,12 +3673,12 @@ export default function AdminDashboard() {
                         )}
                       </button>
                     </th>
-                    {visibleStockColumns.deviceId && <th className="py-3 px-4 font-semibold min-w-[160px]">{t('deviceId', 'Device ID')}</th>}
-                    {visibleStockColumns.deviceType && <th className="py-3 px-3 font-semibold min-w-[190px]">{t('deviceType', 'Device Type')}</th>}
-                    {visibleStockColumns.price && <th className="py-3 px-3 font-semibold text-center min-w-[95px]">{t('price', 'Price')}</th>}
-                    {visibleStockColumns.intakeDate && <th className="py-3 px-3 font-semibold min-w-[130px]">{t('registrationDate', 'Registration Date')}</th>}
-                    {visibleStockColumns.notes && <th className="py-3 px-3 font-semibold min-w-[200px]">{t('warehouseNotes', 'Warehouse Notes')}</th>}
-                    {visibleStockColumns.operation && <th className="py-3 px-4 font-semibold text-center min-w-[100px]">{t('operation', 'Operation')}</th>}
+                    {visibleStockColumns.deviceId && <th className="py-4 px-5 font-semibold min-w-[160px]">{t('deviceId', 'Device ID')}</th>}
+                    {visibleStockColumns.deviceType && <th className="py-4 px-5 font-semibold min-w-[190px]">{t('deviceType', 'Device Type')}</th>}
+                    {visibleStockColumns.price && <th className="py-4 px-5 font-semibold text-center min-w-[95px]">{t('price', 'Price')}</th>}
+                    {visibleStockColumns.intakeDate && <th className="py-4 px-5 font-semibold min-w-[130px]">{t('registrationDate', 'Registration Date')}</th>}
+                    {visibleStockColumns.notes && <th className="py-4 px-5 font-semibold min-w-[200px]">{t('warehouseNotes', 'Warehouse Notes')}</th>}
+                    {visibleStockColumns.operation && <th className="py-4 px-5 font-semibold text-center min-w-[100px]">{t('operation', 'Operation')}</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
@@ -4050,12 +4050,12 @@ export default function AdminDashboard() {
               const paginatedUserActs = filteredList.slice(startUserActIdx, startUserActIdx + userActPageSize);
 
               return (
-                <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900">
+                <div className="mt-6 mb-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse min-w-[850px]">
                       <thead>
                         <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                          <th className="py-3 px-3.5 w-10 text-center">
+                          <th className="py-4 px-4 w-12 text-center">
                             <button
                               type="button"
                               onClick={() => toggleSelectAllUserAct(paginatedUserActs)}
@@ -4068,12 +4068,12 @@ export default function AdminDashboard() {
                               )}
                             </button>
                           </th>
-                          <th className="py-3 px-4">User / Merchant</th>
-                          <th className="py-3 px-4">Action / Activity</th>
-                          <th className="py-3 px-4">Target Entity</th>
-                          <th className="py-3 px-4">Source / Platform</th>
-                          <th className="py-3 px-4">Status</th>
-                          <th className="py-3 px-4">Timestamp</th>
+                          <th className="py-4 px-5">User / Merchant</th>
+                          <th className="py-4 px-5">Action / Activity</th>
+                          <th className="py-4 px-5">Target Entity</th>
+                          <th className="py-4 px-5">Source / Platform</th>
+                          <th className="py-4 px-5">Status</th>
+                          <th className="py-4 px-5">Timestamp</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
