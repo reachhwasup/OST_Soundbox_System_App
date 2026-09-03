@@ -62,6 +62,7 @@ async def register_device(
         # Eager schema migration to ensure all optional/new columns exist
         try:
             await conn.execute("""
+                ALTER TABLE devices DROP CONSTRAINT IF EXISTS devices_merchant_id_fkey;
                 ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_type VARCHAR(100) DEFAULT 'Display Soundbox';
                 ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_model VARCHAR(100) DEFAULT 'Y6B';
                 ALTER TABLE devices ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(255);
