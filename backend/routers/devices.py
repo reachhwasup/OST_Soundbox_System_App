@@ -235,7 +235,7 @@ async def list_devices(
                    COALESCE(u.full_name, m.name) AS merchant_name,
                    COALESCE(m.owner_phone, u.phone_number) AS owner_phone,
                    COALESCE(u.phone_number, m.owner_phone) AS user_phone,
-                   COALESCE(u.full_name, m.name) AS owner_name,
+                   COALESCE(u.full_name, m.name) AS owner_name
             FROM devices d
             LEFT JOIN merchants m ON d.merchant_id::text = m.id::text
             LEFT JOIN users u ON m.user_id = u.id
@@ -256,14 +256,23 @@ async def list_devices(
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_days INT DEFAULT 90;
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_start_date TIMESTAMPTZ;
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_end_date TIMESTAMPTZ;
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_4g VARCHAR(100) DEFAULT 'Y6_LCD_1605_V1.0';
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_4g VARCHAR(100) DEFAULT 'Y6B_LCD_1605_V1.0';
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_wifi VARCHAR(100) DEFAULT 'esp32c2x_2M_OTA';
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
                 """)
                 devices = await conn.fetch(query, *params)
             except Exception as e2:
                 logger.error(f"Fallback list_devices query: {e2}")
-                fallback_query = "SELECT id, device_sn, merchant_id, price, status, created_at FROM devices ORDER BY id DESC"
+                fallback_query = """
+                    SELECT d.id, d.device_sn, d.merchant_id, d.price, d.status, d.created_at,
+                           COALESCE(d.device_type, 'Display Soundbox') AS device_type,
+                           COALESCE(d.battery, '100%') AS battery,
+                           COALESCE(d.signal, 'Good') AS signal,
+                           m.name AS store_name
+                    FROM devices d
+                    LEFT JOIN merchants m ON d.merchant_id::text = m.id::text
+                    ORDER BY d.id DESC
+                """
                 devices = await conn.fetch(fallback_query)
 
         formatted_devices = []
