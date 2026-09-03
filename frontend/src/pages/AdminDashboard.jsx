@@ -3477,27 +3477,16 @@ export default function AdminDashboard() {
         <div className="space-y-4">
 
           {/* 0. Warehouse Stock KPI Summary Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
               <div className="text-[10px] sm:text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Warehouse className="w-3.5 h-3.5" />
                 <span>{t('warehouseStock', 'Warehouse Stock')}</span>
               </div>
               <div className="text-xl sm:text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">
-                {devices.filter(d => !d.merchant_id || String(d.status).toUpperCase() === 'IN_STOCK').length}
+                {devices.filter(d => !d.merchant_id).length}
               </div>
               <div className="text-[10px] text-slate-400 mt-0.5">{t('unassignedAndReady', 'Unassigned & Ready')}</div>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="text-[10px] sm:text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                <DollarSign className="w-3.5 h-3.5" />
-                <span>{t('stockAssetValue', 'Stock Asset Value')}</span>
-              </div>
-              <div className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
-                ${devices.filter(d => !d.merchant_id || String(d.status).toUpperCase() === 'IN_STOCK').reduce((sum, d) => sum + (Number(d.price) || 29), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">{t('stockValuationSub', 'Valuation ($29–$39/unit)')}</div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
@@ -3506,7 +3495,7 @@ export default function AdminDashboard() {
                 <span>{t('availableUnits', 'Available Units')}</span>
               </div>
               <div className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
-                {devices.filter(d => !d.merchant_id || String(d.status).toUpperCase() === 'IN_STOCK').length}
+                {devices.filter(d => !d.merchant_id).length}
               </div>
               <div className="text-[10px] text-slate-400 mt-0.5">{t('readyForDeployment', 'Ready for Deployment')}</div>
             </div>
