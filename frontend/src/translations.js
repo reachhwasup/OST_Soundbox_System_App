@@ -51,9 +51,6 @@ export const translations = {
     signingUp: "Creating account...",
     noAccount: "Don't have an account?",
     haveAccount: "Already have an account?",
-    demoAccounts: "One-Click Quick Test Accounts",
-    adminDemo: "Admin Demo",
-    merchantDemo: "Merchant Demo",
     signOut: "Sign Out",
     
     // Navigation
@@ -439,9 +436,6 @@ export const translations = {
     signingUp: "កំពុងបង្កើតគណនី...",
     noAccount: "មិនទាន់មានគណនី?",
     haveAccount: "មានគណនីរួចហើយ?",
-    demoAccounts: "គណនីសាកល្បងរហ័ស (One-Click)",
-    adminDemo: "គណនី Admin",
-    merchantDemo: "គណនី ម្ចាស់ហាង",
     signOut: "ចាកចេញ",
     
     // Navigation
