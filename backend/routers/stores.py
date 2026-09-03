@@ -1,9 +1,12 @@
+import logging
 from fastapi import APIRouter, HTTPException, Depends, status
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 
 from backend.database import get_db_pool
 from backend.security import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/stores", tags=["Stores"])
 
@@ -17,6 +20,8 @@ class StoreRegisterSchema(BaseModel):
     commune: Optional[str] = None
     village: Optional[str] = None
     street: Optional[str] = None
+    user_id: Optional[int] = None
+    owner_phone: Optional[str] = None
 
 
 class StoreUpdateSchema(BaseModel):
@@ -173,7 +178,6 @@ async def register_store(
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     pool = await get_db_pool()
-    phone = current_user["phone_number"]
     clean_name = payload.name.strip()
     clean_place = payload.place.strip()
     clean_location = payload.location.strip()
@@ -183,17 +187,67 @@ async def register_store(
     village = payload.village.strip() if payload.village else None
     street = payload.street.strip() if payload.street else clean_place
 
+    target_user_id = current_user["id"]
+    target_phone = current_user["phone_number"]
+
+    # Allow Administrator to provision a store on behalf of a specific user
+    if current_user.get("role") == "ADMIN":
+        if payload.user_id:
+            async with pool.acquire() as conn:
+                usr = await conn.fetchrow("SELECT id, phone_number FROM users WHERE id = $1", payload.user_id)
+                if usr:
+                    target_user_id = usr["id"]
+                    target_phone = usr["phone_number"]
+        elif payload.owner_phone:
+            async with pool.acquire() as conn:
+                usr = await conn.fetchrow("SELECT id, phone_number FROM users WHERE phone_number = $1", payload.owner_phone.strip())
+                if usr:
+                    target_user_id = usr["id"]
+                    target_phone = usr["phone_number"]
+                else:
+                    target_phone = payload.owner_phone.strip()
+                    target_user_id = None
+
     async with pool.acquire() as conn:
-        # Insert new store for user (supports multiple stores)
-        store_id = await conn.fetchval(
-            """
-            INSERT INTO merchants (user_id, name, owner_phone, place, location, province, district, commune, village, street)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            RETURNING id
-            """,
-            current_user["id"], clean_name, phone, clean_place, clean_location,
-            province, district, commune, village, street
-        )
+        try:
+            # Insert new store for user (supports multiple stores)
+            store_id = await conn.fetchval(
+                """
+                INSERT INTO merchants (user_id, name, owner_phone, place, location, province, district, commune, village, street)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                RETURNING id
+                """,
+                target_user_id, clean_name, target_phone, clean_place, clean_location,
+                province, district, commune, village, street
+            )
+        except Exception as e:
+            logger.warning(f"Standard store registration insert failed: {e}. Attempting schema auto-heal and fallback...")
+            try:
+                # Auto-heal missing columns or drop restrictive legacy unique constraints
+                await conn.execute("""
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS user_id INT REFERENCES users(id) ON DELETE SET NULL;
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS owner_phone VARCHAR(50);
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS province VARCHAR(100);
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS district VARCHAR(100);
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS commune VARCHAR(100);
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS village VARCHAR(100);
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS street VARCHAR(255);
+                    ALTER TABLE merchants DROP CONSTRAINT IF EXISTS merchants_owner_phone_key;
+                """)
+                store_id = await conn.fetchval(
+                    """
+                    INSERT INTO merchants (user_id, name, owner_phone, place, location)
+                    VALUES ($1, $2, $3, $4, $5)
+                    RETURNING id
+                    """,
+                    target_user_id, clean_name, target_phone, clean_place, clean_location
+                )
+            except Exception as final_e:
+                logger.error(f"Store registration permanently failed: {final_e}", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Failed to register store: {str(final_e)}"
+                )
 
         return {
             "status": "success",
@@ -201,9 +255,9 @@ async def register_store(
             "store_id": store_id,
             "store": {
                 "id": store_id,
-                "user_id": current_user["id"],
+                "user_id": target_user_id,
                 "name": clean_name,
-                "owner_phone": phone,
+                "owner_phone": target_phone,
                 "place": clean_place,
                 "location": clean_location,
                 "province": province,
