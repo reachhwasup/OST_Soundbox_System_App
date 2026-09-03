@@ -46,19 +46,37 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
 
     async with pool.acquire() as conn:
         # Fetch all stores belonging to this user (matching user_id or phone variations)
-        stores = await conn.fetch(
-            """
-            SELECT id, user_id, name, owner_phone, place, location,
-                   province, district, commune, village, street,
-                   created_at, updated_at
-            FROM merchants 
-            WHERE user_id = $1 
-               OR owner_phone = $2 
-               OR owner_phone = $3
-            ORDER BY id ASC
-            """,
-            current_user["id"], phone_clean, phone_alt
-        )
+        try:
+            stores = await conn.fetch(
+                """
+                SELECT id, user_id, 
+                       COALESCE(name, merchant_name, 'My Store') AS name, 
+                       owner_phone, place, location,
+                       province, district, commune, village, street,
+                       created_at
+                FROM merchants 
+                WHERE user_id = $1 
+                   OR owner_phone = $2 
+                   OR owner_phone = $3
+                ORDER BY id ASC
+                """,
+                current_user["id"], phone_clean, phone_alt
+            )
+        except Exception as q_err:
+            logger.warning(f"Full store query failed: {q_err}. Using basic store query...")
+            stores = await conn.fetch(
+                """
+                SELECT id, user_id, 
+                       COALESCE(name, 'My Store') AS name, 
+                       owner_phone, place, location, created_at
+                FROM merchants 
+                WHERE user_id = $1 
+                   OR owner_phone = $2 
+                   OR owner_phone = $3
+                ORDER BY id ASC
+                """,
+                current_user["id"], phone_clean, phone_alt
+            )
 
         # Link any unlinked stores to user_id
         for s in stores:
@@ -85,7 +103,7 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
             all_transactions = []
 
             for s in stores:
-                store_id = s["id"]
+                store_id = str(s["id"])
                 
                 # Fetch devices safely
                 devices = []
@@ -101,7 +119,7 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
                                COALESCE(last_online, last_heartbeat, updated_at, created_at) AS last_active,
                                last_online, last_heartbeat, created_at, updated_at
                         FROM devices
-                        WHERE merchant_id = $1
+                        WHERE merchant_id::text = $1
                         ORDER BY id ASC
                         """,
                         store_id
@@ -117,7 +135,7 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
                         SELECT t.id, t.bank_name, t.bank_tx_id, t.amount, t.currency, t.payer_name, t.status, t.created_at, d.device_sn
                         FROM transactions t
                         JOIN devices d ON t.device_id = d.id
-                        WHERE d.merchant_id = $1
+                        WHERE d.merchant_id::text = $1
                         ORDER BY t.created_at DESC
                         LIMIT 20
                         """,
@@ -135,7 +153,7 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
                                a.sender_user_id, a.sender_name, a.reason, a.created_at, d.device_sn
                         FROM security_alerts a
                         LEFT JOIN devices d ON a.device_id = d.id
-                        WHERE a.merchant_id = $1
+                        WHERE a.merchant_id::text = $1
                         ORDER BY a.created_at DESC
                         LIMIT 20
                         """,
