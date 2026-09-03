@@ -123,6 +123,10 @@ async def init_db():
             ALTER TABLE merchants ADD COLUMN IF NOT EXISTS commune VARCHAR(100);
             ALTER TABLE merchants ADD COLUMN IF NOT EXISTS village VARCHAR(100);
             ALTER TABLE merchants ADD COLUMN IF NOT EXISTS street VARCHAR(150);
+            ALTER TABLE merchants ADD COLUMN IF NOT EXISTS merchant_id VARCHAR(100);
+            ALTER TABLE merchants ADD COLUMN IF NOT EXISTS merchant_name VARCHAR(255);
+            ALTER TABLE merchants ALTER COLUMN merchant_id DROP NOT NULL;
+            ALTER TABLE merchants ALTER COLUMN merchant_name DROP NOT NULL;
             ALTER TABLE merchants DROP CONSTRAINT IF EXISTS merchants_owner_phone_key;
             CREATE INDEX IF NOT EXISTS idx_merchants_user_id ON merchants(user_id);
             CREATE INDEX IF NOT EXISTS idx_merchants_owner_phone ON merchants(owner_phone);

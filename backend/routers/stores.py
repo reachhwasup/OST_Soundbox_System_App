@@ -1,4 +1,6 @@
 import logging
+import time
+import uuid
 from fastapi import APIRouter, HTTPException, Depends, status
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
@@ -208,16 +210,31 @@ async def register_store(
                     target_phone = payload.owner_phone.strip()
                     target_user_id = None
 
+    mch_code = f"MCH-{int(time.time())}"
+
     async with pool.acquire() as conn:
+        # Preemptively relax restrictive constraints if present in the database
         try:
-            # Insert new store for user (supports multiple stores)
+            await conn.execute("""
+                ALTER TABLE merchants ALTER COLUMN merchant_id DROP NOT NULL;
+                ALTER TABLE merchants ALTER COLUMN merchant_name DROP NOT NULL;
+                ALTER TABLE merchants DROP CONSTRAINT IF EXISTS merchants_owner_phone_key;
+            """)
+        except Exception:
+            pass
+
+        try:
+            # Insert new store for user (supplying merchant_id to satisfy legacy NOT NULL constraints)
             store_id = await conn.fetchval(
                 """
-                INSERT INTO merchants (user_id, name, owner_phone, place, location, province, district, commune, village, street)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                INSERT INTO merchants (
+                    merchant_id, merchant_name, user_id, name, owner_phone, place, location, 
+                    province, district, commune, village, street
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
                 RETURNING id
                 """,
-                target_user_id, clean_name, target_phone, clean_place, clean_location,
+                mch_code, clean_name, target_user_id, clean_name, target_phone, clean_place, clean_location,
                 province, district, commune, village, street
             )
         except Exception as e:
@@ -225,6 +242,10 @@ async def register_store(
             try:
                 # Auto-heal missing columns or drop restrictive legacy unique constraints
                 await conn.execute("""
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS merchant_id VARCHAR(100);
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS merchant_name VARCHAR(255);
+                    ALTER TABLE merchants ALTER COLUMN merchant_id DROP NOT NULL;
+                    ALTER TABLE merchants ALTER COLUMN merchant_name DROP NOT NULL;
                     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS user_id INT REFERENCES users(id) ON DELETE SET NULL;
                     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS owner_phone VARCHAR(50);
                     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS province VARCHAR(100);
@@ -236,11 +257,11 @@ async def register_store(
                 """)
                 store_id = await conn.fetchval(
                     """
-                    INSERT INTO merchants (user_id, name, owner_phone, place, location)
-                    VALUES ($1, $2, $3, $4, $5)
+                    INSERT INTO merchants (merchant_id, merchant_name, user_id, name, owner_phone, place, location)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
                     RETURNING id
                     """,
-                    target_user_id, clean_name, target_phone, clean_place, clean_location
+                    mch_code, clean_name, target_user_id, clean_name, target_phone, clean_place, clean_location
                 )
             except Exception as final_e:
                 logger.error(f"Store registration permanently failed: {final_e}", exc_info=True)
