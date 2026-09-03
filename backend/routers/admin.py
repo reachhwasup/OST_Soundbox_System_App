@@ -328,8 +328,14 @@ async def delete_user(user_id: int, current_admin: Dict[str, Any] = Depends(requ
     async with pool.acquire() as conn:
         user = await conn.fetchrow("SELECT id, full_name, phone_number FROM users WHERE id = $1", user_id)
         if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+            # Idempotent deletion: if user already deleted from DB, return success
+            return {
+                "status": "success",
+                "message": "User was already removed or does not exist."
+            }
 
+        # Safe unlinking of associated stores so foreign key constraints never block deletion
+        await conn.execute("UPDATE merchants SET user_id = NULL WHERE user_id = $1", user_id)
         await conn.execute("DELETE FROM users WHERE id = $1", user_id)
 
         return {

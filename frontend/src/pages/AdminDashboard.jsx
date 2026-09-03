@@ -535,10 +535,12 @@ export default function AdminDashboard() {
   const handleDeleteUser = async () => {
     if (!selectedUser) return;
     setSubmitting(true);
+    const userIdToDelete = selectedUser.id;
     try {
-      await api.delete(`/api/admin/users/${selectedUser.id}`);
+      const res = await api.delete(`/api/admin/users/${userIdToDelete}`);
       setIsDeleteOpen(false);
-      const delUsrMsg = 'User deleted successfully.';
+      setUsers((prev) => prev.filter((item) => item.id !== userIdToDelete));
+      const delUsrMsg = res.data?.message || 'User deleted successfully.';
       showToast({
         type: 'unlink',
         title: 'User Deleted',
@@ -547,14 +549,27 @@ export default function AdminDashboard() {
       });
       fetchAllData();
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to delete user.';
-      setError(msg);
-      showToast({
-        type: 'error',
-        title: 'Deletion Failed',
-        message: msg,
-        duration: 5000
-      });
+      if (err.response?.status === 404) {
+        // User is already removed from DB, close modal and remove from state
+        setIsDeleteOpen(false);
+        setUsers((prev) => prev.filter((item) => item.id !== userIdToDelete));
+        showToast({
+          type: 'info',
+          title: 'User Removed',
+          message: 'User was already deleted from the database. Refreshed table.',
+          duration: 5000
+        });
+        fetchAllData();
+      } else {
+        const msg = err.response?.data?.detail || 'Failed to delete user.';
+        setError(msg);
+        showToast({
+          type: 'error',
+          title: 'Deletion Failed',
+          message: msg,
+          duration: 5000
+        });
+      }
     } finally {
       setSubmitting(false);
     }
