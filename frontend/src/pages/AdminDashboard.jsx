@@ -1220,19 +1220,20 @@ export default function AdminDashboard() {
 
     // 3. User account logins from users
     users.forEach(u => {
+      const displayName = u.full_name || u.phone_number || 'Merchant User';
       list.push({
         id: `user_acc_${u.id}`,
         category: 'USER_LOGIN',
-        user_name: u.full_name || u.username,
-        user_phone: u.phone_number || u.phone || '012-345-678',
+        user_name: displayName,
+        user_phone: u.phone_number || '',
         action_label: 'User Account Logged In',
-        target_name: `@${u.username} (${u.role || 'USER'})`,
+        target_name: `${displayName} (${u.role || 'USER'})`,
         target_type: 'User Account',
         platform: 'Web Portal / Mobile App',
         status: 'SUCCESS',
         ip_address: '103.216.50.' + ((u.id * 31) % 250 + 1),
         created_at: u.created_at || '2026-09-01T08:00:00Z',
-        details: `User ${u.full_name || u.username} authenticated successfully into Merchant Portal`
+        details: `User ${displayName} authenticated successfully into Merchant Portal`
       });
     });
 
@@ -1292,16 +1293,17 @@ export default function AdminDashboard() {
 
     // 3. User creations / edits
     users.forEach(u => {
+      const displayName = u.full_name || u.phone_number || 'User';
       list.push({
         id: `admin_user_mgmt_${u.id}`,
         category: 'USER_MANAGEMENT',
         operator: 'SuperAdmin',
         action_label: 'User Account Provisioned',
-        target_name: `@${u.username} (${u.full_name || 'User'})`,
+        target_name: `${displayName} (${u.role || 'USER'})`,
         target_type: 'Account Role',
         status: 'SUCCESS',
         created_at: u.created_at || '2026-08-29T10:00:00Z',
-        details: `Provisioned account with role "${u.role || 'USER'}" for ${u.phone_number || 'merchant'}`
+        details: `Provisioned account with role "${u.role || 'USER'}" for ${u.phone_number || displayName}`
       });
     });
 
@@ -4121,7 +4123,13 @@ export default function AdminDashboard() {
                               )}
                             </button>
                           </td>
-                          <td className="py-3.5 px-4">
+                          <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white">
+                            <div>{act.user_name || 'Merchant'}</div>
+                            {act.user_phone && (
+                              <div className="text-[11px] text-slate-400 font-mono font-normal">{act.user_phone}</div>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 whitespace-nowrap">
                             <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full ${
                               act.category === 'STORE_REGISTER'
                                 ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60'
@@ -4129,7 +4137,7 @@ export default function AdminDashboard() {
                                 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60'
                                 : act.category === 'TELEGRAM_PAIR'
                                 ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60'
-                                : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                : 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60'
                             }`}>
                               {act.category === 'STORE_REGISTER' && <Store className="w-3 h-3" />}
                               {act.category === 'DEVICE_LINK' && <Smartphone className="w-3 h-3" />}
