@@ -334,7 +334,7 @@ export default function AdminDashboard() {
       const [statsRes, usersRes, storesRes, devicesRes, logsRes] = await Promise.all([
         api.get('/api/admin/stats'),
         api.get(`/api/admin/users?search=${searchParam}&role=${roleParam}&status=${statusParam}`),
-        api.get(`/api/admin/stores?search=${searchParam}`),
+        api.get('/api/admin/stores'),
         api.get('/api/devices/'),
         api.get(`/api/admin/logs?search=${searchParam}&log_type=${logTypeFilter}&limit=100`)
       ]);
