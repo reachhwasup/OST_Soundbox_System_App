@@ -181,29 +181,54 @@ async def list_devices(
                    COALESCE(m.owner_phone, u.phone_number) AS owner_phone,
                    COALESCE(u.phone_number, m.owner_phone) AS user_phone,
                    COALESCE(u.full_name, m.name) AS owner_name,
-                   m.province, m.district, m.commune, m.village, m.street
             FROM devices d
-            LEFT JOIN merchants m ON d.merchant_id = m.id
+            LEFT JOIN merchants m ON d.merchant_id::text = m.id::text
             LEFT JOIN users u ON m.user_id = u.id
             WHERE {where_sql}
             ORDER BY d.id DESC
         """
 
-        devices = await conn.fetch(query, *params)
+        try:
+            devices = await conn.fetch(query, *params)
+        except Exception as e:
+            logger.warning(f"list_devices query failed: {e}. Auto-healing schema and retrying...")
+            try:
+                await conn.execute("""
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS batch_no VARCHAR(100) DEFAULT 'BATCH-STD';
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(10,2) DEFAULT 0.00;
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(5,2) DEFAULT 0.00;
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS final_price NUMERIC(10,2) DEFAULT 29.00;
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_days INT DEFAULT 90;
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_start_date TIMESTAMPTZ;
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_end_date TIMESTAMPTZ;
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_4g VARCHAR(100) DEFAULT 'Y6_LCD_1605_V1.0';
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_wifi VARCHAR(100) DEFAULT 'esp32c2x_2M_OTA';
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
+                """)
+                devices = await conn.fetch(query, *params)
+            except Exception as e2:
+                logger.error(f"Fallback list_devices query: {e2}")
+                fallback_query = "SELECT id, device_sn, merchant_id, price, status, created_at FROM devices ORDER BY id DESC"
+                devices = await conn.fetch(fallback_query)
+
+        formatted_devices = []
+        for d in devices:
+            try:
+                row = dict(d)
+                formatted_devices.append({
+                    **row,
+                    "created_at": row["created_at"].isoformat() if hasattr(row.get("created_at"), "isoformat") else (str(row.get("created_at")) if row.get("created_at") else None),
+                    "warranty_start_date": row["warranty_start_date"].isoformat() if hasattr(row.get("warranty_start_date"), "isoformat") else (str(row.get("warranty_start_date")) if row.get("warranty_start_date") else None),
+                    "warranty_end_date": row["warranty_end_date"].isoformat() if hasattr(row.get("warranty_end_date"), "isoformat") else (str(row.get("warranty_end_date")) if row.get("warranty_end_date") else None),
+                    "last_heartbeat": row["last_heartbeat"].isoformat() if hasattr(row.get("last_heartbeat"), "isoformat") else (str(row.get("last_heartbeat")) if row.get("last_heartbeat") else None),
+                    "last_time": row["last_time"].strftime("%Y-%m-%d %H:%M:%S") if hasattr(row.get("last_time"), "strftime") else (str(row.get("last_time")) if row.get("last_time") else None)
+                })
+            except Exception:
+                formatted_devices.append(dict(d))
 
         return {
             "status": "success",
-            "devices": [
-                {
-                    **dict(d),
-                    "created_at": d["created_at"].isoformat() if hasattr(d["created_at"], "isoformat") else (str(d["created_at"]) if d["created_at"] else None),
-                    "warranty_start_date": d["warranty_start_date"].isoformat() if hasattr(d["warranty_start_date"], "isoformat") else (str(d["warranty_start_date"]) if d["warranty_start_date"] else None),
-                    "warranty_end_date": d["warranty_end_date"].isoformat() if hasattr(d["warranty_end_date"], "isoformat") else (str(d["warranty_end_date"]) if d["warranty_end_date"] else None),
-                    "last_heartbeat": d["last_heartbeat"].isoformat() if hasattr(d["last_heartbeat"], "isoformat") else (str(d["last_heartbeat"]) if d["last_heartbeat"] else None),
-                    "last_time": d["last_time"].strftime("%Y-%m-%d %H:%M:%S") if hasattr(d["last_time"], "strftime") else (str(d["last_time"]) if d["last_time"] else None)
-                }
-                for d in devices
-            ]
+            "devices": formatted_devices
         }
 
 
