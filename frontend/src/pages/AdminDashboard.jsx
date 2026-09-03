@@ -216,14 +216,6 @@ export default function AdminDashboard() {
   const [singlePrice, setSinglePrice] = useState('39.00');
   const [stockSubmitting, setStockSubmitting] = useState(false);
 
-  // Store Registration by Admin State
-  const [isAddStoreOpen, setIsAddStoreOpen] = useState(false);
-  const [newStoreOwnerId, setNewStoreOwnerId] = useState('');
-  const [newStoreName, setNewStoreName] = useState('');
-  const [newStorePlace, setNewStorePlace] = useState('');
-  const [newStoreProvince, setNewStoreProvince] = useState('Phnom Penh');
-  const [newStoreSubmitting, setNewStoreSubmitting] = useState(false);
-
   const [isDeviceDetailOpen, setIsDeviceDetailOpen] = useState(false);
   const [selectedDeviceDetail, setSelectedDeviceDetail] = useState(null);
 
@@ -425,41 +417,6 @@ export default function AdminDashboard() {
   };
 
   const handleCreateUser = handleAddUser;
-
-  // Handle Admin Provisioning Store for User
-  const handleCreateStore = async (e) => {
-    e.preventDefault();
-    if (!newStoreName.trim()) {
-      showToast({ type: 'error', title: 'Name Required', message: 'Please enter a store name.' });
-      return;
-    }
-    setNewStoreSubmitting(true);
-    try {
-      const res = await api.post('/api/stores/register', {
-        name: newStoreName.trim(),
-        place: newStorePlace.trim() || 'Store Location',
-        location: `${newStorePlace.trim() ? newStorePlace.trim() + ', ' : ''}${newStoreProvince || 'Phnom Penh'}, Cambodia`,
-        province: newStoreProvince || 'Phnom Penh',
-        user_id: newStoreOwnerId ? Number(newStoreOwnerId) : null
-      });
-      showToast({
-        type: 'success',
-        title: 'Store Registered',
-        message: res.data?.message || `Store '${newStoreName}' created successfully.`,
-        duration: 5000
-      });
-      setIsAddStoreOpen(false);
-      setNewStoreName('');
-      setNewStorePlace('');
-      setNewStoreOwnerId('');
-      fetchAllData();
-    } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to register store.';
-      showToast({ type: 'error', title: 'Registration Failed', message: msg, duration: 5000 });
-    } finally {
-      setNewStoreSubmitting(false);
-    }
-  };
 
   // Open Edit User Modal
   const openEditModal = (u) => {
@@ -2332,20 +2289,6 @@ export default function AdminDashboard() {
 
                         <button
                           type="button"
-                          onClick={() => {
-                            setNewStoreOwnerId(String(u.id));
-                            setNewStoreName('');
-                            setNewStorePlace('');
-                            setIsAddStoreOpen(true);
-                          }}
-                          title="Register Store for this User"
-                          className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-lg transition"
-                        >
-                          <Store className="w-4 h-4" />
-                        </button>
-
-                        <button
-                          type="button"
                           onClick={() => openResetPassModal(u)}
                           title="Reset Password"
                           className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
@@ -2612,19 +2555,6 @@ export default function AdminDashboard() {
                   </button>
                 )}
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewStoreOwnerId('');
-                    setNewStoreName('');
-                    setNewStorePlace('');
-                    setIsAddStoreOpen(true);
-                  }}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>{t('addStore', 'Register Store')}</span>
-                </button>
 
                 <button
                   type="button"
@@ -2733,19 +2663,6 @@ export default function AdminDashboard() {
                   {t('storeManagementSubtitle', 'Complete registry of all registered branches, merchant profiles, and deployed soundbox equipment.')}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setNewStoreOwnerId('');
-                  setNewStoreName('');
-                  setNewStorePlace('');
-                  setIsAddStoreOpen(true);
-                }}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>{t('addStore', 'Register Store')}</span>
-              </button>
             </div>
 
             <div className="overflow-x-auto">
@@ -4639,89 +4556,6 @@ export default function AdminDashboard() {
         </form>
       </Modal>
 
-      {/* Modal: Register Store for User */}
-      <Modal isOpen={isAddStoreOpen} onClose={() => setIsAddStoreOpen(false)} title="Register Store for User">
-        <form onSubmit={handleCreateStore} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
-              Store Owner (User / Merchant) <span className="text-rose-500">*</span>
-            </label>
-            <select
-              value={newStoreOwnerId}
-              onChange={(e) => setNewStoreOwnerId(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
-            >
-              <option value="">— Current Admin Account —</option>
-              {users.map(u => (
-                <option key={u.id} value={u.id}>
-                  {u.full_name || 'User'} ({u.phone_number}) - ID #{u.id}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
-              Store / Business Name <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={newStoreName}
-              onChange={(e) => setNewStoreName(e.target.value)}
-              placeholder="e.g. Amazon Cafe BKK1"
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
-              required
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
-                Place / Market / Street
-              </label>
-              <input
-                type="text"
-                value={newStorePlace}
-                onChange={(e) => setNewStorePlace(e.target.value)}
-                placeholder="e.g. Central Market / St 271"
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
-                Province / City
-              </label>
-              <select
-                value={newStoreProvince}
-                onChange={(e) => setNewStoreProvince(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
-              >
-                <option value="Phnom Penh">Phnom Penh</option>
-                <option value="Siem Reap">Siem Reap</option>
-                <option value="Battambang">Battambang</option>
-                <option value="Kandal">Kandal</option>
-                <option value="Sihanoukville">Sihanoukville</option>
-                <option value="Kampot">Kampot</option>
-              </select>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-            <button
-              type="button"
-              onClick={() => setIsAddStoreOpen(false)}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={newStoreSubmitting}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>{newStoreSubmitting ? 'Registering...' : 'Register Store'}</span>
-            </button>
-          </div>
-        </form>
-      </Modal>
 
 
       {/* Modal: Edit User */}
