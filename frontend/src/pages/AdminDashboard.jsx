@@ -5519,25 +5519,29 @@ export default function AdminDashboard() {
                     <div className="font-bold text-slate-900 dark:text-white text-base font-mono">
                       {selectedDeviceDetail.device_id || selectedDeviceDetail.device_sn}
                     </div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      {selectedDeviceDetail.device_type === 'Display Soundbox' || String(selectedDeviceDetail.device_model || '').includes('Display')
-                        ? '🖥️ Display Soundbox (Screen QR)' 
-                        : '🏷️ Standard Soundbox (Printed QR)'}
-                    </div>
+                    {!visibleColumns.deviceType && (
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        {selectedDeviceDetail.device_type === 'Display Soundbox' || String(selectedDeviceDetail.device_model || '').includes('Display')
+                          ? '🖥️ Display Soundbox (Screen QR)' 
+                          : '🏷️ Standard Soundbox (Printed QR)'}
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${
-                  String(selectedDeviceDetail.status).toUpperCase() === 'PENDING'
-                    ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
-                    : String(selectedDeviceDetail.status || '').toLowerCase() === 'online' || String(selectedDeviceDetail.status || '').toUpperCase() === 'ACTIVE'
-                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                    : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
-                }`}>
-                  {String(selectedDeviceDetail.status).toUpperCase() === 'PENDING'
-                    ? (isKhmer ? '🟣 រង់ចាំការចុះឈ្មោះ' : '🟣 Waiting for Registration')
-                    : selectedDeviceDetail.status || 'Offline'}
-                </span>
+                {!visibleColumns.status && (
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${
+                    String(selectedDeviceDetail.status).toUpperCase() === 'PENDING'
+                      ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                      : String(selectedDeviceDetail.status || '').toLowerCase() === 'online' || String(selectedDeviceDetail.status || '').toUpperCase() === 'ACTIVE'
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                      : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
+                  }`}>
+                    {String(selectedDeviceDetail.status).toUpperCase() === 'PENDING'
+                      ? (isKhmer ? '🟣 រង់ចាំការចុះឈ្មោះ' : '🟣 Waiting for Registration')
+                      : selectedDeviceDetail.status || 'Offline'}
+                  </span>
+                )}
               </div>
 
               {/* 1. Merchant & Store Assignment Card (Key User Request) */}
@@ -5596,16 +5600,18 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  {/* Store Name */}
-                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
-                    <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
-                      <Store className="w-3 h-3 text-slate-400" />
-                      <span>{t('assignedStoreBranch', 'Assigned Store Branch')}</span>
+                  {/* Store Name (Hidden if already shown in table) */}
+                  {!visibleColumns.merchantId && (
+                    <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+                      <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
+                        <Store className="w-3 h-3 text-slate-400" />
+                        <span>{t('assignedStoreBranch', 'Assigned Store Branch')}</span>
+                      </div>
+                      <div className="font-bold text-slate-900 dark:text-white mt-1 truncate">
+                        {displayStoreName}
+                      </div>
                     </div>
-                    <div className="font-bold text-slate-900 dark:text-white mt-1 truncate">
-                      {displayStoreName}
-                    </div>
-                  </div>
+                  )}
 
                   {/* Telegram Chat ID */}
                   <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
@@ -5631,60 +5637,64 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* 2. Commercial & Pricing Card */}
-              <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2">
-                  <DollarSign className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span>{t('commercialSalesInfo', 'Commercial & Sales Details')}</span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2.5 text-xs text-center">
-                  <div className="p-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('originalPrice', 'Price')}</span>
-                    <div className="font-mono font-bold text-slate-800 dark:text-slate-200 mt-0.5">
-                      ${Number(selectedDeviceDetail.price || 29).toFixed(2)}
-                    </div>
+              {/* 2. Commercial & Pricing Card (Hidden if price on table and no batch/notes) */}
+              {(!visibleColumns.price || selectedDeviceDetail.notes || selectedDeviceDetail.batch_no) && (
+                <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
+                  <div className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2">
+                    <DollarSign className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>{t('commercialSalesInfo', 'Commercial & Sales Details')}</span>
                   </div>
 
-                  <div className="p-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('discount', 'Discount')}</span>
-                    <div className="font-mono font-bold text-amber-600 dark:text-amber-400 mt-0.5">
-                      {Number(selectedDeviceDetail.discount_percent) > 0 
-                        ? `${selectedDeviceDetail.discount_percent}%` 
-                        : Number(selectedDeviceDetail.discount_amount) > 0 
-                        ? `$${Number(selectedDeviceDetail.discount_amount).toFixed(2)}` 
-                        : '0%'}
-                    </div>
-                  </div>
-
-                  <div className="p-2 bg-emerald-50/70 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800">
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase font-bold">{t('finalPrice', 'Final Price')}</span>
-                    <div className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-sm mt-0.5">
-                      ${Number(selectedDeviceDetail.final_price || selectedDeviceDetail.price || 29).toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-
-                {(selectedDeviceDetail.notes || selectedDeviceDetail.batch_no) && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
-                    {selectedDeviceDetail.batch_no && (
-                      <div className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg text-slate-600 dark:text-slate-400">
-                        <span className="text-[10px] uppercase font-semibold text-slate-400 block">{t('batchNo', 'Batch Number')}</span>
-                        <span className="font-mono text-slate-800 dark:text-slate-200">{selectedDeviceDetail.batch_no}</span>
+                  {!visibleColumns.price && (
+                    <div className="grid grid-cols-3 gap-2.5 text-xs text-center">
+                      <div className="p-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('originalPrice', 'Price')}</span>
+                        <div className="font-mono font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                          ${Number(selectedDeviceDetail.price || 29).toFixed(2)}
+                        </div>
                       </div>
-                    )}
-                    {selectedDeviceDetail.notes && (
-                      <div className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg text-slate-600 dark:text-slate-400">
-                        <span className="text-[10px] uppercase font-semibold text-slate-400 block">{t('warehouseNotes', 'Warehouse / Notes')}</span>
-                        <span className="text-slate-800 dark:text-slate-200">{selectedDeviceDetail.notes}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
 
-              {/* 3. Warranty 90-Day Live Countdown Card */}
-              {wInfo.status !== 'NO_WARRANTY' && (
+                      <div className="p-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('discount', 'Discount')}</span>
+                        <div className="font-mono font-bold text-amber-600 dark:text-amber-400 mt-0.5">
+                          {Number(selectedDeviceDetail.discount_percent) > 0 
+                            ? `${selectedDeviceDetail.discount_percent}%` 
+                            : Number(selectedDeviceDetail.discount_amount) > 0 
+                            ? `$${Number(selectedDeviceDetail.discount_amount).toFixed(2)}` 
+                            : '0%'}
+                        </div>
+                      </div>
+
+                      <div className="p-2 bg-emerald-50/70 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase font-bold">{t('finalPrice', 'Final Price')}</span>
+                        <div className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-sm mt-0.5">
+                          ${Number(selectedDeviceDetail.final_price || selectedDeviceDetail.price || 29).toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {(selectedDeviceDetail.notes || selectedDeviceDetail.batch_no) && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
+                      {selectedDeviceDetail.batch_no && (
+                        <div className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg text-slate-600 dark:text-slate-400">
+                          <span className="text-[10px] uppercase font-semibold text-slate-400 block">{t('batchNo', 'Batch Number')}</span>
+                          <span className="font-mono text-slate-800 dark:text-slate-200">{selectedDeviceDetail.batch_no}</span>
+                        </div>
+                      )}
+                      {selectedDeviceDetail.notes && (
+                        <div className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg text-slate-600 dark:text-slate-400">
+                          <span className="text-[10px] uppercase font-semibold text-slate-400 block">{t('warehouseNotes', 'Warehouse / Notes')}</span>
+                          <span className="text-slate-800 dark:text-slate-200">{selectedDeviceDetail.notes}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 3. Warranty 90-Day Live Countdown Card (Hidden if warranty on table) */}
+              {!visibleColumns.warranty && wInfo.status !== 'NO_WARRANTY' && (
                 <div className="p-4 bg-gradient-to-br from-emerald-50/70 to-teal-50/50 dark:from-emerald-950/40 dark:to-slate-900/60 rounded-2xl border border-emerald-100 dark:border-emerald-900/50 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -5732,55 +5742,67 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              {/* 4. Hardware Telemetry & Firmware Grid */}
-              <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2.5">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2">
-                  <Smartphone className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span>{t('hardwareTelemetryTitle', 'Hardware & Telemetry Status')}</span>
+              {/* 4. Hardware Telemetry & Firmware Grid (Hidden if all telemetry on table) */}
+              {(!visibleColumns.battery || !visibleColumns.signal || !visibleColumns.version4g || !visibleColumns.versionWifi) && (
+                <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2.5">
+                  <div className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2">
+                    <Smartphone className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>{t('hardwareTelemetryTitle', 'Hardware & Telemetry Status')}</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                    {!visibleColumns.battery && (
+                      <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('battery', 'Battery')}</span>
+                        <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mt-0.5">
+                          <Battery className="w-4 h-4 text-emerald-500" />
+                          {selectedDeviceDetail.battery || '100%'}
+                        </div>
+                      </div>
+                    )}
+
+                    {!visibleColumns.signal && (
+                      <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('signal', 'Signal Quality')}</span>
+                        <div className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1.5 mt-0.5">
+                          <Signal className="w-4 h-4" />
+                          {selectedDeviceDetail.signal || 'Good'}
+                        </div>
+                      </div>
+                    )}
+
+                    {!visibleColumns.version4g && (
+                      <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('version4G', '4G Firmware')}</span>
+                        <div className="font-mono text-slate-700 dark:text-slate-300 font-bold mt-0.5 truncate" title={selectedDeviceDetail.version_4g}>
+                          {selectedDeviceDetail.version_4g || 'Y6_STD_1605_V1.0'}
+                        </div>
+                      </div>
+                    )}
+
+                    {!visibleColumns.versionWifi && (
+                      <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('versionWifi', 'WiFi Firmware')}</span>
+                        <div className="font-mono text-slate-700 dark:text-slate-300 font-bold mt-0.5 truncate" title={selectedDeviceDetail.version_wifi}>
+                          {selectedDeviceDetail.version_wifi || 'esp32c2x_2M_OTA'}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('battery', 'Battery')}</span>
-                    <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mt-0.5">
-                      <Battery className="w-4 h-4 text-emerald-500" />
-                      {selectedDeviceDetail.battery || '100%'}
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('signal', 'Signal Quality')}</span>
-                    <div className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1.5 mt-0.5">
-                      <Signal className="w-4 h-4" />
-                      {selectedDeviceDetail.signal || 'Good'}
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('version4G', '4G Firmware')}</span>
-                    <div className="font-mono text-slate-700 dark:text-slate-300 font-bold mt-0.5 truncate" title={selectedDeviceDetail.version_4g}>
-                      {selectedDeviceDetail.version_4g || 'Y6_STD_1605_V1.0'}
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('versionWifi', 'WiFi Firmware')}</span>
-                    <div className="font-mono text-slate-700 dark:text-slate-300 font-bold mt-0.5 truncate" title={selectedDeviceDetail.version_wifi}>
-                      {selectedDeviceDetail.version_wifi || 'esp32c2x_2M_OTA'}
-                    </div>
-                  </div>
-                </div>
-              </div>
+              )}
 
               {/* 5. Timestamps */}
               <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/60 text-xs space-y-1.5">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Last Telemetry Heartbeat:</span>
-                  <span className="font-mono text-slate-700 dark:text-slate-300">
-                    {selectedDeviceDetail.last_time || (selectedDeviceDetail.last_heartbeat ? new Date(selectedDeviceDetail.last_heartbeat).toLocaleString() : '—')}
-                  </span>
-                </div>
-                <div className="flex justify-between border-t border-slate-200/60 dark:border-slate-700/60 pt-1.5">
+                {!visibleColumns.lastTime && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Last Telemetry Heartbeat:</span>
+                    <span className="font-mono text-slate-700 dark:text-slate-300">
+                      {selectedDeviceDetail.last_time || (selectedDeviceDetail.last_heartbeat ? new Date(selectedDeviceDetail.last_heartbeat).toLocaleString() : '—')}
+                    </span>
+                  </div>
+                )}
+                <div className={`flex justify-between ${!visibleColumns.lastTime ? 'border-t border-slate-200/60 dark:border-slate-700/60 pt-1.5' : ''}`}>
                   <span className="text-slate-400">Created / Registered At:</span>
                   <span className="font-mono text-slate-700 dark:text-slate-300">
                     {selectedDeviceDetail.created_at ? new Date(selectedDeviceDetail.created_at).toLocaleString() : '—'}
