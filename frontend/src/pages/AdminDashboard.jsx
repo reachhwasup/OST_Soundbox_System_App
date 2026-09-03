@@ -1069,8 +1069,8 @@ export default function AdminDashboard() {
   // Warehouse Stock Devices Filtering Logic
   const filteredStockDevices = useMemo(() => {
     const list = devices.filter(d => {
-      // Must be IN_STOCK and unassigned (not PENDING and not assigned)
-      if (d.merchant_id || String(d.status).toUpperCase() !== 'IN_STOCK') return false;
+      // Must be unassigned (available in warehouse stock)
+      if (d.merchant_id) return false;
 
       if (stockSearchTerm.trim()) {
         const q = stockSearchTerm.toLowerCase().trim();
