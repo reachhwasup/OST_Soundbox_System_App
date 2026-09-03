@@ -1096,7 +1096,7 @@ export default function UserDashboard() {
   const hasAnyStore = stores.length > 0;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-10 py-6 sm:py-10 space-y-6 sm:space-y-8">
+    <div className="max-w-[1680px] mx-auto px-4 sm:px-8 lg:px-10 py-6 sm:py-10 space-y-6 sm:space-y-8">
       
       {/* Case 1: USER HAS NOT REGISTERED ANY STORE YET */}
       {!hasAnyStore ? (
