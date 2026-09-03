@@ -553,7 +553,7 @@ export default function UserDashboard() {
     const locData = compileLocation(provinceId, districtId, communeId, villageId, streetOrLandmark);
 
     try {
-      await api.post('/api/stores/register', {
+      const res = await api.post('/api/stores/register', {
         name: storeName.trim(),
         place: locData.place,
         location: locData.location,
@@ -563,6 +563,29 @@ export default function UserDashboard() {
         village: locData.village,
         street: locData.street
       });
+      const newStore = res.data?.store || {
+        id: res.data?.store_id || Date.now(),
+        name: storeName.trim(),
+        place: locData.place,
+        location: locData.location,
+        province: locData.province,
+        district: locData.district,
+        commune: locData.commune,
+        village: locData.village,
+        street: locData.street,
+        devices: [],
+        recent_transactions: []
+      };
+
+      // Instantly inject new store into state so dashboard flips without waiting
+      setStores(prev => {
+        const filtered = prev.filter(s => s.id !== newStore.id);
+        return [newStore, ...filtered];
+      });
+      setSelectedStoreIndex(0);
+      resetRegisterForm();
+      setIsRegisterStoreOpen(false);
+
       const regMsg = `Store '${storeName.trim()}' registered successfully!`;
       showToast({
         type: 'success',
@@ -570,9 +593,8 @@ export default function UserDashboard() {
         message: regMsg,
         duration: 5000
       });
-      resetRegisterForm();
-      setIsRegisterStoreOpen(false);
-      await fetchStoresData();
+
+      await fetchStoresData(true);
       if (typeof refreshUser === 'function') {
         await refreshUser();
       }
