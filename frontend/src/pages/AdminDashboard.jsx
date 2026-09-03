@@ -2095,20 +2095,22 @@ export default function AdminDashboard() {
                     <button
                       type="button"
                       onClick={() => openResetPassModal(u)}
-                      className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-amber-600 text-xs"
+                      className="px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-xs font-semibold flex items-center gap-1"
                       title="Reset Password"
                     >
-                      <Key className="w-4 h-4" />
+                      <Key className="w-3.5 h-3.5" />
+                      <span>Password</span>
                     </button>
 
                     {u.id !== currentAdmin?.id && (
                       <button
                         type="button"
                         onClick={() => openDeleteModal(u)}
-                        className="p-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/30 text-rose-600 text-xs"
+                        className="px-2.5 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/30 text-rose-600 text-xs font-semibold flex items-center gap-1"
                         title="Delete User"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>{t('delete', 'Delete')}</span>
                       </button>
                     )}
                   </div>
@@ -2258,50 +2260,56 @@ export default function AdminDashboard() {
                         {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString() : 'Never'}
                       </td>
 
-                      <td className="py-3.5 text-right space-x-1">
-                        <button
-                          type="button"
-                          onClick={() => openEditUserModal(u)}
-                          title="Edit User"
-                          className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        
-                        {u.id !== currentAdmin?.id && (
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                           <button
                             type="button"
-                            onClick={() => handleToggleStatus(u)}
-                            title={u.status === 'ACTIVE' ? 'Suspend User' : 'Activate User'}
-                            className={`p-1.5 rounded-lg transition ${
-                              u.status === 'ACTIVE' 
-                                ? 'text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30'
-                                : 'text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
-                            }`}
+                            onClick={() => openEditUserModal(u)}
+                            className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                            title="Edit User"
                           >
-                            {u.status === 'ACTIVE' ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                            <Edit className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                            <span>{t('edit', 'Edit')}</span>
                           </button>
-                        )}
 
-                        <button
-                          type="button"
-                          onClick={() => openResetPassModal(u)}
-                          title="Reset Password"
-                          className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
-                        >
-                          <Key className="w-4 h-4" />
-                        </button>
+                          {u.id !== currentAdmin?.id && (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleStatus(u)}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs ${
+                                u.status === 'ACTIVE' 
+                                  ? 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                                  : 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                              }`}
+                              title={u.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
+                            >
+                              {u.status === 'ACTIVE' ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
+                              <span>{u.status === 'ACTIVE' ? 'Suspend' : 'Activate'}</span>
+                            </button>
+                          )}
 
-                        {u.id !== currentAdmin?.id && (
                           <button
                             type="button"
-                            onClick={() => openDeleteModal(u)}
-                            title="Delete User"
-                            className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition"
+                            onClick={() => openResetPassModal(u)}
+                            className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                            title="Reset Password"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Key className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                            <span>Password</span>
                           </button>
-                        )}
+
+                          {u.id !== currentAdmin?.id && (
+                            <button
+                              type="button"
+                              onClick={() => openDeleteModal(u)}
+                              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                              title="Delete User"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                              <span>{t('delete', 'Delete')}</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
 
                     </tr>
