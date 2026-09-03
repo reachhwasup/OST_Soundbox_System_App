@@ -3794,6 +3794,16 @@ export default function AdminDashboard() {
                                 <Edit className="w-3 h-3 text-blue-600 dark:text-blue-400" />
                                 <span>{t('edit', 'Edit')}</span>
                               </button>
+
+                              <button
+                                type="button"
+                                onClick={() => openDeleteDeviceModal(d)}
+                                className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                                title={t('delete', 'Delete')}
+                              >
+                                <Trash2 className="w-3 h-3 text-rose-600 dark:text-rose-400" />
+                                <span>{t('delete', 'Delete')}</span>
+                              </button>
                             </div>
                           </td>
                         )}
