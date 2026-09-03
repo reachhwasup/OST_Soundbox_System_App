@@ -437,7 +437,7 @@ export default function UserDashboard() {
       const res = await api.get('/api/stores/my-stores');
       const storeList = res.data.stores || [];
       setStores(storeList);
-      if (selectedStoreIndex >= storeList.length && storeList.length > 0) {
+      if (storeList.length > 0) {
         setSelectedStoreIndex(0);
       }
     } catch (err) {
@@ -573,8 +573,9 @@ export default function UserDashboard() {
       resetRegisterForm();
       setIsRegisterStoreOpen(false);
       await fetchStoresData();
-      await refreshUser();
-      setSelectedStoreIndex(stores.length);
+      if (typeof refreshUser === 'function') {
+        await refreshUser();
+      }
     } catch (err) {
       const msg = err.response?.data?.detail || 'Failed to register store.';
       setError(msg);

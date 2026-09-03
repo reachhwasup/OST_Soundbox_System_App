@@ -41,24 +41,32 @@ class StoreUpdateSchema(BaseModel):
 @router.get("/my-store")
 async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)):
     pool = await get_db_pool()
+    phone_clean = str(current_user.get("phone_number", "")).strip()
+    phone_alt = phone_clean.lstrip("0") if phone_clean.startswith("0") else ("0" + phone_clean)
+
     async with pool.acquire() as conn:
-        # Fetch all stores belonging to this user
+        # Fetch all stores belonging to this user (matching user_id or phone variations)
         stores = await conn.fetch(
             """
             SELECT id, user_id, name, owner_phone, place, location,
                    province, district, commune, village, street,
                    created_at, updated_at
             FROM merchants 
-            WHERE user_id = $1 OR (user_id IS NULL AND owner_phone = $2)
+            WHERE user_id = $1 
+               OR owner_phone = $2 
+               OR owner_phone = $3
             ORDER BY id ASC
             """,
-            current_user["id"], current_user["phone_number"]
+            current_user["id"], phone_clean, phone_alt
         )
 
         # Link any unlinked stores to user_id
         for s in stores:
-            if s["user_id"] is None:
-                await conn.execute("UPDATE merchants SET user_id = $1 WHERE id = $2", current_user["id"], s["id"])
+            if s["user_id"] is None or s["user_id"] != current_user["id"]:
+                try:
+                    await conn.execute("UPDATE merchants SET user_id = $1 WHERE id = $2", current_user["id"], s["id"])
+                except Exception:
+                    pass
 
         if not stores:
             return {
@@ -70,83 +78,107 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
                 "recent_transactions": []
             }
 
-        # For each store, fetch linked devices and recent transactions
+        # For each store, fetch linked devices and recent transactions safely
         enhanced_stores = []
         all_devices = []
         all_transactions = []
 
         for s in stores:
             store_id = s["id"]
-            devices = await conn.fetch(
-                """
-                SELECT id, device_sn, 
-                       COALESCE(device_type, 'Soundbox') AS device_type,
-                       device_model, telegram_chat_id, status,
-                       COALESCE(price, 29.00) AS price,
-                       COALESCE(battery, '100%') AS battery,
-                       COALESCE(signal, 'Good') AS signal,
-                       COALESCE(last_online, last_heartbeat, updated_at, created_at) AS last_active,
-                       last_online, last_heartbeat, created_at, updated_at
-                FROM devices
-                WHERE merchant_id = $1
-                ORDER BY id ASC
-                """,
-                store_id
-            )
+            
+            # Fetch devices safely
+            devices = []
+            try:
+                devices = await conn.fetch(
+                    """
+                    SELECT id, device_sn, 
+                           COALESCE(device_type, 'Soundbox') AS device_type,
+                           device_model, telegram_chat_id, status,
+                           COALESCE(price, 29.00) AS price,
+                           COALESCE(battery, '100%') AS battery,
+                           COALESCE(signal, 'Good') AS signal,
+                           COALESCE(last_online, last_heartbeat, updated_at, created_at) AS last_active,
+                           last_online, last_heartbeat, created_at, updated_at
+                    FROM devices
+                    WHERE merchant_id = $1
+                    ORDER BY id ASC
+                    """,
+                    store_id
+                )
+            except Exception as d_err:
+                logger.warning(f"Failed to fetch devices for store {store_id}: {d_err}")
 
-            transactions = await conn.fetch(
-                """
-                SELECT t.id, t.bank_name, t.bank_tx_id, t.amount, t.currency, t.payer_name, t.status, t.created_at, d.device_sn
-                FROM transactions t
-                JOIN devices d ON t.device_id = d.id
-                WHERE d.merchant_id = $1
-                ORDER BY t.created_at DESC
-                LIMIT 20
-                """,
-                store_id
-            )
+            # Fetch transactions safely
+            transactions = []
+            try:
+                transactions = await conn.fetch(
+                    """
+                    SELECT t.id, t.bank_name, t.bank_tx_id, t.amount, t.currency, t.payer_name, t.status, t.created_at, d.device_sn
+                    FROM transactions t
+                    JOIN devices d ON t.device_id = d.id
+                    WHERE d.merchant_id = $1
+                    ORDER BY t.created_at DESC
+                    LIMIT 20
+                    """,
+                    store_id
+                )
+            except Exception as t_err:
+                logger.warning(f"Failed to fetch transactions for store {store_id}: {t_err}")
 
-            alerts = await conn.fetch(
-                """
-                SELECT a.id, a.alert_type, a.severity, a.bank_name, a.bank_tx_id, a.amount, a.currency, 
-                       a.sender_user_id, a.sender_name, a.reason, a.created_at, d.device_sn
-                FROM security_alerts a
-                LEFT JOIN devices d ON a.device_id = d.id
-                WHERE a.merchant_id = $1
-                ORDER BY a.created_at DESC
-                LIMIT 20
-                """,
-                store_id
-            )
+            # Fetch alerts safely
+            alerts = []
+            try:
+                alerts = await conn.fetch(
+                    """
+                    SELECT a.id, a.alert_type, a.severity, a.bank_name, a.bank_tx_id, a.amount, a.currency, 
+                           a.sender_user_id, a.sender_name, a.reason, a.created_at, d.device_sn
+                    FROM security_alerts a
+                    LEFT JOIN devices d ON a.device_id = d.id
+                    WHERE a.merchant_id = $1
+                    ORDER BY a.created_at DESC
+                    LIMIT 20
+                    """,
+                    store_id
+                )
+            except Exception as a_err:
+                logger.warning(f"Failed to fetch alerts for store {store_id}: {a_err}")
+
+            formatted_txs = []
+            for tx in transactions:
+                try:
+                    formatted_txs.append({
+                        **dict(tx),
+                        "amount": float(tx["amount"]) if tx.get("amount") is not None else 0.0,
+                        "created_at": tx["created_at"].isoformat() if tx.get("created_at") else None
+                    })
+                except Exception:
+                    pass
+
+            formatted_alerts = []
+            for alt in alerts:
+                try:
+                    formatted_alerts.append({
+                        **dict(alt),
+                        "amount": float(alt["amount"]) if alt.get("amount") is not None else None,
+                        "created_at": alt["created_at"].isoformat() if alt.get("created_at") else None
+                    })
+                except Exception:
+                    pass
 
             store_dict = {
                 **dict(s),
-                "created_at": s["created_at"].isoformat() if s["created_at"] else None,
-                "updated_at": s["updated_at"].isoformat() if s["updated_at"] else None,
+                "created_at": s["created_at"].isoformat() if s.get("created_at") else None,
+                "updated_at": s["updated_at"].isoformat() if s.get("updated_at") else None,
                 "devices": [
                     {
                         **dict(d),
-                        "created_at": d["created_at"].isoformat() if d["created_at"] else None,
-                        "last_heartbeat": d["last_heartbeat"].isoformat() if d["last_heartbeat"] else None
+                        "created_at": d["created_at"].isoformat() if d.get("created_at") else None,
+                        "last_heartbeat": d["last_heartbeat"].isoformat() if d.get("last_heartbeat") else None
                     }
                     for d in devices
                 ],
-                "recent_transactions": [
-                    {
-                        **dict(tx),
-                        "amount": float(tx["amount"]),
-                        "created_at": tx["created_at"].isoformat() if tx["created_at"] else None
-                    }
-                    for tx in transactions
-                ],
-                "security_alerts": [
-                    {
-                        **dict(alt),
-                        "amount": float(alt["amount"]) if alt["amount"] is not None else None,
-                        "created_at": alt["created_at"].isoformat() if alt["created_at"] else None
-                    }
-                    for alt in alerts
-                ]
+                "recent_transactions": formatted_txs,
+                "security_alerts": formatted_alerts
             }
 
             enhanced_stores.append(store_dict)
