@@ -64,6 +64,8 @@ async def register_device(
                 disc_amt = (float(payload.discount_percent) / 100.0) * base_price
             calc_final_price = max(0.0, base_price - disc_amt)
             w_days = int(payload.warranty_days or 90)
+            now_dt = datetime.now(timezone.utc)
+            w_end_dt = now_dt + timedelta(days=w_days)
 
             # Reassign / link to this merchant and activate with warranty
             await conn.execute("""
@@ -71,12 +73,12 @@ async def register_device(
                 SET merchant_id = $1, telegram_chat_id = $2, device_type = $3, device_model = $4, 
                     price = $5, discount_amount = $6, discount_percent = $7, final_price = $8,
                     warranty_days = $9, 
-                    warranty_start_date = COALESCE(warranty_start_date, CURRENT_TIMESTAMP),
-                    warranty_end_date = COALESCE(warranty_end_date, CURRENT_TIMESTAMP + ($9 || ' days')::INTERVAL),
+                    warranty_start_date = COALESCE(warranty_start_date, $10),
+                    warranty_end_date = COALESCE(warranty_end_date, $11),
                     status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
-                WHERE id = $10
+                WHERE id = $12
             """, payload.merchant_id, chat_id, payload.device_type or "Display Soundbox", payload.device_model or "Display Soundbox", 
-               base_price, disc_amt, float(payload.discount_percent or 0.0), calc_final_price, w_days, existing_device["id"])
+               base_price, disc_amt, float(payload.discount_percent or 0.0), calc_final_price, w_days, now_dt, w_end_dt, existing_device["id"])
 
             return {
                 "status": "success",
@@ -90,6 +92,8 @@ async def register_device(
                 disc_amt = (float(payload.discount_percent) / 100.0) * base_price
             calc_final_price = max(0.0, base_price - disc_amt)
             w_days = int(payload.warranty_days or 90)
+            now_dt = datetime.now(timezone.utc)
+            w_end_dt = now_dt + timedelta(days=w_days)
 
             # Insert new device linked to merchant with warranty
             new_id = await conn.fetchval("""
@@ -101,11 +105,11 @@ async def register_device(
                 VALUES (
                     $1, $2, $3, $4, $5, 
                     $6, $7, $8, $9, 
-                    $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + ($10 || ' days')::INTERVAL, 'ACTIVE'
+                    $10, $11, $12, 'ACTIVE'
                 )
                 RETURNING id
             """, payload.merchant_id, device_sn, payload.device_type or "Display Soundbox", payload.device_model or "Display Soundbox", chat_id, 
-               base_price, disc_amt, float(payload.discount_percent or 0.0), calc_final_price, w_days)
+               base_price, disc_amt, float(payload.discount_percent or 0.0), calc_final_price, w_days, now_dt, w_end_dt)
 
             return {
                 "status": "success",
