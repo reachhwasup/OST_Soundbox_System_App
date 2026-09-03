@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
@@ -5,6 +6,8 @@ from datetime import datetime, timedelta, timezone
 
 from backend.database import get_db_pool
 from backend.security import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/devices", tags=["Devices"])
 
@@ -239,10 +242,24 @@ async def bulk_import_devices(
                 skipped_count += 1
                 continue
 
-            await conn.execute("""
-                INSERT INTO devices (device_id, device_sn, device_model, batch_no, notes, price, status, is_active, battery, signal)
-                VALUES ($1, $1, $2, $3, $4, $5, 'IN_STOCK', FALSE, '100%', 'Good')
-            """, sn, payload.device_model or "Y6B", payload.batch_no or "BATCH-BULK", payload.notes, payload.price or 29.00)
+            try:
+                await conn.execute("""
+                    INSERT INTO devices (device_id, device_sn, device_model, batch_no, notes, price, status, is_active, battery, signal)
+                    VALUES ($1, $1, $2, $3, $4, $5, 'IN_STOCK', FALSE, '100%', 'Good')
+                """, sn, payload.device_model or "Y6B", payload.batch_no or "BATCH-BULK", payload.notes, payload.price or 29.00)
+            except Exception as e:
+                # Auto-heal missing columns if running against older DB schema
+                await conn.execute("""
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_model VARCHAR(100) DEFAULT 'Y6B';
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS batch_no VARCHAR(100) DEFAULT 'BATCH-BULK';
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_type VARCHAR(100) DEFAULT 'Display Soundbox';
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
+                """)
+                await conn.execute("""
+                    INSERT INTO devices (device_id, device_sn, notes, price, status, is_active, battery, signal)
+                    VALUES ($1, $1, $2, $3, 'IN_STOCK', FALSE, '100%', 'Good')
+                """, sn, payload.notes, payload.price or 29.00)
             imported_count += 1
 
         return {
@@ -288,11 +305,40 @@ async def intake_single_device(
         initial_status = 'ACTIVE' if payload.merchant_id else 'IN_STOCK'
         is_active = True if payload.merchant_id else False
 
-        new_id = await conn.fetchval("""
-            INSERT INTO devices (device_id, device_sn, device_type, device_model, merchant_id, batch_no, notes, price, status, is_active, battery, signal)
-            VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8::device_status, $9, '100%', 'Good')
-            RETURNING id
-        """, sn, payload.device_type or "Soundbox", payload.device_model or "Y6B", payload.merchant_id, payload.batch_no or "BATCH-SINGLE", payload.notes, payload.price or 29.00, initial_status, is_active)
+        try:
+            new_id = await conn.fetchval("""
+                INSERT INTO devices (
+                    device_id, device_sn, device_type, device_model, 
+                    merchant_id, batch_no, notes, price, status, is_active, battery, signal
+                )
+                VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9, '100%', 'Good')
+                RETURNING id
+            """, sn, payload.device_type or "Display Soundbox", payload.device_model or "Y6B", payload.merchant_id, payload.batch_no or "BATCH-SINGLE", payload.notes, payload.price or 29.00, initial_status, is_active)
+        except Exception as insert_err:
+            logger.warning(f"Standard device intake failed: {insert_err}. Attempting schema auto-heal and fallback...")
+            try:
+                # Auto-heal missing columns if running against an older database schema
+                await conn.execute("""
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_model VARCHAR(100) DEFAULT 'Y6B';
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS batch_no VARCHAR(100) DEFAULT 'BATCH-SINGLE';
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_type VARCHAR(100) DEFAULT 'Display Soundbox';
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
+                """)
+                new_id = await conn.fetchval("""
+                    INSERT INTO devices (
+                        device_id, device_sn, device_type, 
+                        merchant_id, notes, price, status, is_active, battery, signal
+                    )
+                    VALUES ($1, $1, $2, $3, $4, $5, $6, $7, '100%', 'Good')
+                    RETURNING id
+                """, sn, payload.device_type or "Display Soundbox", payload.merchant_id, payload.notes, payload.price or 29.00, initial_status, is_active)
+            except Exception as final_err:
+                logger.error(f"Device intake permanently failed for SN '{sn}': {final_err}", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Failed to intake device: {str(final_err)}"
+                )
 
         return {
             "status": "success",

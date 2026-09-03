@@ -55,18 +55,6 @@ async def init_db():
             END $$;
 
             DO $$ BEGIN
-                ALTER TYPE device_status ADD VALUE IF NOT EXISTS 'IN_STOCK';
-            EXCEPTION WHEN duplicate_object THEN null; END $$;
-
-            DO $$ BEGIN
-                ALTER TYPE device_status ADD VALUE IF NOT EXISTS 'PENDING';
-            EXCEPTION WHEN duplicate_object THEN null; END $$;
-
-            DO $$ BEGIN
-                ALTER TYPE device_status ADD VALUE IF NOT EXISTS 'RETIRED';
-            EXCEPTION WHEN duplicate_object THEN null; END $$;
-
-            DO $$ BEGIN
                 CREATE TYPE tx_status AS ENUM ('PENDING', 'PROCESSED', 'FAILED', 'DUPLICATE');
             EXCEPTION
                 WHEN duplicate_object THEN null;
@@ -84,6 +72,13 @@ async def init_db():
                 WHEN duplicate_object THEN null;
             END $$;
         """)
+
+        # Safely ensure all device_status enum values exist in PostgreSQL
+        for val in ['IN_STOCK', 'PENDING', 'RETIRED']:
+            try:
+                await conn.execute(f"ALTER TYPE device_status ADD VALUE IF NOT EXISTS '{val}';")
+            except Exception:
+                pass
 
         # 2. Users Table
         await conn.execute("""
@@ -103,32 +98,31 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
         """)
 
-        # 3. Merchants / Stores Table
+        # 3. Merchants Table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS merchants (
                 id SERIAL PRIMARY KEY,
-                user_id INT REFERENCES users(id) ON DELETE SET NULL,
-                name VARCHAR(255) NOT NULL,
-                owner_phone VARCHAR(50) NOT NULL,
-                place VARCHAR(255),
+                name VARCHAR(150) NOT NULL,
+                place VARCHAR(150),
                 location VARCHAR(255),
+                telegram_chat_id VARCHAR(100),
+                user_id INT REFERENCES users(id) ON DELETE SET NULL,
+                owner_phone VARCHAR(50),
+                province VARCHAR(100),
+                district VARCHAR(100),
+                commune VARCHAR(100),
+                village VARCHAR(100),
+                street VARCHAR(150),
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
-        """)
-
-        # Ensure missing columns in merchants are added if table pre-existed
-        await conn.execute("""
             ALTER TABLE merchants ADD COLUMN IF NOT EXISTS user_id INT REFERENCES users(id) ON DELETE SET NULL;
-            ALTER TABLE merchants ADD COLUMN IF NOT EXISTS place VARCHAR(255);
-            ALTER TABLE merchants ADD COLUMN IF NOT EXISTS location VARCHAR(255);
+            ALTER TABLE merchants ADD COLUMN IF NOT EXISTS owner_phone VARCHAR(50);
             ALTER TABLE merchants ADD COLUMN IF NOT EXISTS province VARCHAR(100);
             ALTER TABLE merchants ADD COLUMN IF NOT EXISTS district VARCHAR(100);
             ALTER TABLE merchants ADD COLUMN IF NOT EXISTS commune VARCHAR(100);
             ALTER TABLE merchants ADD COLUMN IF NOT EXISTS village VARCHAR(100);
-            ALTER TABLE merchants ADD COLUMN IF NOT EXISTS street VARCHAR(255);
-            ALTER TABLE merchants ALTER COLUMN owner_phone TYPE VARCHAR(50);
-            ALTER TABLE merchants DROP CONSTRAINT IF EXISTS merchants_owner_phone_key;
+            ALTER TABLE merchants ADD COLUMN IF NOT EXISTS street VARCHAR(150);
             CREATE INDEX IF NOT EXISTS idx_merchants_user_id ON merchants(user_id);
             CREATE INDEX IF NOT EXISTS idx_merchants_owner_phone ON merchants(owner_phone);
         """)
@@ -160,6 +154,7 @@ async def init_db():
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS merchant_id INT REFERENCES merchants(id) ON DELETE SET NULL;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_sn VARCHAR(100);
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_type VARCHAR(50) DEFAULT 'Display Soundbox';
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_model VARCHAR(50) DEFAULT 'Y6B';
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(100);
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS status device_status DEFAULT 'ACTIVE';
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS last_heartbeat TIMESTAMP WITH TIME ZONE;
