@@ -223,7 +223,9 @@ export default function UserDashboard() {
             deviceType: d.device_type || (String(d.device_model || '').includes('Display') ? 'Display Soundbox' : 'Standard Soundbox'),
             batteryLevel: (String(d.status || '').toUpperCase() === 'OFFLINE' || String(d.status || '').toUpperCase() === 'INACTIVE') 
               ? null 
-              : (d.battery_level !== undefined ? d.battery_level : 85),
+              : (d.battery !== undefined && d.battery !== null
+                  ? parseInt(String(d.battery).replace('%', '')) 
+                  : (d.battery_level !== undefined && d.battery_level !== null ? d.battery_level : 100)),
             signal: d.signal || d.signal_strength || 'Good',
             signalStrength: d.signal || d.signal_strength || 'Good',
             telegramChatId: d.telegram_chat_id || '',
@@ -1375,7 +1377,7 @@ export default function UserDashboard() {
                           const isOnline = r.hasDevice && (r.status === 'ACTIVE' || r.status === 'ONLINE');
                           const isTesting = r.device && testingDeviceId === r.device.id;
                           const isRebooting = r.device && rebootingDeviceId === r.device.id;
-                          const battery = isOnline ? (r.batteryLevel !== null && r.batteryLevel !== undefined ? r.batteryLevel : 85) : null;
+                          const battery = isOnline ? (r.batteryLevel !== null && r.batteryLevel !== undefined ? r.batteryLevel : 100) : null;
 
                           // Warranty calculation for row
                           const durationDays = Number(r.device?.warranty_days) || 90;
@@ -1665,7 +1667,7 @@ export default function UserDashboard() {
                       const isOnline = r.hasDevice && (r.status === 'ACTIVE' || r.status === 'ONLINE');
                       const isTesting = r.device && testingDeviceId === r.device.id;
                       const isRebooting = r.device && rebootingDeviceId === r.device.id;
-                      const battery = isOnline ? (r.batteryLevel !== null && r.batteryLevel !== undefined ? r.batteryLevel : 85) : null;
+                      const battery = isOnline ? (r.batteryLevel !== null && r.batteryLevel !== undefined ? r.batteryLevel : 100) : null;
 
                       return (
                         <div 
