@@ -27,7 +27,7 @@ async def get_db_pool() -> asyncpg.Pool:
                 if attempt == 10:
                     logger.error(f"Could not connect to PostgreSQL database after 10 attempts: {e}")
                     raise e
-                logger.warning(f"PostgreSQL not ready yet (attempt {attempt}/10). Retrying in 1.5s...")
+                logger.warning(f"PostgreSQL not ready yet (attempt {attempt}/10): {e}. Retrying in 1.5s...")
                 await asyncio.sleep(1.5)
     return db_pool
 
