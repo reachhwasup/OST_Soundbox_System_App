@@ -2621,6 +2621,17 @@ export default function AdminDashboard() {
                       <span className="text-slate-400">{t('location', 'Location')}:</span>
                       <span className="font-semibold text-slate-800 dark:text-slate-200">{s.province || s.location || '—'}</span>
                     </div>
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                      <span className="text-slate-400">{t('telegramChatId', 'Telegram ID')}:</span>
+                      {s.telegram_chat_id ? (
+                        <span className="font-mono font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                          <Send className="w-3 h-3 text-blue-500" />
+                          <span>{s.telegram_chat_id.startsWith('@') ? s.telegram_chat_id : `@${s.telegram_chat_id}`}</span>
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 italic text-[11px]">{t('notConnected', 'Not Linked')}</span>
+                      )}
+                    </div>
                   </div>
 
                   <button
@@ -2690,6 +2701,7 @@ export default function AdminDashboard() {
                     <th className="py-4 px-5 font-semibold">{t('storeName', 'Store Name')}</th>
                     <th className="py-4 px-5 font-semibold">{t('owner', 'Merchant / Owner')}</th>
                     <th className="py-4 px-5 font-semibold">{t('location', 'Location (Province / District)')}</th>
+                    <th className="py-4 px-5 font-semibold">{t('telegramChatId', 'Telegram ID')}</th>
                     <th className="py-4 px-5 font-semibold">{t('connectedSoundboxes', 'Soundboxes')}</th>
                     <th className="py-4 px-5 font-semibold text-right">{t('actions', 'Details')}</th>
                   </tr>
@@ -2766,6 +2778,18 @@ export default function AdminDashboard() {
                               </div>
                             )}
                           </div>
+                        </td>
+
+                        {/* Telegram ID */}
+                        <td className="py-3.5 px-5">
+                          {s.telegram_chat_id ? (
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 whitespace-nowrap">
+                              <Send className="w-3 h-3 text-blue-500 shrink-0" />
+                              <span>{s.telegram_chat_id.startsWith('@') ? s.telegram_chat_id : `@${s.telegram_chat_id}`}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">{t('notConnected', 'Not Linked')}</span>
+                          )}
                         </td>
 
                         {/* Soundbox Count */}
@@ -5023,6 +5047,13 @@ export default function AdminDashboard() {
                   <span className="text-slate-400 block">{t('phoneNumber', 'Phone Number')}:</span>
                   <span className="font-semibold text-slate-800 dark:text-slate-200 font-mono">
                     {selectedStoreForDetails.owner_phone}
+                  </span>
+                </div>
+                <div className="col-span-2 pt-1 border-t border-indigo-100/60 dark:border-indigo-900/40">
+                  <span className="text-slate-400 block">{t('telegramChatId', 'Telegram ID')}:</span>
+                  <span className="font-semibold text-blue-600 dark:text-blue-400 font-mono inline-flex items-center gap-1 mt-0.5">
+                    <Send className="w-3 h-3 text-blue-500" />
+                    <span>{selectedStoreForDetails.telegram_chat_id ? (selectedStoreForDetails.telegram_chat_id.startsWith('@') ? selectedStoreForDetails.telegram_chat_id : `@${selectedStoreForDetails.telegram_chat_id}`) : 'Not Linked'}</span>
                   </span>
                 </div>
               </div>

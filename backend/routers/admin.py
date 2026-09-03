@@ -367,7 +367,12 @@ async def list_stores(
                 SELECT COUNT(*) FROM devices d 
                 WHERE d.merchant_id::text = m.id::text 
                    OR (m.merchant_id IS NOT NULL AND d.merchant_id::text = m.merchant_id::text)
-            ), 0) AS device_count
+            ), 0) AS device_count,
+            COALESCE(
+                m.telegram_chat_id,
+                (SELECT d.telegram_chat_id FROM devices d WHERE (d.merchant_id::text = m.id::text OR (m.merchant_id IS NOT NULL AND d.merchant_id::text = m.merchant_id::text)) AND d.telegram_chat_id IS NOT NULL LIMIT 1),
+                ''
+            ) AS telegram_chat_id
         FROM merchants m
         LEFT JOIN users u ON m.user_id = u.id OR (m.user_id IS NULL AND m.owner_phone = u.phone_number)
         WHERE 1=1
@@ -386,6 +391,7 @@ async def list_stores(
             OR m.place ILIKE $1 
             OR m.location ILIKE $1 
             OR u.full_name ILIKE $1
+            OR m.telegram_chat_id ILIKE $1
         )"""
         params.append(s)
 
@@ -402,6 +408,7 @@ async def list_stores(
                     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS merchant_name VARCHAR(255);
                     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS user_id INT;
                     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS owner_phone VARCHAR(50);
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(255);
                     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS place VARCHAR(255);
                     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS location VARCHAR(255);
                     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS province VARCHAR(100);
@@ -423,7 +430,8 @@ async def list_stores(
                            COALESCE(m.street, '') AS street,
                            m.created_at,
                            'Merchant' AS owner_name,
-                           0 AS device_count
+                           0 AS device_count,
+                           COALESCE((SELECT d.telegram_chat_id FROM devices d WHERE d.merchant_id::text = m.id::text AND d.telegram_chat_id IS NOT NULL LIMIT 1), '') AS telegram_chat_id
                     FROM merchants m
                     ORDER BY m.id DESC
                 """
