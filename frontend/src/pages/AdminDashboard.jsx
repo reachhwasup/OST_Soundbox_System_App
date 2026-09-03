@@ -3055,7 +3055,7 @@ export default function AdminDashboard() {
                     {visibleColumns.merchantId && <th className="py-4 px-4 font-semibold min-w-[180px]">{t('merchantStore', 'Assigned Store')}</th>}
                     {visibleColumns.status && <th className="py-4 px-4 font-semibold text-center min-w-[110px]">{t('status', 'Status')}</th>}
                     {visibleColumns.price && <th className="py-4 px-4 font-semibold text-center min-w-[110px]">{t('price', 'Price')}</th>}
-                    {visibleColumns.warranty && <th className="py-4 px-4 font-semibold text-center min-w-[140px]">{t('warranty', 'Warranty (90d)')}</th>}
+                    {visibleColumns.warranty && <th className="py-4 px-4 font-semibold text-center min-w-[140px]">{t('warranty', 'Warranty')}</th>}
                     {visibleColumns.battery && <th className="py-4 px-4 font-semibold text-center min-w-[95px]">{t('battery', 'Battery')}</th>}
                     {visibleColumns.signal && <th className="py-4 px-4 font-semibold text-center min-w-[95px]">{t('signal', 'Signal')}</th>}
                     {visibleColumns.version4g && <th className="py-4 px-4 font-semibold min-w-[150px]">{t('version4G', '4G Version')}</th>}
@@ -5918,7 +5918,7 @@ export default function AdminDashboard() {
               merchantId: t('merchantStore', 'Assigned Store'),
               status: t('status', 'Status'),
               price: t('price', 'Price ($)'),
-              warranty: t('warranty', 'Warranty (90d Countdown)'),
+              warranty: t('warranty', 'Warranty'),
               battery: t('battery', 'Battery'),
               signal: t('signal', 'Signal'),
               version4g: t('version4G', '4G Version'),

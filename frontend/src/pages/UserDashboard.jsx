@@ -1364,7 +1364,7 @@ export default function UserDashboard() {
                           {visibleColumns.battery && <th className="py-4 px-5">{isKhmer ? 'ថាមពលថ្ម' : 'Battery Level'}</th>}
                           {visibleColumns.signal && <th className="py-4 px-5">{isKhmer ? 'កម្រិតសេវា' : 'Signal'}</th>}
                           {visibleColumns.telegram && <th className="py-4 px-5">{isKhmer ? 'Telegram Bot' : 'Telegram Bot'}</th>}
-                          {visibleColumns.warranty && <th className="py-4 px-5 text-center">{isKhmer ? 'ការធានា (Warranty)' : 'Warranty (90d)'}</th>}
+                          {visibleColumns.warranty && <th className="py-4 px-5 text-center">{isKhmer ? 'ការធានា' : 'Warranty'}</th>}
                           {visibleColumns.status && <th className="py-4 px-5">{isKhmer ? 'ស្ថានភាព' : 'Status'}</th>}
                           {visibleColumns.actions && <th className="py-4 px-5 text-right rounded-r-xl whitespace-nowrap">{isKhmer ? 'សកម្មភាព' : 'Actions'}</th>}
                         </tr>
@@ -2995,7 +2995,7 @@ export default function UserDashboard() {
               { key: 'battery', label: isKhmer ? 'ថាមពលថ្ម' : 'Battery Level' },
               { key: 'signal', label: isKhmer ? 'កម្រិតសេវា (Signal)' : 'Signal Strength' },
               { key: 'telegram', label: isKhmer ? 'Telegram Bot' : 'Telegram Bot' },
-              { key: 'warranty', label: isKhmer ? 'ការធានា (90 ថ្ងៃ)' : 'Warranty (90-Day)' },
+              { key: 'warranty', label: isKhmer ? 'ការធានា' : 'Warranty' },
               { key: 'status', label: isKhmer ? 'ស្ថានភាព' : 'Status' },
               { key: 'actions', label: isKhmer ? 'សកម្មភាព' : 'Actions' }
             ].map(({ key, label }) => (

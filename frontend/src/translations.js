@@ -670,7 +670,7 @@ export const translations = {
     adminActivitySubtitle: "កំណត់ត្រាសកម្មភាពអ្នកគ្រប់គ្រង ការបញ្ចូលស្តុក ការលក់/ដាក់ឱ្យប្រើ និងការបញ្ជាឧបករណ៍ពីចម្ងាយ",
     
     // Warranty & Discount Tracking
-    warranty: "ការធានា (Warranty)",
+    warranty: "ការធានា",
     warrantyPeriod: "រយៈពេលធានា",
     warrantyCountdown: "រាប់ថយក្រោយការធានា",
     daysRemaining: "ចំនួនថ្ងៃនៅសល់",
