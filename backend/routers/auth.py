@@ -119,7 +119,7 @@ async def login(payload: LoginSchema):
 
         # Check if user has registered store
         store = await conn.fetchrow(
-            "SELECT id, name, place, location FROM merchants WHERE user_id = $1 OR owner_phone = $2",
+            "SELECT COALESCE(merchant_id, id::text) AS merchant_id, id, COALESCE(merchant_name, name) AS merchant_name, COALESCE(merchant_name, name) AS name, place, location FROM merchants WHERE user_id = $1 OR owner_phone = $2",
             user["id"], clean_phone
         )
 
@@ -151,7 +151,7 @@ async def get_me(current_user: Dict[str, Any] = Depends(get_current_user)):
     pool = await get_db_pool()
     async with pool.acquire() as conn:
         store = await conn.fetchrow(
-            "SELECT id, name, place, location, owner_phone FROM merchants WHERE user_id = $1 OR owner_phone = $2",
+            "SELECT COALESCE(merchant_id, id::text) AS merchant_id, id, COALESCE(merchant_name, name) AS merchant_name, COALESCE(merchant_name, name) AS name, place, location, owner_phone FROM merchants WHERE user_id = $1 OR owner_phone = $2",
             current_user["id"], current_user["phone_number"]
         )
         
@@ -204,7 +204,7 @@ async def update_profile(
 
         # Check store info
         store = await conn.fetchrow(
-            "SELECT id, name, place, location, owner_phone FROM merchants WHERE user_id = $1 OR owner_phone = $2",
+            "SELECT COALESCE(merchant_id, id::text) AS merchant_id, id, COALESCE(merchant_name, name) AS merchant_name, COALESCE(merchant_name, name) AS name, place, location, owner_phone FROM merchants WHERE user_id = $1 OR owner_phone = $2",
             current_user["id"], target_phone
         )
 

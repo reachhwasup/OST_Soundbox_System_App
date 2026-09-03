@@ -101,8 +101,10 @@ async def init_db():
         # 3. Merchants Table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS merchants (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(150) NOT NULL,
+                merchant_id SERIAL PRIMARY KEY,
+                merchant_name VARCHAR(150) NOT NULL,
+                name VARCHAR(150),
+                id INT,
                 place VARCHAR(150),
                 location VARCHAR(255),
                 telegram_chat_id VARCHAR(100),
@@ -116,6 +118,10 @@ async def init_db():
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
+            ALTER TABLE merchants ADD COLUMN IF NOT EXISTS merchant_id VARCHAR(100);
+            ALTER TABLE merchants ADD COLUMN IF NOT EXISTS merchant_name VARCHAR(255);
+            ALTER TABLE merchants ADD COLUMN IF NOT EXISTS name VARCHAR(255);
+            ALTER TABLE merchants ADD COLUMN IF NOT EXISTS id INT;
             ALTER TABLE merchants ADD COLUMN IF NOT EXISTS user_id INT REFERENCES users(id) ON DELETE SET NULL;
             ALTER TABLE merchants ADD COLUMN IF NOT EXISTS owner_phone VARCHAR(50);
             ALTER TABLE merchants ADD COLUMN IF NOT EXISTS province VARCHAR(100);
@@ -123,10 +129,18 @@ async def init_db():
             ALTER TABLE merchants ADD COLUMN IF NOT EXISTS commune VARCHAR(100);
             ALTER TABLE merchants ADD COLUMN IF NOT EXISTS village VARCHAR(100);
             ALTER TABLE merchants ADD COLUMN IF NOT EXISTS street VARCHAR(150);
-            ALTER TABLE merchants ADD COLUMN IF NOT EXISTS merchant_id VARCHAR(100);
-            ALTER TABLE merchants ADD COLUMN IF NOT EXISTS merchant_name VARCHAR(255);
+            ALTER TABLE merchants ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(100);
             ALTER TABLE merchants ALTER COLUMN merchant_id DROP NOT NULL;
             ALTER TABLE merchants ALTER COLUMN merchant_name DROP NOT NULL;
+
+            -- Auto-sync columns so merchant_id and merchant_name are always populated
+            UPDATE merchants SET
+                merchant_id = COALESCE(merchant_id, id::text),
+                merchant_name = COALESCE(merchant_name, name, 'Store'),
+                name = COALESCE(name, merchant_name, 'Store'),
+                id = COALESCE(id, CASE WHEN merchant_id ~ '^[0-9]+$' THEN merchant_id::int ELSE NULL END)
+            WHERE merchant_id IS NULL OR merchant_name IS NULL OR name IS NULL;
+
             ALTER TABLE merchants DROP CONSTRAINT IF EXISTS merchants_owner_phone_key;
             CREATE INDEX IF NOT EXISTS idx_merchants_user_id ON merchants(user_id);
             CREATE INDEX IF NOT EXISTS idx_merchants_owner_phone ON merchants(owner_phone);

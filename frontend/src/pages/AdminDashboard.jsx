@@ -1673,7 +1673,7 @@ export default function AdminDashboard() {
     if (storeSelectedIds.length === paginatedStores.length && paginatedStores.length > 0) {
       setStoreSelectedIds([]);
     } else {
-      setStoreSelectedIds(paginatedStores.map(s => s.id));
+      setStoreSelectedIds(paginatedStores.map(s => s.merchant_id || s.id));
     }
   };
 
@@ -2592,10 +2592,10 @@ export default function AdminDashboard() {
                       </div>
                       <div>
                         <div className="font-bold text-slate-900 dark:text-white text-base">
-                          {s.name}
+                          {s.merchant_name || s.name}
                         </div>
                         <div className="text-xs text-slate-400">
-                          ID: #{s.id}
+                          ID: #{s.merchant_id || s.id}
                         </div>
                       </div>
                     </div>
@@ -2710,23 +2710,23 @@ export default function AdminDashboard() {
                   {paginatedStores.length > 0 ? (
                     paginatedStores.map((s) => (
                       <tr 
-                        key={s.id} 
+                        key={s.merchant_id || s.id} 
                         onClick={() => {
                           setSelectedStoreForDetails(s);
                           setIsStoreDetailsOpen(true);
                         }}
                         className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition cursor-pointer group ${
-                          storeSelectedIds.includes(s.id) ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : ''
+                          storeSelectedIds.includes(s.merchant_id || s.id) ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : ''
                         }`}
                       >
                         {/* Selection Checkbox */}
                         <td className="py-4 sm:py-4.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
-                            onClick={() => toggleStoreSelection(s.id)}
+                            onClick={() => toggleStoreSelection(s.merchant_id || s.id)}
                             className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
                           >
-                            {storeSelectedIds.includes(s.id) ? (
+                            {storeSelectedIds.includes(s.merchant_id || s.id) ? (
                               <CheckSquare className="w-4 h-4 text-emerald-600" />
                             ) : (
                               <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
@@ -2742,10 +2742,10 @@ export default function AdminDashboard() {
                             </div>
                             <div>
                               <div className="font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">
-                                {s.name}
+                                {s.merchant_name || s.name}
                               </div>
                               <div className="text-[11px] text-slate-400">
-                                ID: #{s.id}
+                                ID: #{s.merchant_id || s.id}
                               </div>
                             </div>
                           </div>
@@ -5017,10 +5017,10 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <h4 className="text-base font-bold text-slate-900 dark:text-white">
-                    {selectedStoreForDetails.name}
+                    {selectedStoreForDetails.merchant_name || selectedStoreForDetails.name}
                   </h4>
                   <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
-                    <span>ID: #{selectedStoreForDetails.id}</span>
+                    <span>ID: #{selectedStoreForDetails.merchant_id || selectedStoreForDetails.id}</span>
                     <span>•</span>
                     <span className="font-mono">{selectedStoreForDetails.owner_phone}</span>
                   </div>

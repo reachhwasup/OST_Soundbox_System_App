@@ -85,7 +85,7 @@ async def list_users(
             OR EXISTS (
                 SELECT 1 FROM merchants m 
                 WHERE (m.user_id = u.id OR (m.user_id IS NULL AND m.owner_phone = u.phone_number))
-                AND (m.name ILIKE ${param_idx} OR m.place ILIKE ${param_idx} OR m.location ILIKE ${param_idx})
+                AND (m.name ILIKE ${param_idx} OR m.merchant_name ILIKE ${param_idx} OR m.place ILIKE ${param_idx} OR m.location ILIKE ${param_idx})
             )
         )""")
         params.append(s)
@@ -112,8 +112,10 @@ async def list_users(
             COALESCE(
                 (
                     SELECT json_agg(json_build_object(
-                        'id', m.id,
-                        'name', m.name,
+                        'merchant_id', COALESCE(m.merchant_id, m.id::text),
+                        'id', COALESCE(m.merchant_id, m.id::text),
+                        'merchant_name', COALESCE(m.merchant_name, m.name),
+                        'name', COALESCE(m.merchant_name, m.name),
                         'place', m.place,
                         'location', m.location
                     ))
@@ -351,8 +353,10 @@ async def list_stores(
     pool = await get_db_pool()
     query = """
         SELECT 
-            m.id, 
-            COALESCE(m.name, m.merchant_name, 'Store') AS name, 
+            COALESCE(m.merchant_id, m.id::text) AS merchant_id,
+            COALESCE(m.merchant_id, m.id::text) AS id,
+            COALESCE(m.merchant_name, m.name, 'Store') AS merchant_name,
+            COALESCE(m.merchant_name, m.name, 'Store') AS name, 
             COALESCE(m.owner_phone, '') AS owner_phone, 
             COALESCE(m.place, '') AS place, 
             COALESCE(m.location, '') AS location, 
@@ -362,7 +366,7 @@ async def list_stores(
             COALESCE(m.village, '') AS village, 
             COALESCE(m.street, '') AS street,
             m.created_at,
-            COALESCE(u.full_name, u.phone_number, m.name, 'Merchant') AS owner_name,
+            COALESCE(u.full_name, u.phone_number, m.merchant_name, m.name, 'Merchant') AS owner_name,
             COALESCE((
                 SELECT COUNT(*) FROM devices d 
                 WHERE d.merchant_id::text = m.id::text 
@@ -381,6 +385,7 @@ async def list_stores(
         s = f"%{search.strip()}%"
         query += """ AND (
             m.name ILIKE $1 
+            OR m.merchant_name ILIKE $1
             OR m.owner_phone ILIKE $1 
             OR m.province ILIKE $1 
             OR m.district ILIKE $1 
@@ -403,8 +408,10 @@ async def list_stores(
             logger.warning(f"Standard list_stores query failed: {e}. Running fallback query...")
             try:
                 fallback_query = """
-                    SELECT m.id, 
-                           COALESCE(m.name, 'Store') AS name, 
+                    SELECT COALESCE(m.merchant_id, m.id::text) AS merchant_id,
+                           COALESCE(m.merchant_id, m.id::text) AS id,
+                           COALESCE(m.merchant_name, m.name, 'Store') AS merchant_name,
+                           COALESCE(m.merchant_name, m.name, 'Store') AS name, 
                            COALESCE(m.owner_phone, '') AS owner_phone, 
                            COALESCE(m.place, '') AS place, 
                            COALESCE(m.location, '') AS location, 

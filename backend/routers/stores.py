@@ -49,8 +49,11 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
         try:
             stores = await conn.fetch(
                 """
-                SELECT id, user_id, 
-                       COALESCE(name, merchant_name, 'My Store') AS name, 
+                SELECT COALESCE(merchant_id, id::text) AS merchant_id,
+                       COALESCE(merchant_id, id::text) AS id, 
+                       user_id, 
+                       COALESCE(merchant_name, name, 'My Store') AS merchant_name,
+                       COALESCE(merchant_name, name, 'My Store') AS name, 
                        owner_phone, place, location,
                        province, district, commune, village, street,
                        created_at
@@ -66,8 +69,11 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
             logger.warning(f"Full store query failed: {q_err}. Using basic store query...")
             stores = await conn.fetch(
                 """
-                SELECT id, user_id, 
-                       COALESCE(name, 'My Store') AS name, 
+                SELECT COALESCE(merchant_id, id::text) AS merchant_id,
+                       COALESCE(merchant_id, id::text) AS id, 
+                       user_id, 
+                       COALESCE(merchant_name, name, 'My Store') AS merchant_name,
+                       COALESCE(merchant_name, name, 'My Store') AS name, 
                        owner_phone, place, location, created_at
                 FROM merchants 
                 WHERE user_id = $1 
@@ -357,8 +363,10 @@ async def register_store(
             "message": f"Store '{clean_name}' created successfully.",
             "store_id": store_id,
             "store": {
+                "merchant_id": str(store_id),
                 "id": store_id,
                 "user_id": target_user_id,
+                "merchant_name": clean_name,
                 "name": clean_name,
                 "owner_phone": target_phone,
                 "place": clean_place,
@@ -385,12 +393,12 @@ async def update_store(
     async with pool.acquire() as conn:
         if store_id:
             store = await conn.fetchrow(
-                "SELECT id, name, place, location, province, district, commune, village, street FROM merchants WHERE id = $1 AND (user_id = $2 OR owner_phone = $3)",
+                "SELECT COALESCE(merchant_id, id::text) AS merchant_id, id, COALESCE(merchant_name, name) AS name, place, location, province, district, commune, village, street FROM merchants WHERE id = $1 AND (user_id = $2 OR owner_phone = $3)",
                 store_id, current_user["id"], current_user["phone_number"]
             )
         else:
             store = await conn.fetchrow(
-                "SELECT id, name, place, location, province, district, commune, village, street FROM merchants WHERE user_id = $1 OR owner_phone = $2 ORDER BY id ASC LIMIT 1",
+                "SELECT COALESCE(merchant_id, id::text) AS merchant_id, id, COALESCE(merchant_name, name) AS name, place, location, province, district, commune, village, street FROM merchants WHERE user_id = $1 OR owner_phone = $2 ORDER BY id ASC LIMIT 1",
                 current_user["id"], current_user["phone_number"]
             )
 
@@ -424,7 +432,7 @@ async def update_store(
         await conn.execute(
             """
             UPDATE merchants 
-            SET name = $1, place = $2, location = $3,
+            SET name = $1, merchant_name = $1, place = $2, location = $3,
                 province = $4, district = $5, commune = $6, village = $7, street = $8,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = $9
@@ -438,7 +446,9 @@ async def update_store(
             "status": "success",
             "message": f"Store '{new_name}' updated successfully.",
             "store": {
+                "merchant_id": str(store["id"]),
                 "id": store["id"],
+                "merchant_name": new_name,
                 "name": new_name,
                 "place": new_place,
                 "location": new_location,

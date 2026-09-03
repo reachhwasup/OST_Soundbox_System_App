@@ -37,8 +37,8 @@ async def register_device(
     async with pool.acquire() as conn:
         # Check merchant existence & permissions
         merchant = await conn.fetchrow(
-            "SELECT id, name, user_id, owner_phone FROM merchants WHERE id = $1",
-            payload.merchant_id
+            "SELECT COALESCE(merchant_id, id::text) AS merchant_id, id, COALESCE(merchant_name, name) AS name, user_id, owner_phone FROM merchants WHERE id::text = $1::text OR merchant_id::text = $1::text",
+            str(payload.merchant_id)
         )
         if not merchant:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Store/Merchant not found.")
@@ -231,13 +231,13 @@ async def list_devices(
                    COALESCE(d.last_online, d.last_heartbeat, d.updated_at, d.created_at) AS last_time,
                    COALESCE(d.last_heartbeat, d.last_online) AS last_heartbeat,
                    d.created_at,
-                   m.name AS store_name,
-                   COALESCE(u.full_name, m.name) AS merchant_name,
+                   COALESCE(m.merchant_name, m.name) AS store_name,
+                   COALESCE(u.full_name, m.merchant_name, m.name) AS merchant_name,
                    COALESCE(m.owner_phone, u.phone_number) AS owner_phone,
                    COALESCE(u.phone_number, m.owner_phone) AS user_phone,
-                   COALESCE(u.full_name, m.name) AS owner_name
+                   COALESCE(u.full_name, m.merchant_name, m.name) AS owner_name
             FROM devices d
-            LEFT JOIN merchants m ON d.merchant_id::text = m.id::text
+            LEFT JOIN merchants m ON (d.merchant_id::text = m.merchant_id::text OR d.merchant_id::text = m.id::text)
             LEFT JOIN users u ON m.user_id = u.id
             WHERE {where_sql}
             ORDER BY d.id DESC
@@ -268,9 +268,9 @@ async def list_devices(
                            COALESCE(d.device_type, 'Display Soundbox') AS device_type,
                            COALESCE(d.battery, '100%') AS battery,
                            COALESCE(d.signal, 'Good') AS signal,
-                           m.name AS store_name
+                           COALESCE(m.merchant_name, m.name) AS store_name
                     FROM devices d
-                    LEFT JOIN merchants m ON d.merchant_id::text = m.id::text
+                    LEFT JOIN merchants m ON (d.merchant_id::text = m.merchant_id::text OR d.merchant_id::text = m.id::text)
                     ORDER BY d.id DESC
                 """
                 devices = await conn.fetch(fallback_query)
@@ -762,7 +762,7 @@ async def unlink_device(
             """
             SELECT d.id, d.merchant_id, d.device_sn, m.user_id, m.owner_phone
             FROM devices d
-            LEFT JOIN merchants m ON d.merchant_id = m.id
+            LEFT JOIN merchants m ON (d.merchant_id::text = m.merchant_id::text OR d.merchant_id::text = m.id::text)
             WHERE d.id = $1
             """,
             device_id

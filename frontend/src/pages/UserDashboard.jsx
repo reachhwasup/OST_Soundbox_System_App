@@ -134,10 +134,10 @@ export default function UserDashboard() {
     const res = stores.filter(s => {
       if (storeSearch.trim()) {
         const q = storeSearch.trim().toLowerCase();
-        const nameMatch = String(s.name || '').toLowerCase().includes(q);
+        const nameMatch = String(s.merchant_name || s.name || '').toLowerCase().includes(q);
         const locMatch = String(s.location || s.place || '').toLowerCase().includes(q);
         const phoneMatch = String(s.owner_phone || '').toLowerCase().includes(q);
-        const idMatch = String(s.id || '').includes(q);
+        const idMatch = String(s.merchant_id || s.id || '').includes(q);
         if (!nameMatch && !locMatch && !phoneMatch && !idMatch) return false;
       }
       if (storeProvinceFilter !== 'ALL') {
@@ -213,7 +213,7 @@ export default function UserDashboard() {
             rowId: `dev-${d.id || d.device_sn || idx}-${s.id}`,
             store: s,
             device: d,
-            storeName: s.name || 'Store Branch',
+            storeName: s.merchant_name || s.name || 'Store Branch',
             storeId: s.id,
             location: s.location || s.place || 'Phnom Penh, Cambodia',
             province: s.province || '',
@@ -462,7 +462,7 @@ export default function UserDashboard() {
     const list = [];
     stores.forEach(s => {
       (s.devices || []).forEach(d => {
-        list.push({ ...d, storeName: s.name, storeId: s.id, storeLocation: s.location || s.place });
+        list.push({ ...d, storeName: s.merchant_name || s.name, storeId: s.merchant_id || s.id, storeLocation: s.location || s.place });
       });
     });
     return list;
@@ -497,7 +497,7 @@ export default function UserDashboard() {
     const list = [];
     stores.forEach(s => {
       (s.recent_transactions || []).forEach(tx => {
-        list.push({ ...tx, storeName: s.name, storeId: s.id });
+        list.push({ ...tx, storeName: s.merchant_name || s.name, storeId: s.merchant_id || s.id });
       });
     });
     // Sort descending by created_at
@@ -1280,7 +1280,7 @@ export default function UserDashboard() {
                   >
                     <option value="ALL">{isKhmer ? 'សាខាហាងទាំងអស់' : 'All Branches'}</option>
                     {stores.map(s => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
+                      <option key={s.merchant_id || s.id} value={s.merchant_id || s.id}>{s.merchant_name || s.name}</option>
                     ))}
                   </select>
 
@@ -1904,7 +1904,7 @@ export default function UserDashboard() {
                   >
                     <option value="ALL">{isKhmer ? 'សាខាហាងទាំងអស់' : 'All Store Branches'}</option>
                     {stores.map(s => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
+                      <option key={s.merchant_id || s.id} value={s.merchant_id || s.id}>{s.merchant_name || s.name}</option>
                     ))}
                   </select>
 
@@ -2426,7 +2426,7 @@ export default function UserDashboard() {
                   className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white"
                 >
                   {stores.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
+                    <option key={s.merchant_id || s.id} value={s.merchant_id || s.id}>{s.merchant_name || s.name}</option>
                   ))}
                 </select>
               </div>
@@ -2712,7 +2712,7 @@ export default function UserDashboard() {
                 >
                   {stores.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.name}
+                      {s.merchant_name || s.name}
                     </option>
                   ))}
                 </select>
