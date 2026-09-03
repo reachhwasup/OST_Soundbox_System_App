@@ -146,10 +146,11 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
             formatted_txs = []
             for tx in transactions:
                 try:
+                    tx_d = dict(tx)
                     formatted_txs.append({
-                        **dict(tx),
-                        "amount": float(tx["amount"]) if tx.get("amount") is not None else 0.0,
-                        "created_at": tx["created_at"].isoformat() if tx.get("created_at") else None
+                        **tx_d,
+                        "amount": float(tx_d["amount"]) if tx_d.get("amount") is not None else 0.0,
+                        "created_at": tx_d["created_at"].isoformat() if tx_d.get("created_at") else None
                     })
                 except Exception:
                     pass
@@ -157,26 +158,33 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
             formatted_alerts = []
             for alt in alerts:
                 try:
+                    alt_d = dict(alt)
                     formatted_alerts.append({
-                        **dict(alt),
-                        "amount": float(alt["amount"]) if alt.get("amount") is not None else None,
-                        "created_at": alt["created_at"].isoformat() if alt.get("created_at") else None
+                        **alt_d,
+                        "amount": float(alt_d["amount"]) if alt_d.get("amount") is not None else None,
+                        "created_at": alt_d["created_at"].isoformat() if alt_d.get("created_at") else None
+                    })
+                except Exception:
+                    pass
+
+            s_d = dict(s)
+            formatted_devices = []
+            for d in devices:
+                try:
+                    d_d = dict(d)
+                    formatted_devices.append({
+                        **d_d,
+                        "created_at": d_d["created_at"].isoformat() if d_d.get("created_at") else None,
+                        "last_heartbeat": d_d["last_heartbeat"].isoformat() if d_d.get("last_heartbeat") else None
                     })
                 except Exception:
                     pass
 
             store_dict = {
-                **dict(s),
-                "created_at": s["created_at"].isoformat() if s.get("created_at") else None,
-                "updated_at": s["updated_at"].isoformat() if s.get("updated_at") else None,
-                "devices": [
-                    {
-                        **dict(d),
-                        "created_at": d["created_at"].isoformat() if d.get("created_at") else None,
-                        "last_heartbeat": d["last_heartbeat"].isoformat() if d.get("last_heartbeat") else None
-                    }
-                    for d in devices
-                ],
+                **s_d,
+                "created_at": s_d["created_at"].isoformat() if s_d.get("created_at") else None,
+                "updated_at": s_d["updated_at"].isoformat() if s_d.get("updated_at") else None,
+                "devices": formatted_devices,
                 "recent_transactions": formatted_txs,
                 "security_alerts": formatted_alerts
             }

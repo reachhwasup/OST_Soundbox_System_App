@@ -437,7 +437,7 @@ async def list_stores(
             "stores": [
                 {
                     **dict(s),
-                    "created_at": s["created_at"].isoformat() if s.get("created_at") else None
+                    "created_at": s["created_at"].isoformat() if dict(s).get("created_at") else None
                 }
                 for s in stores
             ]

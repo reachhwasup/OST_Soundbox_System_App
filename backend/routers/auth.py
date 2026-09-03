@@ -156,7 +156,7 @@ async def get_me(current_user: Dict[str, Any] = Depends(get_current_user)):
         )
         
         # Link store to user_id if matched by phone but user_id is null
-        if store and store.get("id"):
+        if store and store["id"]:
             await conn.execute(
                 "UPDATE merchants SET user_id = $1 WHERE id = $2 AND user_id IS NULL",
                 current_user["id"], store["id"]
