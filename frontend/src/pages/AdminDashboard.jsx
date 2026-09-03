@@ -331,7 +331,7 @@ export default function AdminDashboard() {
       const roleParam = encodeURIComponent(roleFilter.trim());
       const statusParam = encodeURIComponent(statusFilter.trim());
 
-      const [statsRes, usersRes, storesRes, devicesRes, logsRes] = await Promise.all([
+      const results = await Promise.allSettled([
         api.get('/api/admin/stats'),
         api.get(`/api/admin/users?search=${searchParam}&role=${roleParam}&status=${statusParam}`),
         api.get('/api/admin/stores'),
@@ -339,11 +339,23 @@ export default function AdminDashboard() {
         api.get(`/api/admin/logs?search=${searchParam}&log_type=${logTypeFilter}&limit=100`)
       ]);
 
-      setStats(statsRes.data.stats);
-      setUsers(usersRes.data.users || []);
-      setStores(storesRes.data.stores || []);
-      setDevices(devicesRes.data.devices || []);
-      setLogs(logsRes.data?.logs || []);
+      const [statsRes, usersRes, storesRes, devicesRes, logsRes] = results;
+
+      if (statsRes.status === 'fulfilled' && statsRes.value?.data?.stats) {
+        setStats(statsRes.value.data.stats);
+      }
+      if (usersRes.status === 'fulfilled' && usersRes.value?.data?.users) {
+        setUsers(usersRes.value.data.users);
+      }
+      if (storesRes.status === 'fulfilled' && storesRes.value?.data?.stores) {
+        setStores(storesRes.value.data.stores);
+      }
+      if (devicesRes.status === 'fulfilled' && devicesRes.value?.data?.devices) {
+        setDevices(devicesRes.value.data.devices);
+      }
+      if (logsRes.status === 'fulfilled' && logsRes.value?.data?.logs) {
+        setLogs(logsRes.value.data.logs);
+      }
     } catch (err) {
       console.error(err);
       const msg = err.response?.data?.detail || 'Failed to fetch administrative data.';

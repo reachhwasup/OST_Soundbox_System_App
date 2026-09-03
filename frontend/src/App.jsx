@@ -32,6 +32,15 @@ function MainLayout() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  // When user is logged in, clean up URL pathname so it doesn't stay on /login
+  useEffect(() => {
+    if (user && typeof window !== 'undefined') {
+      if (window.location.pathname === '/login' || window.location.pathname === '/register') {
+        window.history.replaceState(null, '', '/');
+      }
+    }
+  }, [user]);
+
   const handleSwitchToRegister = () => {
     setAuthMode('register');
     if (window.location.pathname !== '/register') {
