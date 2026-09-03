@@ -369,7 +369,6 @@ async def list_stores(
                    OR (m.merchant_id IS NOT NULL AND d.merchant_id::text = m.merchant_id::text)
             ), 0) AS device_count,
             COALESCE(
-                m.telegram_chat_id,
                 (SELECT d.telegram_chat_id FROM devices d WHERE (d.merchant_id::text = m.id::text OR (m.merchant_id IS NOT NULL AND d.merchant_id::text = m.merchant_id::text)) AND d.telegram_chat_id IS NOT NULL LIMIT 1),
                 ''
             ) AS telegram_chat_id
@@ -391,7 +390,7 @@ async def list_stores(
             OR m.place ILIKE $1 
             OR m.location ILIKE $1 
             OR u.full_name ILIKE $1
-            OR m.telegram_chat_id ILIKE $1
+            OR EXISTS (SELECT 1 FROM devices d WHERE (d.merchant_id::text = m.id::text OR (m.merchant_id IS NOT NULL AND d.merchant_id::text = m.merchant_id::text)) AND d.telegram_chat_id ILIKE $1)
         )"""
         params.append(s)
 
@@ -401,25 +400,11 @@ async def list_stores(
         try:
             stores = await conn.fetch(query, *params)
         except Exception as e:
-            logger.warning(f"Standard list_stores query failed: {e}. Running schema auto-heal and fallback...")
+            logger.warning(f"Standard list_stores query failed: {e}. Running fallback query...")
             try:
-                await conn.execute("""
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS merchant_id VARCHAR(100);
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS merchant_name VARCHAR(255);
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS user_id INT;
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS owner_phone VARCHAR(50);
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(255);
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS place VARCHAR(255);
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS location VARCHAR(255);
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS province VARCHAR(100);
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS district VARCHAR(100);
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS commune VARCHAR(100);
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS village VARCHAR(100);
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS street VARCHAR(255);
-                """)
                 fallback_query = """
                     SELECT m.id, 
-                           COALESCE(m.name, m.merchant_name, 'Store') AS name, 
+                           COALESCE(m.name, 'Store') AS name, 
                            COALESCE(m.owner_phone, '') AS owner_phone, 
                            COALESCE(m.place, '') AS place, 
                            COALESCE(m.location, '') AS location, 
