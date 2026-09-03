@@ -1895,7 +1895,7 @@ export default function AdminDashboard() {
 
       {/* KPI Stats Cards - Dedicated to Users tab only */}
       {stats && adminTab === 'users' && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3.5">
           <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
             <div className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('totalUsers', 'Total Users')}</div>
             <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1">{stats.total_users}</div>
@@ -1915,10 +1915,6 @@ export default function AdminDashboard() {
           <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
             <div className="text-[10px] sm:text-xs font-semibold text-blue-600 uppercase tracking-wider">{t('totalStores', 'Stores Total')}</div>
             <div className="text-xl sm:text-2xl font-bold text-blue-600 mt-1">{stats.total_stores}</div>
-          </div>
-          <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-            <div className="text-[10px] sm:text-xs font-semibold text-amber-600 uppercase tracking-wider">{t('totalSoundboxes', 'Soundboxes')}</div>
-            <div className="text-xl sm:text-2xl font-bold text-amber-600 mt-1">{stats.total_devices}</div>
           </div>
         </div>
       )}
