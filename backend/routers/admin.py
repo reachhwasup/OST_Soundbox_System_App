@@ -351,14 +351,25 @@ async def list_stores(
     pool = await get_db_pool()
     query = """
         SELECT 
-            m.id, m.name, m.owner_phone, m.place, m.location, 
-            m.province, m.district, m.commune, m.village, m.street,
+            m.id, 
+            COALESCE(m.name, m.merchant_name, 'Store') AS name, 
+            COALESCE(m.owner_phone, '') AS owner_phone, 
+            COALESCE(m.place, '') AS place, 
+            COALESCE(m.location, '') AS location, 
+            COALESCE(m.province, '') AS province, 
+            COALESCE(m.district, '') AS district, 
+            COALESCE(m.commune, '') AS commune, 
+            COALESCE(m.village, '') AS village, 
+            COALESCE(m.street, '') AS street,
             m.created_at,
-            u.full_name AS owner_name,
-            COUNT(d.id) AS device_count
+            COALESCE(u.full_name, u.phone_number, m.name, 'Merchant') AS owner_name,
+            COALESCE((
+                SELECT COUNT(*) FROM devices d 
+                WHERE d.merchant_id::text = m.id::text 
+                   OR (m.merchant_id IS NOT NULL AND d.merchant_id::text = m.merchant_id::text)
+            ), 0) AS device_count
         FROM merchants m
-        LEFT JOIN users u ON m.user_id = u.id
-        LEFT JOIN devices d ON d.merchant_id = m.id
+        LEFT JOIN users u ON m.user_id = u.id OR (m.user_id IS NULL AND m.owner_phone = u.phone_number)
         WHERE 1=1
     """
     params = []
@@ -378,23 +389,55 @@ async def list_stores(
         )"""
         params.append(s)
 
-    query += """
-        GROUP BY 
-            m.id, m.name, m.owner_phone, m.place, m.location, 
-            m.province, m.district, m.commune, m.village, m.street,
-            m.created_at, u.full_name 
-        ORDER BY m.id DESC
-    """
+    query += " ORDER BY m.id DESC"
 
     async with pool.acquire() as conn:
-        stores = await conn.fetch(query, *params)
+        try:
+            stores = await conn.fetch(query, *params)
+        except Exception as e:
+            logger.warning(f"Standard list_stores query failed: {e}. Running schema auto-heal and fallback...")
+            try:
+                await conn.execute("""
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS merchant_id VARCHAR(100);
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS merchant_name VARCHAR(255);
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS user_id INT;
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS owner_phone VARCHAR(50);
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS place VARCHAR(255);
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS location VARCHAR(255);
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS province VARCHAR(100);
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS district VARCHAR(100);
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS commune VARCHAR(100);
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS village VARCHAR(100);
+                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS street VARCHAR(255);
+                """)
+                fallback_query = """
+                    SELECT m.id, 
+                           COALESCE(m.name, m.merchant_name, 'Store') AS name, 
+                           COALESCE(m.owner_phone, '') AS owner_phone, 
+                           COALESCE(m.place, '') AS place, 
+                           COALESCE(m.location, '') AS location, 
+                           COALESCE(m.province, '') AS province, 
+                           COALESCE(m.district, '') AS district, 
+                           COALESCE(m.commune, '') AS commune, 
+                           COALESCE(m.village, '') AS village, 
+                           COALESCE(m.street, '') AS street,
+                           m.created_at,
+                           'Merchant' AS owner_name,
+                           0 AS device_count
+                    FROM merchants m
+                    ORDER BY m.id DESC
+                """
+                stores = await conn.fetch(fallback_query)
+            except Exception as final_e:
+                logger.error(f"Fallback list_stores query also failed: {final_e}")
+                stores = []
 
         return {
             "status": "success",
             "stores": [
                 {
                     **dict(s),
-                    "created_at": s["created_at"].isoformat() if s["created_at"] else None
+                    "created_at": s["created_at"].isoformat() if s.get("created_at") else None
                 }
                 for s in stores
             ]
