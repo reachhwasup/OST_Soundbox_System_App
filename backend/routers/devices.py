@@ -59,8 +59,36 @@ async def register_device(
 
         chat_id = payload.telegram_chat_id.strip() if payload.telegram_chat_id and payload.telegram_chat_id.strip() else None
 
-        m_id_str = str(payload.merchant_id)
-        m_id_int = int(payload.merchant_id)
+        # Eager schema migration to ensure all optional/new columns exist
+        try:
+            await conn.execute("""
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_type VARCHAR(100) DEFAULT 'Display Soundbox';
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_model VARCHAR(100) DEFAULT 'Y6B';
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(255);
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(10, 2) DEFAULT 0.00;
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(5, 2) DEFAULT 0.00;
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS final_price NUMERIC(10, 2) DEFAULT 29.00;
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_days INT DEFAULT 90;
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_start_date TIMESTAMPTZ;
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_end_date TIMESTAMPTZ;
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'ACTIVE';
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+            """)
+        except Exception as mig_err:
+            logger.warning(f"Schema migration warning in register_device: {mig_err}")
+
+        # Check merchant_id column datatype in devices table to avoid asyncpg DataError
+        col_type = await conn.fetchval("""
+            SELECT data_type 
+            FROM information_schema.columns 
+            WHERE table_name = 'devices' AND column_name = 'merchant_id'
+        """)
+        if col_type in ('integer', 'bigint', 'smallint'):
+            m_id_target = int(payload.merchant_id)
+        else:
+            m_id_target = str(payload.merchant_id)
 
         # Base price and discount calculation
         base_price = float(payload.price or 29.00)
@@ -85,38 +113,16 @@ async def register_device(
                         warranty_end_date = COALESCE(warranty_end_date, $11),
                         status = 'ACTIVE', is_active = TRUE, updated_at = CURRENT_TIMESTAMP
                     WHERE id = $12
-                """, m_id_str, chat_id, payload.device_type or "Display Soundbox", payload.device_model or "Display Soundbox", 
+                """, m_id_target, chat_id, payload.device_type or "Display Soundbox", payload.device_model or "Display Soundbox", 
                    base_price, disc_amt, float(payload.discount_percent or 0.0), calc_final_price, w_days, now_dt, w_end_dt, dev_id)
             except Exception as update_err:
-                logger.warning(f"Standard device link update failed: {update_err}. Running schema migration and fallback...")
+                logger.warning(f"Full device link update failed: {update_err}. Running minimal fallback...")
                 try:
                     await conn.execute("""
-                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_type VARCHAR(100) DEFAULT 'Display Soundbox';
-                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_model VARCHAR(100) DEFAULT 'Y6B';
-                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(255);
-                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
-                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(10, 2) DEFAULT 0.00;
-                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(5, 2) DEFAULT 0.00;
-                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS final_price NUMERIC(10, 2) DEFAULT 29.00;
-                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_days INT DEFAULT 90;
-                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_start_date TIMESTAMPTZ;
-                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_end_date TIMESTAMPTZ;
-                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
-                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'ACTIVE';
-                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
-                    """)
-                    try:
-                        await conn.execute("""
-                            UPDATE devices 
-                            SET merchant_id = $1, telegram_chat_id = $2, status = 'ACTIVE', is_active = TRUE, updated_at = CURRENT_TIMESTAMP
-                            WHERE id = $3
-                        """, m_id_str, chat_id, dev_id)
-                    except Exception:
-                        await conn.execute("""
-                            UPDATE devices 
-                            SET merchant_id = $1, telegram_chat_id = $2, status = 'ACTIVE', is_active = TRUE, updated_at = CURRENT_TIMESTAMP
-                            WHERE id = $3
-                        """, m_id_int, chat_id, dev_id)
+                        UPDATE devices 
+                        SET merchant_id = $1, telegram_chat_id = $2, status = 'ACTIVE', is_active = TRUE, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = $3
+                    """, m_id_target, chat_id, dev_id)
                 except Exception as final_update_err:
                     logger.error(f"Device link update completely failed: {final_update_err}", exc_info=True)
                     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to link device: {str(final_update_err)}")
