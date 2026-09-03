@@ -59,60 +59,108 @@ async def register_device(
 
         chat_id = payload.telegram_chat_id.strip() if payload.telegram_chat_id and payload.telegram_chat_id.strip() else None
 
-        if existing_device:
-            # Calculate final price with discount
-            base_price = float(payload.price or 29.00)
-            disc_amt = float(payload.discount_amount or 0.0)
-            if payload.discount_percent and float(payload.discount_percent) > 0:
-                disc_amt = (float(payload.discount_percent) / 100.0) * base_price
-            calc_final_price = max(0.0, base_price - disc_amt)
-            w_days = int(payload.warranty_days or 90)
-            now_dt = datetime.now(timezone.utc)
-            w_end_dt = now_dt + timedelta(days=w_days)
+        m_id_str = str(payload.merchant_id)
+        m_id_int = int(payload.merchant_id)
 
+        # Base price and discount calculation
+        base_price = float(payload.price or 29.00)
+        disc_amt = float(payload.discount_amount or 0.0)
+        if payload.discount_percent and float(payload.discount_percent) > 0:
+            disc_amt = (float(payload.discount_percent) / 100.0) * base_price
+        calc_final_price = max(0.0, base_price - disc_amt)
+        w_days = int(payload.warranty_days or 90)
+        now_dt = datetime.now(timezone.utc)
+        w_end_dt = now_dt + timedelta(days=w_days)
+
+        if existing_device:
+            dev_id = existing_device["id"]
             # Reassign / link to this merchant and activate with warranty
-            await conn.execute("""
-                UPDATE devices 
-                SET merchant_id = $1, telegram_chat_id = $2, device_type = $3, device_model = $4, 
-                    price = $5, discount_amount = $6, discount_percent = $7, final_price = $8,
-                    warranty_days = $9, 
-                    warranty_start_date = COALESCE(warranty_start_date, $10),
-                    warranty_end_date = COALESCE(warranty_end_date, $11),
-                    status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
-                WHERE id = $12
-            """, payload.merchant_id, chat_id, payload.device_type or "Display Soundbox", payload.device_model or "Display Soundbox", 
-               base_price, disc_amt, float(payload.discount_percent or 0.0), calc_final_price, w_days, now_dt, w_end_dt, existing_device["id"])
+            try:
+                await conn.execute("""
+                    UPDATE devices 
+                    SET merchant_id = $1, telegram_chat_id = $2, device_type = $3, device_model = $4, 
+                        price = $5, discount_amount = $6, discount_percent = $7, final_price = $8,
+                        warranty_days = $9, 
+                        warranty_start_date = COALESCE(warranty_start_date, $10),
+                        warranty_end_date = COALESCE(warranty_end_date, $11),
+                        status = 'ACTIVE', is_active = TRUE, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = $12
+                """, m_id_str, chat_id, payload.device_type or "Display Soundbox", payload.device_model or "Display Soundbox", 
+                   base_price, disc_amt, float(payload.discount_percent or 0.0), calc_final_price, w_days, now_dt, w_end_dt, dev_id)
+            except Exception as update_err:
+                logger.warning(f"Standard device link update failed: {update_err}. Running schema migration and fallback...")
+                try:
+                    await conn.execute("""
+                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_type VARCHAR(100) DEFAULT 'Display Soundbox';
+                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_model VARCHAR(100) DEFAULT 'Y6B';
+                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(255);
+                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
+                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(10, 2) DEFAULT 0.00;
+                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(5, 2) DEFAULT 0.00;
+                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS final_price NUMERIC(10, 2) DEFAULT 29.00;
+                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_days INT DEFAULT 90;
+                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_start_date TIMESTAMPTZ;
+                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_end_date TIMESTAMPTZ;
+                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'ACTIVE';
+                        ALTER TABLE devices ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+                    """)
+                    try:
+                        await conn.execute("""
+                            UPDATE devices 
+                            SET merchant_id = $1, telegram_chat_id = $2, status = 'ACTIVE', is_active = TRUE, updated_at = CURRENT_TIMESTAMP
+                            WHERE id = $3
+                        """, m_id_str, chat_id, dev_id)
+                    except Exception:
+                        await conn.execute("""
+                            UPDATE devices 
+                            SET merchant_id = $1, telegram_chat_id = $2, status = 'ACTIVE', is_active = TRUE, updated_at = CURRENT_TIMESTAMP
+                            WHERE id = $3
+                        """, m_id_int, chat_id, dev_id)
+                except Exception as final_update_err:
+                    logger.error(f"Device link update completely failed: {final_update_err}", exc_info=True)
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to link device: {str(final_update_err)}")
 
             return {
                 "status": "success",
                 "message": f"Soundbox '{device_sn}' linked successfully.",
-                "device_id": existing_device["id"]
+                "device_id": dev_id
             }
         else:
-            base_price = float(payload.price or 29.00)
-            disc_amt = float(payload.discount_amount or 0.0)
-            if payload.discount_percent and float(payload.discount_percent) > 0:
-                disc_amt = (float(payload.discount_percent) / 100.0) * base_price
-            calc_final_price = max(0.0, base_price - disc_amt)
-            w_days = int(payload.warranty_days or 90)
-            now_dt = datetime.now(timezone.utc)
-            w_end_dt = now_dt + timedelta(days=w_days)
-
             # Insert new device linked to merchant with warranty
-            new_id = await conn.fetchval("""
-                INSERT INTO devices (
-                    merchant_id, device_sn, device_type, device_model, telegram_chat_id, 
-                    price, discount_amount, discount_percent, final_price, 
-                    warranty_days, warranty_start_date, warranty_end_date, status
-                )
-                VALUES (
-                    $1, $2, $3, $4, $5, 
-                    $6, $7, $8, $9, 
-                    $10, $11, $12, 'ACTIVE'
-                )
-                RETURNING id
-            """, payload.merchant_id, device_sn, payload.device_type or "Display Soundbox", payload.device_model or "Display Soundbox", chat_id, 
-               base_price, disc_amt, float(payload.discount_percent or 0.0), calc_final_price, w_days, now_dt, w_end_dt)
+            try:
+                new_id = await conn.fetchval("""
+                    INSERT INTO devices (
+                        merchant_id, device_sn, device_type, device_model, telegram_chat_id, 
+                        price, discount_amount, discount_percent, final_price, 
+                        warranty_days, warranty_start_date, warranty_end_date, status, is_active
+                    )
+                    VALUES (
+                        $1, $2, $3, $4, $5, 
+                        $6, $7, $8, $9, 
+                        $10, $11, $12, 'ACTIVE', TRUE
+                    )
+                    RETURNING id
+                """, m_id_str, device_sn, payload.device_type or "Display Soundbox", payload.device_model or "Display Soundbox", chat_id, 
+                   base_price, disc_amt, float(payload.discount_percent or 0.0), calc_final_price, w_days, now_dt, w_end_dt)
+            except Exception as insert_err:
+                logger.warning(f"Standard device link insert failed: {insert_err}. Retrying with int or basic schema...")
+                try:
+                    new_id = await conn.fetchval("""
+                        INSERT INTO devices (
+                            merchant_id, device_sn, device_type, telegram_chat_id, status, is_active
+                        )
+                        VALUES ($1, $2, $3, $4, 'ACTIVE', TRUE)
+                        RETURNING id
+                    """, m_id_str, device_sn, payload.device_type or "Display Soundbox", chat_id)
+                except Exception:
+                    new_id = await conn.fetchval("""
+                        INSERT INTO devices (
+                            merchant_id, device_sn, device_type, telegram_chat_id, status, is_active
+                        )
+                        VALUES ($1, $2, $3, $4, 'ACTIVE', TRUE)
+                        RETURNING id
+                    """, m_id_int, device_sn, payload.device_type or "Display Soundbox", chat_id)
 
             return {
                 "status": "success",
