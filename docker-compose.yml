@@ -2,27 +2,34 @@ services:
   fastapi-gateway:
     build:
       context: .
-    image: ios_app_backend
+    image: ost_app_backend
     container_name: ost_app_backend
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8001:8000"
     environment:
-      - DATABASE_URL=postgresql://postgres:fDdiFw_KB2930otN@ost_postgres:5432/postgres
-      - API_SECRET_KEY=your-api-key
-      - ADMIN_PHONE=016441474
-      - ADMIN_PASSWORD=reach1234
-      - ADMIN_NAME=Admin Reach
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:fDdiFw_KB2930otN@ost_postgres:5432/postgres}
+      - API_SECRET_KEY=${API_SECRET_KEY:-your-api-key}
+      - ADMIN_PHONE=${ADMIN_PHONE:-012345678}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-Admin123!}
+      - ADMIN_NAME=${ADMIN_NAME:-System Administrator}
     restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    image: ios_app_frontend
+    image: ost_app_frontend
     container_name: ost_app_frontend
     ports:
       - "3000:80"
     depends_on:
-      - fastapi-gateway
+      fastapi-gateway:
+        condition: service_healthy
     restart: always
