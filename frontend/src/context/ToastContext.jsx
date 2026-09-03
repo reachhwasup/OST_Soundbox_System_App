@@ -82,10 +82,10 @@ function ToastItem({ toast, onRemove }) {
     badgeColor = "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300";
   } else if (type === 'update' || type === 'updated') {
     Icon = RefreshCw;
-    iconBg = "bg-indigo-100 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400";
-    progressBarColor = "bg-indigo-500";
+    iconBg = "bg-emerald-100 dark:bg-emerald-950/70 text-emerald-600 dark:text-emerald-400";
+    progressBarColor = "bg-emerald-500";
     badgeText = "Updated";
-    badgeColor = "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300";
+    badgeColor = "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300";
   } else if (type === 'error' || type === 'danger') {
     Icon = AlertCircle;
     iconBg = "bg-rose-100 dark:bg-rose-950/70 text-rose-600 dark:text-rose-400";

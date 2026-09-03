@@ -3035,12 +3035,12 @@ export default function AdminDashboard() {
                   }
                   setIsBatchCommandOpen(true);
                 }}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-2 transition cursor-pointer"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-2 transition cursor-pointer"
               >
                 <Radio className="w-4 h-4" />
                 <span>{t('batchSendCommands', 'Batch Send Commands')}</span>
                 {devSelectedIds.length > 0 && (
-                  <span className="px-1.5 py-0.5 bg-blue-800 text-[10px] font-bold rounded-full">
+                  <span className="px-1.5 py-0.5 bg-emerald-800 text-[10px] font-bold rounded-full">
                     {devSelectedIds.length}
                   </span>
                 )}
@@ -4962,7 +4962,7 @@ export default function AdminDashboard() {
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-sm"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm"
             >
               {submitting ? 'Saving...' : t('saveChanges', 'Save Changes')}
             </button>
@@ -5449,7 +5449,7 @@ export default function AdminDashboard() {
                   step={5}
                   value={commandVolume}
                   onChange={(e) => setCommandVolume(Number(e.target.value))}
-                  className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-600"
                 />
                 <div className="flex justify-between text-[10px] text-slate-400">
                   <span>Mute (0%)</span>
@@ -5471,7 +5471,7 @@ export default function AdminDashboard() {
               <button
                 type="submit"
                 disabled={commandSubmitting}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 <Send className="w-3.5 h-3.5" />
                 <span>{commandSubmitting ? 'Dispatching...' : 'Dispatch Command'}</span>
@@ -5871,7 +5871,7 @@ export default function AdminDashboard() {
               <button
                 type="submit"
                 disabled={commandSubmitting}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>{commandSubmitting ? 'Saving...' : 'Save Assignment'}</span>
@@ -5947,7 +5947,7 @@ export default function AdminDashboard() {
             <button
               type="submit"
               disabled={commandSubmitting}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <Send className="w-3.5 h-3.5" />
               <span>{commandSubmitting ? 'Sending...' : 'Dispatch to All'}</span>
@@ -6014,14 +6014,14 @@ export default function AdminDashboard() {
                 lastTime: false,
                 operation: true
               })}
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+              className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
             >
               Reset to Default
             </button>
             <button
               type="button"
               onClick={() => setIsColumnsModalOpen(false)}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs transition cursor-pointer"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-xs transition cursor-pointer"
             >
               Done
             </button>
