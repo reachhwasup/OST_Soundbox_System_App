@@ -60,6 +60,7 @@ app.include_router(admin.router)
 
 
 @app.get("/health", tags=["System"])
+@app.get("/api/health", tags=["System"])
 async def health_check():
     """Health check endpoint for container health probes."""
     return {
