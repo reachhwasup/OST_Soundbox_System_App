@@ -2849,7 +2849,7 @@ export default function AdminDashboard() {
           
           {/* 1. Cloud Speaker Search & Filter Bar */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-5 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
               
               {/* Device ID / SN */}
               <div>
@@ -2942,34 +2942,43 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-end gap-2 sm:col-span-2 md:col-span-1 lg:col-span-2">
-                <button
-                  type="button"
-                  onClick={() => setDevPage(1)}
-                  className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
-                >
-                  <Search className="w-3.5 h-3.5" />
-                  <span>{t('search', 'Search')}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleResetDeviceFilters}
-                  className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
-                >
-                  <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{t('reset', 'Reset')}</span>
-                </button>
+            </div>
+
+            {/* Bottom Row: Results Counter & Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                <span>
+                  Showing <strong className="text-slate-900 dark:text-white font-mono">{filteredDevices.length}</strong> of <strong className="text-slate-900 dark:text-white font-mono">{devices.filter(d => d.merchant_id || String(d.status).toUpperCase() === 'PENDING').length}</strong> deployed soundboxes
+                </span>
+                {filteredDevices.length < devices.filter(d => d.merchant_id || String(d.status).toUpperCase() === 'PENDING').length && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                    Filtered
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
+                {(devFilterId.trim() || (devFilterType && devFilterType !== 'ALL') || devFilterStatus || devFilterMerchant.trim() || (devFilterWarranty && devFilterWarranty !== 'ALL') || devFilterDate.trim()) && (
+                  <button
+                    type="button"
+                    onClick={handleResetDeviceFilters}
+                    className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    title="Reset Filters"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{t('reset', 'Reset')}</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={handleExportDevicesCSV}
-                  className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                  className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
                 >
                   <Download className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{t('export', 'Export')}</span>
+                  <span>{t('exportCsv', 'Export CSV')}</span>
                 </button>
               </div>
-
             </div>
           </div>
 
