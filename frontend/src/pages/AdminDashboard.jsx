@@ -2862,7 +2862,7 @@ export default function AdminDashboard() {
               {/* Device ID / SN */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('deviceId', 'Device ID / SN')}
+                  {t('deviceId', 'Device SN')}
                 </label>
                 <input
                   type="text"
@@ -3046,7 +3046,7 @@ export default function AdminDashboard() {
                         )}
                       </button>
                     </th>
-                    {visibleColumns.deviceId && <th className="py-4 px-4 font-semibold min-w-[160px]">{t('deviceId', 'Device ID')}</th>}
+                    {visibleColumns.deviceId && <th className="py-4 px-4 font-semibold min-w-[160px]">{t('deviceId', 'Device SN')}</th>}
                     {visibleColumns.deviceType && <th className="py-4 px-4 font-semibold min-w-[190px]">{t('deviceType', 'Device Type')}</th>}
                     {visibleColumns.merchantId && <th className="py-4 px-4 font-semibold min-w-[180px]">{t('merchantStore', 'Assigned Store')}</th>}
                     {visibleColumns.status && <th className="py-4 px-4 font-semibold text-center min-w-[110px]">{t('status', 'Status')}</th>}
@@ -3694,7 +3694,7 @@ export default function AdminDashboard() {
                         )}
                       </button>
                     </th>
-                    {visibleStockColumns.deviceId && <th className="py-4 px-5 font-semibold min-w-[160px]">{t('deviceId', 'Device ID')}</th>}
+                    {visibleStockColumns.deviceId && <th className="py-4 px-5 font-semibold min-w-[160px]">{t('deviceId', 'Device SN')}</th>}
                     {visibleStockColumns.deviceType && <th className="py-4 px-5 font-semibold min-w-[190px]">{t('deviceType', 'Device Type')}</th>}
                     {visibleStockColumns.price && <th className="py-4 px-5 font-semibold text-center min-w-[95px]">{t('price', 'Price')}</th>}
                     {visibleStockColumns.intakeDate && <th className="py-4 px-5 font-semibold min-w-[130px]">{t('registrationDate', 'Registration Date')}</th>}
@@ -5898,7 +5898,7 @@ export default function AdminDashboard() {
 
           <div className="grid grid-cols-2 gap-2.5">
             {Object.entries({
-              deviceId: t('deviceId', 'Device ID'),
+              deviceId: t('deviceId', 'Device SN'),
               deviceType: t('deviceType', 'Device Type'),
               merchantId: t('merchantStore', 'Assigned Store'),
               status: t('status', 'Status'),
@@ -5971,7 +5971,7 @@ export default function AdminDashboard() {
 
           <div className="grid grid-cols-2 gap-2.5">
             {Object.entries({
-              deviceId: 'Device ID (SN)',
+              deviceId: 'Device SN',
               deviceType: 'Device Type',
               price: 'Unit Price ($)',
               intakeDate: 'Registration Date',
