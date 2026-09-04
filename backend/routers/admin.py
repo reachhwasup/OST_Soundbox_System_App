@@ -20,8 +20,8 @@ class AdminCreateUserSchema(BaseModel):
 
 
 class AdminUpdateUserSchema(BaseModel):
-    phone_number: Optional[str] = Field(None, min_length=8, max_length=20)
-    full_name: Optional[str] = Field(None, min_length=2, max_length=255)
+    phone_number: Optional[str] = Field(None, min_length=8, max_length=20, description="Forbidden: Administrators cannot edit user data")
+    full_name: Optional[str] = Field(None, min_length=2, max_length=255, description="Forbidden: Administrators cannot edit user data")
     role: Optional[str] = None
     status: Optional[str] = None
 
@@ -204,6 +204,13 @@ async def update_user(
     payload: AdminUpdateUserSchema,
     current_admin: Dict[str, Any] = Depends(require_admin)
 ):
+    # Enforce rule: Administrators are not permitted to edit user personal data
+    if payload.phone_number is not None or payload.full_name is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrators are not permitted to edit user personal data (phone number, full name)."
+        )
+
     if user_id == current_admin["id"]:
         if payload.status and payload.status.upper() != "ACTIVE":
             raise HTTPException(
@@ -218,33 +225,13 @@ async def update_user(
 
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        user = await conn.fetchrow("SELECT id, phone_number FROM users WHERE id = $1", user_id)
+        user = await conn.fetchrow("SELECT id FROM users WHERE id = $1", user_id)
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
-
-        # Check phone conflict
-        clean_phone = normalize_phone_number(payload.phone_number) if payload.phone_number else None
-        if clean_phone and clean_phone != user["phone_number"]:
-            conflict = await conn.fetchrow(
-                "SELECT id FROM users WHERE phone_number = $1 AND id != $2",
-                clean_phone, user_id
-            )
-            if conflict:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phone number is already in use by another user.")
 
         updates = []
         params = []
         idx = 1
-
-        if clean_phone is not None:
-            updates.append(f"phone_number = ${idx}")
-            params.append(clean_phone)
-            idx += 1
-
-        if payload.full_name is not None:
-            updates.append(f"full_name = ${idx}")
-            params.append(payload.full_name.strip())
-            idx += 1
 
         if payload.role is not None:
             updates.append(f"role = ${idx}")

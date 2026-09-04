@@ -257,7 +257,6 @@ export default function AdminDashboard() {
 
   // User Management Modals state
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
-  const [isEditUserOpen, setIsEditUserOpen] = useState(false);
   const [isResetPassOpen, setIsResetPassOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -305,12 +304,6 @@ export default function AdminDashboard() {
   const [newRole, setNewRole] = useState('USER');
   const [newStatus, setNewStatus] = useState('ACTIVE');
   const [submitting, setSubmitting] = useState(false);
-
-  // Form states for Edit User
-  const [editPhone, setEditPhone] = useState('');
-  const [editName, setEditName] = useState('');
-  const [editRole, setEditRole] = useState('USER');
-  const [editStatus, setEditStatus] = useState('ACTIVE');
 
   // Form states for Reset Password
   const [resetPasswordVal, setResetPasswordVal] = useState('');
@@ -417,54 +410,6 @@ export default function AdminDashboard() {
   };
 
   const handleCreateUser = handleAddUser;
-
-  // Open Edit User Modal
-  const openEditModal = (u) => {
-    setSelectedUser(u);
-    setEditPhone(u.phone_number);
-    setEditName(u.full_name || '');
-    setEditRole(u.role);
-    setEditStatus(u.status);
-    setIsEditUserOpen(true);
-  };
-
-  const openEditUserModal = openEditModal;
-
-  // Handle Update User
-  const handleUpdateUser = async (e) => {
-    e.preventDefault();
-    if (!selectedUser) return;
-    setSubmitting(true);
-    setError('');
-    try {
-      await api.put(`/api/admin/users/${selectedUser.id}`, {
-        phone_number: editPhone.trim(),
-        full_name: editName.trim(),
-        role: editRole,
-        status: editStatus
-      });
-      setIsEditUserOpen(false);
-      const updUsrMsg = 'User updated successfully.';
-      showToast({
-        type: 'update',
-        title: 'User Updated',
-        message: updUsrMsg,
-        duration: 5000
-      });
-      fetchAllData();
-    } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to update user.';
-      setError(msg);
-      showToast({
-        type: 'error',
-        title: 'Update Failed',
-        message: msg,
-        duration: 5000
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   // Handle Status Toggle (Quick Active <-> Suspended)
   const handleToggleStatus = async (u) => {
@@ -2068,15 +2013,6 @@ export default function AdminDashboard() {
 
                   {/* Mobile Actions Bar */}
                   <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => openEditUserModal(u)}
-                      className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center gap-1"
-                    >
-                      <Edit className="w-3.5 h-3.5" />
-                      <span>{t('edit', 'Edit')}</span>
-                    </button>
-                    
                     {u.id !== currentAdmin?.id && (
                       <button
                         type="button"
@@ -2262,16 +2198,6 @@ export default function AdminDashboard() {
 
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={() => openEditUserModal(u)}
-                            className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                            title="Edit User"
-                          >
-                            <Edit className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                            <span>{t('edit', 'Edit')}</span>
-                          </button>
-
                           {u.id !== currentAdmin?.id && (
                             <button
                               type="button"
@@ -4584,79 +4510,6 @@ export default function AdminDashboard() {
       </Modal>
 
 
-
-      {/* Modal: Edit User */}
-      <Modal isOpen={isEditUserOpen} onClose={() => setIsEditUserOpen(false)} title="Edit User Details">
-        <form onSubmit={handleUpdateUser} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
-              Phone Number (លេខទូរស័ព្ទ)
-            </label>
-            <div className="relative">
-              <input
-                type="tel"
-                value={editPhone}
-                onChange={(e) => setEditPhone(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono focus:ring-2 focus:ring-emerald-500"
-                required
-              />
-              <Phone className="w-4 h-4 text-slate-400 absolute inset-y-0 left-3 my-auto pointer-events-none" />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">Full Name</label>
-            <input
-              type="text"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">{t('role', 'Role')}</label>
-              <select
-                value={editRole}
-                onChange={(e) => setEditRole(e.target.value)}
-                disabled={selectedUser?.id === currentAdmin?.id}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white disabled:opacity-50 focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="USER">{t('merchant', 'User / Merchant')}</option>
-                <option value="ADMIN">{t('admin', 'Administrator')}</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">{t('status', 'Status')}</label>
-              <select
-                value={editStatus}
-                onChange={(e) => setEditStatus(e.target.value)}
-                disabled={selectedUser?.id === currentAdmin?.id}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white disabled:opacity-50 focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="ACTIVE">{t('active', 'Active')}</option>
-                <option value="SUSPENDED">{t('inactive', 'Suspended')}</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-            <button
-              type="button"
-              onClick={() => setIsEditUserOpen(false)}
-              className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-300"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm"
-            >
-              {submitting ? 'Saving...' : 'Save Changes'}
-            </button>
-          </div>
-        </form>
-      </Modal>
 
       {/* Modal: Reset Password */}
       <Modal isOpen={isResetPassOpen} onClose={() => setIsResetPassOpen(false)} title={`Reset Password: ${selectedUser?.phone_number || ''}`}>
