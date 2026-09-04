@@ -2461,41 +2461,29 @@ export default function AdminDashboard() {
 
             </div>
 
-            {/* Bottom Row: Results Counter & Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                <span>Showing <strong className="text-slate-900 dark:text-white font-mono">{filteredStores.length}</strong> of <strong className="text-slate-900 dark:text-white font-mono">{stores.length}</strong> store locations</span>
-                {filteredStores.length < stores.length && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                    Filtered
-                  </span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2 self-end sm:self-auto">
-                {(storeSearch || storeProvinceFilter || storeDistrictFilter || storeCommuneFilter || storeOwnerFilter !== 'ALL' || storeDateFilter || storeSortBy !== 'NEWEST') && (
-                  <button
-                    type="button"
-                    onClick={handleResetStoreFilters}
-                    className="px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
-                    title="Clear Filters"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{t('reset', 'Reset Filters')}</span>
-                  </button>
-                )}
-
-
+            {/* Bottom Row: Action Buttons */}
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              {(storeSearch || storeProvinceFilter || storeDistrictFilter || storeCommuneFilter || storeOwnerFilter !== 'ALL' || storeDateFilter || storeSortBy !== 'NEWEST') && (
                 <button
                   type="button"
-                  onClick={handleExportStoresCSV}
-                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer"
-                  title="Export Filtered Stores to CSV"
+                  onClick={handleResetStoreFilters}
+                  className="px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                  title="Clear Filters"
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>{t('exportCsv', 'Export CSV')}</span>
+                  <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                  <span>{t('reset', 'Reset Filters')}</span>
                 </button>
-              </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleExportStoresCSV}
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                title="Export Filtered Stores to CSV"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>{t('exportCsv', 'Export CSV')}</span>
+              </button>
             </div>
           </div>
           
@@ -2910,20 +2898,8 @@ export default function AdminDashboard() {
 
             </div>
 
-            {/* Bottom Row: Results Counter & Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                <span>
-                  Showing <strong className="text-slate-900 dark:text-white font-mono">{filteredDevices.length}</strong> of <strong className="text-slate-900 dark:text-white font-mono">{devices.filter(d => d.merchant_id || String(d.status).toUpperCase() === 'PENDING').length}</strong> deployed soundboxes
-                </span>
-                {filteredDevices.length < devices.filter(d => d.merchant_id || String(d.status).toUpperCase() === 'PENDING').length && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                    Filtered
-                  </span>
-                )}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
+            {/* Bottom Row: Action Buttons */}
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800/80">
                 {(devFilterId.trim() || (devFilterType && devFilterType !== 'ALL') || devFilterStatus || devFilterMerchant.trim() || (devFilterWarranty && devFilterWarranty !== 'ALL') || devFilterDate.trim()) && (
                   <button
                     type="button"
@@ -2945,7 +2921,6 @@ export default function AdminDashboard() {
                   <span>{t('exportCsv', 'Export CSV')}</span>
                 </button>
               </div>
-            </div>
           </div>
 
           {/* 2. Action Toolbar & Batch Operations */}
@@ -3577,20 +3552,8 @@ export default function AdminDashboard() {
 
             </div>
 
-            {/* Bottom Row: Results Counter & Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                <span>
-                  Showing <strong className="text-slate-900 dark:text-white font-mono">{filteredStockDevices.length}</strong> of <strong className="text-slate-900 dark:text-white font-mono">{devices.filter(d => !d.merchant_id || String(d.status).toUpperCase() === 'IN_STOCK').length}</strong> available stock units
-                </span>
-                {filteredStockDevices.length < devices.filter(d => !d.merchant_id || String(d.status).toUpperCase() === 'IN_STOCK').length && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                    Filtered
-                  </span>
-                )}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
+            {/* Bottom Row: Action Buttons */}
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800/80">
                 <button
                   type="button"
                   onClick={() => setIsStockModalOpen(true)}
@@ -3630,7 +3593,6 @@ export default function AdminDashboard() {
                   <span>{t('columns', 'Columns')}</span>
                 </button>
               </div>
-            </div>
           </div>
 
           {/* 2. Warehouse Stock Table Card */}
