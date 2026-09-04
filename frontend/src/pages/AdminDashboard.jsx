@@ -178,7 +178,6 @@ export default function AdminDashboard() {
   // Stock & Inventory Filter & Pagination States
   const [stockSearchTerm, setStockSearchTerm] = useState('');
   const [stockTypeFilter, setStockTypeFilter] = useState('ALL');
-  const [stockBatchFilter, setStockBatchFilter] = useState('ALL');
   const [stockPriceFilter, setStockPriceFilter] = useState('ALL');
   const [stockDateFilter, setStockDateFilter] = useState('');
   const [stockSortBy, setStockSortBy] = useState('NEWEST'); // 'NEWEST' | 'OLDEST' | 'SN_ASC' | 'SN_DESC' | 'PRICE_DESC' | 'PRICE_ASC'
@@ -792,18 +791,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     setStockPage(1);
-  }, [stockSearchTerm, stockTypeFilter, stockBatchFilter, stockPriceFilter, stockDateFilter, stockSortBy]);
-
-  // Available Stock Batches
-  const availableStockBatches = useMemo(() => {
-    const set = new Set();
-    devices.forEach(d => {
-      if ((!d.merchant_id || String(d.status).toUpperCase() === 'IN_STOCK') && d.batch_no && String(d.batch_no).trim()) {
-        set.add(String(d.batch_no).trim());
-      }
-    });
-    return Array.from(set).sort();
-  }, [devices]);
+  }, [stockSearchTerm, stockTypeFilter, stockPriceFilter, stockDateFilter, stockSortBy]);
 
   // Available Provinces for Stores Filter
   // Available Provinces for Stores Filter
@@ -1022,8 +1010,7 @@ export default function AdminDashboard() {
         const sn = String(d.device_sn || d.device_id || '').toLowerCase();
         const dtype = String(d.device_type || '').toLowerCase();
         const notes = String(d.notes || '').toLowerCase();
-        const batch = String(d.batch_no || '').toLowerCase();
-        if (!sn.includes(q) && !dtype.includes(q) && !notes.includes(q) && !batch.includes(q)) {
+        if (!sn.includes(q) && !dtype.includes(q) && !notes.includes(q)) {
           return false;
         }
       }
@@ -1032,12 +1019,6 @@ export default function AdminDashboard() {
         const targetType = stockTypeFilter.toLowerCase();
         const dType = String(d.device_type || '').toLowerCase();
         if (!dType.includes(targetType.includes('display') ? 'display' : 'standard')) {
-          return false;
-        }
-      }
-
-      if (stockBatchFilter !== 'ALL') {
-        if (String(d.batch_no || '').trim() !== stockBatchFilter.trim()) {
           return false;
         }
       }
@@ -1078,13 +1059,12 @@ export default function AdminDashboard() {
       // Default: NEWEST
       return (new Date(b.created_at || 0) - new Date(a.created_at || 0)) || (b.id - a.id);
     });
-  }, [devices, stockSearchTerm, stockTypeFilter, stockBatchFilter, stockPriceFilter, stockDateFilter, stockSortBy]);
+  }, [devices, stockSearchTerm, stockTypeFilter, stockPriceFilter, stockDateFilter, stockSortBy]);
 
   // Reset Stock Filters
   const handleResetStockFilters = () => {
     setStockSearchTerm('');
     setStockTypeFilter('ALL');
-    setStockBatchFilter('ALL');
     setStockPriceFilter('ALL');
     setStockDateFilter('');
     setStockSortBy('NEWEST');
@@ -1459,7 +1439,6 @@ export default function AdminDashboard() {
       const res = await api.post('/api/devices/bulk-import', {
         serial_numbers: rawLines,
         device_model: bulkModel,
-        batch_no: bulkBatchNo,
         notes: bulkNotes,
         price: Number(bulkPrice) || 29.00
       });
@@ -3444,8 +3423,8 @@ export default function AdminDashboard() {
           {/* 1. Warehouse Stock Search & Filter Toolbar */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-3.5">
             
-            {/* Filter Grid Row 1: Search, Device Type, Batch / Lot No */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3">
+            {/* Filter Grid Row 1: Search, Device Type */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               
               {/* 1. Search by SN / Notes / Location */}
               <div>
@@ -3480,27 +3459,10 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-              {/* 3. Batch / Lot Number Filter */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('batchNo', 'Batch / Lot No')}
-                </label>
-                <select
-                  value={stockBatchFilter}
-                  onChange={(e) => setStockBatchFilter(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
-                >
-                  <option value="ALL">{t('allBatches', 'All Shipment Batches')}</option>
-                  {availableStockBatches.map(b => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
-                </select>
-              </div>
-
             </div>
 
             {/* Filter Grid Row 2: Price Tier, Intake Date, Sort By */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
 
               {/* 4. Price Tier */}
               <div>
@@ -3563,7 +3525,7 @@ export default function AdminDashboard() {
                   <span>{t('addStockDevice', '+ Add Stock Device')}</span>
                 </button>
 
-                {(stockSearchTerm || stockTypeFilter !== 'ALL' || stockBatchFilter !== 'ALL' || stockPriceFilter !== 'ALL' || stockDateFilter || stockSortBy !== 'NEWEST') && (
+                {(stockSearchTerm || stockTypeFilter !== 'ALL' || stockPriceFilter !== 'ALL' || stockDateFilter || stockSortBy !== 'NEWEST') && (
                   <button
                     type="button"
                     onClick={handleResetStockFilters}
@@ -3771,7 +3733,6 @@ export default function AdminDashboard() {
                         <span className="font-mono font-bold text-xs text-slate-900 dark:text-white block">
                           {d.device_sn || d.device_id}
                         </span>
-                        <span className="text-[10px] text-slate-400 font-mono">Batch: {d.batch_no || 'BATCH-STD'}</span>
                       </div>
                     </div>
 
@@ -5452,8 +5413,8 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* 2. Commercial & Pricing Card (Hidden if price on table and no batch/notes) */}
-              {(!visibleColumns.price || selectedDeviceDetail.notes || selectedDeviceDetail.batch_no) && (
+              {/* 2. Commercial & Pricing Card */}
+              {(!visibleColumns.price || selectedDeviceDetail.notes) && (
                 <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
                   <div className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2">
                     <DollarSign className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -5489,20 +5450,10 @@ export default function AdminDashboard() {
                     </div>
                   )}
 
-                  {(selectedDeviceDetail.notes || selectedDeviceDetail.batch_no) && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
-                      {selectedDeviceDetail.batch_no && (
-                        <div className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg text-slate-600 dark:text-slate-400">
-                          <span className="text-[10px] uppercase font-semibold text-slate-400 block">{t('batchNo', 'Batch Number')}</span>
-                          <span className="font-mono text-slate-800 dark:text-slate-200">{selectedDeviceDetail.batch_no}</span>
-                        </div>
-                      )}
-                      {selectedDeviceDetail.notes && (
-                        <div className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg text-slate-600 dark:text-slate-400">
-                          <span className="text-[10px] uppercase font-semibold text-slate-400 block">{t('warehouseNotes', 'Warehouse / Notes')}</span>
-                          <span className="text-slate-800 dark:text-slate-200">{selectedDeviceDetail.notes}</span>
-                        </div>
-                      )}
+                  {selectedDeviceDetail.notes && (
+                    <div className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg text-slate-600 dark:text-slate-400 text-xs">
+                      <span className="text-[10px] uppercase font-semibold text-slate-400 block">{t('warehouseNotes', 'Warehouse / Notes')}</span>
+                      <span className="text-slate-800 dark:text-slate-200">{selectedDeviceDetail.notes}</span>
                     </div>
                   )}
                 </div>

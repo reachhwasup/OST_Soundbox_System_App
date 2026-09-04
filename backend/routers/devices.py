@@ -213,7 +213,7 @@ async def list_devices(
                    COALESCE(d.device_type, 'Display Soundbox') AS device_type,
                    COALESCE(d.device_model, d.device_name, 'Display Soundbox') AS device_model,
                    d.merchant_id,
-                   COALESCE(d.batch_no, 'BATCH-STD') AS batch_no,
+                   d.batch_no,
                    d.notes,
                    COALESCE(d.price, 29.00) AS price,
                    COALESCE(d.discount_amount, 0.00) AS discount_amount,
@@ -335,7 +335,7 @@ async def bulk_import_devices(
                 await conn.execute("""
                     INSERT INTO devices (device_id, device_sn, device_model, batch_no, notes, price, status, is_active, battery, signal)
                     VALUES ($1, $1, $2, $3, $4, $5, 'IN_STOCK', FALSE, '100%', 'Good')
-                """, sn, payload.device_model or "Y6B", payload.batch_no or "BATCH-BULK", payload.notes, payload.price or 29.00)
+                """, sn, payload.device_model or "Y6B", payload.batch_no, payload.notes, payload.price or 29.00)
             except Exception as e:
                 # Auto-heal missing columns if running against older DB schema
                 await conn.execute("""
@@ -402,7 +402,7 @@ async def intake_single_device(
                 )
                 VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9, '100%', 'Good')
                 RETURNING id
-            """, sn, payload.device_type or "Display Soundbox", payload.device_model or "Y6B", payload.merchant_id, payload.batch_no or "BATCH-SINGLE", payload.notes, payload.price or 29.00, initial_status, is_active)
+            """, sn, payload.device_type or "Display Soundbox", payload.device_model or "Y6B", payload.merchant_id, payload.batch_no, payload.notes, payload.price or 29.00, initial_status, is_active)
         except Exception as insert_err:
             logger.warning(f"Standard device intake failed: {insert_err}. Attempting schema auto-heal and fallback...")
             try:
