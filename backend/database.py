@@ -229,6 +229,14 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_transactions_bank_tx ON transactions(bank_name, bank_tx_id);
             CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at);
 
+            ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_device_id_fkey;
+            ALTER TABLE transactions ADD COLUMN IF NOT EXISTS txid VARCHAR(150);
+            ALTER TABLE transactions ADD COLUMN IF NOT EXISTS chat_id VARCHAR(100);
+            ALTER TABLE transactions ADD COLUMN IF NOT EXISTS raw_payload TEXT;
+            ALTER TABLE transactions ADD COLUMN IF NOT EXISTS device_ack BOOLEAN DEFAULT FALSE;
+            ALTER TABLE transactions ADD COLUMN IF NOT EXISTS ack_status VARCHAR(50);
+            ALTER TABLE transactions ADD COLUMN IF NOT EXISTS ack_at TIMESTAMP WITH TIME ZONE;
+
             CREATE TABLE IF NOT EXISTS group_users (
                 id SERIAL PRIMARY KEY,
                 chat_id VARCHAR(50) NOT NULL,
@@ -270,6 +278,10 @@ async def init_db():
                 reason TEXT,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
+            ALTER TABLE security_alerts DROP CONSTRAINT IF EXISTS security_alerts_device_id_fkey;
+            ALTER TABLE security_alerts DROP CONSTRAINT IF EXISTS security_alerts_merchant_id_fkey;
+            ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS device_id VARCHAR(100);
+            ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS merchant_id VARCHAR(100);
             CREATE INDEX IF NOT EXISTS idx_security_alerts_merchant ON security_alerts(merchant_id);
             CREATE INDEX IF NOT EXISTS idx_security_alerts_created_at ON security_alerts(created_at DESC);
 

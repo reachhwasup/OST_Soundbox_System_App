@@ -410,7 +410,7 @@ async def list_stores(
                            m.created_at,
                            'Merchant' AS owner_name,
                            0 AS device_count,
-                           COALESCE((SELECT d.telegram_chat_id FROM devices d WHERE d.merchant_id::text = m.id::text AND d.telegram_chat_id IS NOT NULL LIMIT 1), '') AS telegram_chat_id
+                           COALESCE((SELECT d.telegram_chat_id FROM devices d WHERE (d.merchant_id::text = m.id::text OR (m.merchant_id IS NOT NULL AND d.merchant_id::text = m.merchant_id::text)) AND d.telegram_chat_id IS NOT NULL LIMIT 1), '') AS telegram_chat_id
                     FROM merchants m
                     ORDER BY m.id DESC
                 """
@@ -474,11 +474,11 @@ async def get_admin_logs(
                 t.created_at,
                 COALESCE(t.raw_telegram_message, '') AS raw_message,
                 COALESCE(d.device_sn, d.device_id, 'Y6B') AS device_sn,
-                COALESCE(m.name, 'Store') AS store_name,
+                COALESCE(m.merchant_name, m.name, 'Store') AS store_name,
                 m.owner_phone
             FROM transactions t
-            LEFT JOIN devices d ON t.device_id = d.id
-            LEFT JOIN merchants m ON d.merchant_id = m.id
+            LEFT JOIN devices d ON (t.device_id::text = d.id::text OR t.device_id::text = d.device_sn::text OR t.device_id::text = d.device_id::text)
+            LEFT JOIN merchants m ON (d.merchant_id::text = m.id::text OR d.merchant_id::text = m.merchant_id::text)
             WHERE {" AND ".join(tx_where)}
             ORDER BY t.created_at DESC
             LIMIT ${param_idx} OFFSET ${param_idx + 1}
@@ -519,11 +519,11 @@ async def get_admin_logs(
                 a.created_at,
                 a.raw_message,
                 COALESCE(d.device_sn, d.device_id, 'Y6B') AS device_sn,
-                COALESCE(m.name, 'Store') AS store_name,
+                COALESCE(m.merchant_name, m.name, 'Store') AS store_name,
                 m.owner_phone
             FROM security_alerts a
-            LEFT JOIN devices d ON a.device_id = d.id
-            LEFT JOIN merchants m ON a.merchant_id = m.id
+            LEFT JOIN devices d ON (a.device_id::text = d.id::text OR a.device_id::text = d.device_sn::text OR a.device_id::text = d.device_id::text)
+            LEFT JOIN merchants m ON (a.merchant_id::text = m.id::text OR a.merchant_id::text = m.merchant_id::text)
             WHERE {" AND ".join(sec_where)}
             ORDER BY a.created_at DESC
             LIMIT ${s_idx} OFFSET ${s_idx + 1}

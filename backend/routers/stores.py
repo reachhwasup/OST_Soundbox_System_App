@@ -3,7 +3,7 @@ import time
 import uuid
 from fastapi import APIRouter, HTTPException, Depends, status
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 
 from backend.database import get_db_pool
 from backend.security import get_current_user
@@ -88,7 +88,7 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
         for s in stores:
             if s["user_id"] is None or s["user_id"] != current_user["id"]:
                 try:
-                    await conn.execute("UPDATE merchants SET user_id = $1 WHERE id = $2", current_user["id"], s["id"])
+                    await conn.execute("UPDATE merchants SET user_id = $1 WHERE id::text = $2::text OR merchant_id::text = $2::text", current_user["id"], str(s["id"]))
                 except Exception:
                     pass
 
@@ -110,6 +110,7 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
 
             for s in stores:
                 store_id = str(s["id"])
+                alt_store_id = str(s.get("merchant_id") or s["id"])
                 
                 # Fetch devices safely
                 devices = []
@@ -125,10 +126,10 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
                                COALESCE(last_online, last_heartbeat, updated_at, created_at) AS last_active,
                                last_online, last_heartbeat, created_at, updated_at
                         FROM devices
-                        WHERE merchant_id::text = $1
+                        WHERE merchant_id::text = $1 OR merchant_id::text = $2
                         ORDER BY id ASC
                         """,
-                        store_id
+                        store_id, alt_store_id
                     )
                 except Exception as d_err:
                     logger.warning(f"Failed to fetch devices for store {store_id}: {d_err}")
@@ -140,12 +141,12 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
                         """
                         SELECT t.id, t.bank_name, t.bank_tx_id, t.amount, t.currency, t.payer_name, t.status, t.created_at, d.device_sn
                         FROM transactions t
-                        JOIN devices d ON t.device_id = d.id
-                        WHERE d.merchant_id::text = $1
+                        JOIN devices d ON (t.device_id::text = d.id::text OR t.device_id::text = d.device_sn::text OR t.device_id::text = d.device_id::text)
+                        WHERE d.merchant_id::text = $1 OR d.merchant_id::text = $2
                         ORDER BY t.created_at DESC
                         LIMIT 20
                         """,
-                        store_id
+                        store_id, alt_store_id
                     )
                 except Exception as t_err:
                     logger.warning(f"Failed to fetch transactions for store {store_id}: {t_err}")
@@ -158,12 +159,12 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
                         SELECT a.id, a.alert_type, a.severity, a.bank_name, a.bank_tx_id, a.amount, a.currency, 
                                a.sender_user_id, a.sender_name, a.reason, a.created_at, d.device_sn
                         FROM security_alerts a
-                        LEFT JOIN devices d ON a.device_id = d.id
-                        WHERE a.merchant_id::text = $1
+                        LEFT JOIN devices d ON (a.device_id::text = d.id::text OR a.device_id::text = d.device_sn::text OR a.device_id::text = d.device_id::text)
+                        WHERE a.merchant_id::text = $1 OR a.merchant_id::text = $2
                         ORDER BY a.created_at DESC
                         LIMIT 20
                         """,
-                        store_id
+                        store_id, alt_store_id
                     )
                 except Exception as a_err:
                     logger.warning(f"Failed to fetch alerts for store {store_id}: {a_err}")
@@ -386,19 +387,29 @@ async def register_store(
 @router.put("/my-store")
 async def update_store(
     payload: StoreUpdateSchema,
-    store_id: Optional[int] = None,
+    store_id: Optional[Union[int, str]] = None,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     pool = await get_db_pool()
     async with pool.acquire() as conn:
         if store_id:
             store = await conn.fetchrow(
-                "SELECT COALESCE(merchant_id, id::text) AS merchant_id, id, COALESCE(merchant_name, name) AS name, place, location, province, district, commune, village, street FROM merchants WHERE id = $1 AND (user_id = $2 OR owner_phone = $3)",
-                store_id, current_user["id"], current_user["phone_number"]
+                """SELECT COALESCE(merchant_id, id::text) AS merchant_id, id, 
+                          COALESCE(merchant_name, name) AS name, place, location, 
+                          province, district, commune, village, street 
+                   FROM merchants 
+                   WHERE (id::text = $1::text OR merchant_id::text = $1::text) 
+                     AND ($2 = 'ADMIN' OR user_id = $3 OR owner_phone = $4)""",
+                str(store_id), current_user["role"], current_user["id"], current_user["phone_number"]
             )
         else:
             store = await conn.fetchrow(
-                "SELECT COALESCE(merchant_id, id::text) AS merchant_id, id, COALESCE(merchant_name, name) AS name, place, location, province, district, commune, village, street FROM merchants WHERE user_id = $1 OR owner_phone = $2 ORDER BY id ASC LIMIT 1",
+                """SELECT COALESCE(merchant_id, id::text) AS merchant_id, id, 
+                          COALESCE(merchant_name, name) AS name, place, location, 
+                          province, district, commune, village, street 
+                   FROM merchants 
+                   WHERE user_id = $1 OR owner_phone = $2 
+                   ORDER BY id ASC LIMIT 1""",
                 current_user["id"], current_user["phone_number"]
             )
 
@@ -411,8 +422,8 @@ async def update_store(
         # Enforce business rule: Store must unlink all devices before updating store details
         if current_user.get("role") != "ADMIN":
             linked_devices_count = await conn.fetchval(
-                "SELECT COUNT(*) FROM devices WHERE merchant_id = $1",
-                store["id"]
+                "SELECT COUNT(*) FROM devices WHERE merchant_id::text = $1::text OR merchant_id::text = $2::text",
+                str(store["id"]), str(store.get("merchant_id") or store["id"])
             )
             if linked_devices_count and linked_devices_count > 0:
                 raise HTTPException(
@@ -435,18 +446,18 @@ async def update_store(
             SET name = $1, merchant_name = $1, place = $2, location = $3,
                 province = $4, district = $5, commune = $6, village = $7, street = $8,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = $9
+            WHERE id::text = $9::text OR merchant_id::text = $9::text
             """,
             new_name, new_place, new_location,
             new_province, new_district, new_commune, new_village, new_street,
-            store["id"]
+            str(store["id"])
         )
 
         return {
             "status": "success",
             "message": f"Store '{new_name}' updated successfully.",
             "store": {
-                "merchant_id": str(store["id"]),
+                "merchant_id": str(store.get("merchant_id") or store["id"]),
                 "id": store["id"],
                 "merchant_name": new_name,
                 "name": new_name,
@@ -463,22 +474,32 @@ async def update_store(
 
 @router.delete("/{store_id}")
 async def delete_store(
-    store_id: int,
+    store_id: Union[int, str],
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     pool = await get_db_pool()
     async with pool.acquire() as conn:
         store = await conn.fetchrow(
-            "SELECT id, name FROM merchants WHERE id = $1 AND (user_id = $2 OR owner_phone = $3)",
-            store_id, current_user["id"], current_user["phone_number"]
+            """SELECT COALESCE(merchant_id, id::text) AS merchant_id, id, 
+                      COALESCE(merchant_name, name) AS name 
+               FROM merchants 
+               WHERE (id::text = $1::text OR merchant_id::text = $1::text) 
+                 AND ($2 = 'ADMIN' OR user_id = $3 OR owner_phone = $4)""",
+            str(store_id), current_user["role"], current_user["id"], current_user["phone_number"]
         )
-        if not store and current_user["role"] != "ADMIN":
+        if not store:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Store not found or unauthorized."
             )
 
-        await conn.execute("DELETE FROM merchants WHERE id = $1", store_id)
+        # Unlink any associated devices safely before deletion
+        await conn.execute(
+            "UPDATE devices SET merchant_id = NULL, status = 'IN_STOCK', is_active = FALSE WHERE merchant_id::text = $1::text OR merchant_id::text = $2::text",
+            str(store["id"]), str(store.get("merchant_id") or store["id"])
+        )
+
+        await conn.execute("DELETE FROM merchants WHERE id::text = $1::text OR merchant_id::text = $1::text", str(store["id"]))
 
         return {
             "status": "success",

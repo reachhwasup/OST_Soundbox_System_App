@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 from datetime import datetime, timedelta, timezone
 
 from backend.database import get_db_pool
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/devices", tags=["Devices"])
 
 
 class DeviceRegisterSchema(BaseModel):
-    merchant_id: int
+    merchant_id: Union[int, str]
     device_sn: str = Field(..., description="Serial Number of Soundbox Y6B")
     telegram_chat_id: Optional[str] = None
     device_type: str = "Display Soundbox"
@@ -238,7 +238,7 @@ async def list_devices(
                    COALESCE(u.full_name, m.merchant_name, m.name) AS owner_name
             FROM devices d
             LEFT JOIN merchants m ON (d.merchant_id::text = m.merchant_id::text OR d.merchant_id::text = m.id::text)
-            LEFT JOIN users u ON m.user_id = u.id
+            LEFT JOIN users u ON m.user_id = u.id OR (m.user_id IS NULL AND m.owner_phone = u.phone_number)
             WHERE {where_sql}
             ORDER BY d.id DESC
         """
@@ -365,7 +365,7 @@ class DeviceIntakeSchema(BaseModel):
     device_model: str = "Y6B"
     batch_no: Optional[str] = None
     notes: Optional[str] = None
-    merchant_id: Optional[int] = None
+    merchant_id: Optional[Union[int, str]] = None
     price: Optional[float] = 29.00
 
 
@@ -394,6 +394,21 @@ async def intake_single_device(
         initial_status = 'ACTIVE' if payload.merchant_id else 'IN_STOCK'
         is_active = True if payload.merchant_id else False
 
+        # Safely resolve merchant_id type matching devices table schema
+        m_id_target = None
+        if payload.merchant_id is not None:
+            col_type = await conn.fetchval("""
+                SELECT data_type FROM information_schema.columns 
+                WHERE table_name = 'devices' AND column_name = 'merchant_id'
+            """)
+            if col_type in ('integer', 'bigint', 'smallint'):
+                try:
+                    m_id_target = int(payload.merchant_id)
+                except Exception:
+                    m_id_target = None
+            else:
+                m_id_target = str(payload.merchant_id)
+
         try:
             new_id = await conn.fetchval("""
                 INSERT INTO devices (
@@ -402,7 +417,7 @@ async def intake_single_device(
                 )
                 VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9, '100%', 'Good')
                 RETURNING id
-            """, sn, payload.device_type or "Display Soundbox", payload.device_model or "Y6B", payload.merchant_id, payload.batch_no, payload.notes, payload.price or 29.00, initial_status, is_active)
+            """, sn, payload.device_type or "Display Soundbox", payload.device_model or "Y6B", m_id_target, payload.batch_no, payload.notes, payload.price or 29.00, initial_status, is_active)
         except Exception as insert_err:
             logger.warning(f"Standard device intake failed: {insert_err}. Attempting schema auto-heal and fallback...")
             try:
@@ -421,7 +436,7 @@ async def intake_single_device(
                     )
                     VALUES ($1, $1, $2, $3, $4, $5, $6, $7, '100%', 'Good')
                     RETURNING id
-                """, sn, payload.device_type or "Display Soundbox", payload.merchant_id, payload.notes, payload.price or 29.00, initial_status, is_active)
+                """, sn, payload.device_type or "Display Soundbox", m_id_target, payload.notes, payload.price or 29.00, initial_status, is_active)
             except Exception as final_err:
                 logger.error(f"Device intake permanently failed for SN '{sn}': {final_err}", exc_info=True)
                 raise HTTPException(
@@ -575,7 +590,7 @@ class DeviceUpdateSchema(BaseModel):
     device_type: Optional[str] = None
     device_model: Optional[str] = None
     status: Optional[str] = None
-    merchant_id: Optional[int] = None
+    merchant_id: Optional[Union[int, str]] = None
     batch_no: Optional[str] = None
     notes: Optional[str] = None
     price: Optional[float] = None
@@ -729,8 +744,19 @@ async def update_device(
                 updates.append("is_active = FALSE")
 
         if payload.merchant_id is not None:
+            col_type = await conn.fetchval("""
+                SELECT data_type FROM information_schema.columns 
+                WHERE table_name = 'devices' AND column_name = 'merchant_id'
+            """)
+            if col_type in ('integer', 'bigint', 'smallint'):
+                try:
+                    m_id_target = int(payload.merchant_id)
+                except Exception:
+                    m_id_target = None
+            else:
+                m_id_target = str(payload.merchant_id)
             updates.append(f"merchant_id = ${idx}")
-            params.append(payload.merchant_id)
+            params.append(m_id_target)
             idx += 1
             if payload.status is None:
                 updates.append("status = 'ACTIVE'::device_status")
