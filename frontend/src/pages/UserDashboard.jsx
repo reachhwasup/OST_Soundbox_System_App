@@ -113,6 +113,20 @@ export default function UserDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Helper to extract clean human-readable error string from API errors
+  const getErrorMessage = (err, fallback = 'An unexpected error occurred.') => {
+    const detail = err?.response?.data?.detail;
+    if (typeof detail === 'string' && detail.trim()) return detail;
+    if (Array.isArray(detail)) {
+      return detail.map(d => (typeof d === 'object' ? d?.msg || JSON.stringify(d) : String(d))).join(', ');
+    }
+    if (detail && typeof detail === 'object') {
+      return detail.msg || detail.message || JSON.stringify(detail);
+    }
+    if (err?.message) return err.message;
+    return fallback;
+  };
+
   // Store Tab Filter States
   const [storeSearch, setStoreSearch] = useState('');
   const [storeProvinceFilter, setStoreProvinceFilter] = useState('ALL');
@@ -444,7 +458,7 @@ export default function UserDashboard() {
       }
     } catch (err) {
       console.error(err);
-      const msg = err.response?.data?.detail || 'Failed to load store information.';
+      const msg = getErrorMessage(err, 'Failed to load store information.');
       setError(msg);
     } finally {
       if (!silent) setLoading(false);
@@ -601,7 +615,7 @@ export default function UserDashboard() {
         await refreshUser();
       }
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to register store.';
+      const msg = getErrorMessage(err, 'Failed to register store.');
       setError(msg);
       showToast({
         type: 'error',
@@ -665,7 +679,7 @@ export default function UserDashboard() {
       setIsEditStoreOpen(false);
       await fetchStoresData();
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to update store.';
+      const msg = getErrorMessage(err, 'Failed to update store.');
       setError(msg);
       showToast({
         type: 'error',
@@ -696,7 +710,7 @@ export default function UserDashboard() {
       setSelectedStoreIndex(0);
       await fetchStoresData();
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to delete store.';
+      const msg = getErrorMessage(err, 'Failed to delete store.');
       setError(msg);
       showToast({
         type: 'error',
@@ -744,7 +758,7 @@ export default function UserDashboard() {
       setIsDeviceModalOpen(false);
       await fetchStoresData();
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to link device.';
+      const msg = getErrorMessage(err, 'Failed to link device.');
       setError(msg);
       showToast({
         type: 'error',
@@ -798,7 +812,7 @@ export default function UserDashboard() {
       setIsEditDeviceOpen(false);
       await fetchStoresData();
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to update device.';
+      const msg = getErrorMessage(err, 'Failed to update device.');
       setError(msg);
       showToast({
         type: 'error',
@@ -834,7 +848,7 @@ export default function UserDashboard() {
       });
       await fetchStoresData();
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to unlink device.';
+      const msg = getErrorMessage(err, 'Failed to unlink device.');
       setError(msg);
       showToast({
         type: 'error',
@@ -867,7 +881,7 @@ export default function UserDashboard() {
       });
       fetchStoresData(true);
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to trigger test voice broadcast.';
+      const msg = getErrorMessage(err, 'Failed to trigger test voice broadcast.');
       showToast({ type: 'error', title: 'Broadcast Failed', message: msg });
     } finally {
       setTestingDeviceId(null);
@@ -890,7 +904,7 @@ export default function UserDashboard() {
       });
       fetchStoresData(true);
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to reboot soundbox.';
+      const msg = getErrorMessage(err, 'Failed to reboot soundbox.');
       showToast({ type: 'error', title: 'Reboot Failed', message: msg });
     } finally {
       setRebootingDeviceId(null);
@@ -922,7 +936,7 @@ export default function UserDashboard() {
       });
       fetchStoresData(true);
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to update volume.';
+      const msg = getErrorMessage(err, 'Failed to update volume.');
       showToast({ type: 'error', title: 'Volume Failed', message: msg });
     }
   };

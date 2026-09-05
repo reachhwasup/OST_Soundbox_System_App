@@ -3,13 +3,35 @@ import { CheckCircle2, Unlink, Link2, RefreshCw, AlertCircle, X } from 'lucide-r
 
 const ToastContext = createContext(null);
 
+function formatToastContent(val) {
+  if (val == null) return '';
+  if (typeof val === 'string' || typeof val === 'number') return String(val);
+  if (Array.isArray(val)) {
+    return val
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object') {
+          const field = Array.isArray(item.loc) ? item.loc[item.loc.length - 1] : '';
+          return field ? `${field}: ${item.msg || JSON.stringify(item)}` : (item.msg || JSON.stringify(item));
+        }
+        return String(item);
+      })
+      .join(', ');
+  }
+  if (typeof val === 'object') {
+    return val.msg || val.message || JSON.stringify(val);
+  }
+  return String(val);
+}
+
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
   const showToast = useCallback(({ type = 'success', title, message, duration = 5000 }) => {
-
     const id = Date.now() + Math.random().toString(36).substring(2, 9);
-    const newToast = { id, type, title, message, duration, isExiting: false };
+    const safeTitle = formatToastContent(title);
+    const safeMessage = formatToastContent(message);
+    const newToast = { id, type, title: safeTitle, message: safeMessage, duration, isExiting: false };
 
     setToasts((prev) => [...prev, newToast]);
 
@@ -59,6 +81,8 @@ export function useToast() {
 
 function ToastItem({ toast, onRemove }) {
   const { type, title, message, isExiting, duration } = toast;
+  const safeTitle = formatToastContent(title);
+  const safeMessage = formatToastContent(message);
 
   // Icon & Theme Styling based on Action Type
   let Icon = CheckCircle2;
@@ -113,15 +137,15 @@ function ToastItem({ toast, onRemove }) {
             <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded-full ${badgeColor}`}>
               {badgeText}
             </span>
-            {title && (
+            {safeTitle && (
               <h4 className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
-                {title}
+                {safeTitle}
               </h4>
             )}
           </div>
-          {message && (
+          {safeMessage && (
             <p className="text-xs text-slate-600 dark:text-slate-300 leading-snug break-words">
-              {message}
+              {safeMessage}
             </p>
           )}
         </div>

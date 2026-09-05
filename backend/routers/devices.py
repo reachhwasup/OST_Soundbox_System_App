@@ -148,10 +148,10 @@ async def register_device(
                         $10, $11, $12, 'ACTIVE', TRUE
                     )
                     RETURNING id
-                """, m_id_str, device_sn, payload.device_type or "Display Soundbox", payload.device_model or "Display Soundbox", chat_id, 
+                """, m_id_target, device_sn, payload.device_type or "Display Soundbox", payload.device_model or "Display Soundbox", chat_id, 
                    base_price, disc_amt, float(payload.discount_percent or 0.0), calc_final_price, w_days, now_dt, w_end_dt)
             except Exception as insert_err:
-                logger.warning(f"Standard device link insert failed: {insert_err}. Retrying with int or basic schema...")
+                logger.warning(f"Standard device link insert failed: {insert_err}. Retrying with fallback schema...")
                 try:
                     new_id = await conn.fetchval("""
                         INSERT INTO devices (
@@ -159,15 +159,23 @@ async def register_device(
                         )
                         VALUES ($1, $2, $3, $4, 'ACTIVE', TRUE)
                         RETURNING id
-                    """, m_id_str, device_sn, payload.device_type or "Display Soundbox", chat_id)
-                except Exception:
-                    new_id = await conn.fetchval("""
-                        INSERT INTO devices (
-                            merchant_id, device_sn, device_type, telegram_chat_id, status, is_active
+                    """, m_id_target, device_sn, payload.device_type or "Display Soundbox", chat_id)
+                except Exception as fallback_err:
+                    alt_m_id = str(payload.merchant_id) if isinstance(m_id_target, int) else (int(payload.merchant_id) if str(payload.merchant_id).isdigit() else payload.merchant_id)
+                    try:
+                        new_id = await conn.fetchval("""
+                            INSERT INTO devices (
+                                merchant_id, device_sn, device_type, telegram_chat_id, status, is_active
+                            )
+                            VALUES ($1, $2, $3, $4, 'ACTIVE', TRUE)
+                            RETURNING id
+                        """, alt_m_id, device_sn, payload.device_type or "Display Soundbox", chat_id)
+                    except Exception as final_err:
+                        logger.error(f"Device insert failed completely: {final_err}", exc_info=True)
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Failed to link Soundbox: {str(final_err)}"
                         )
-                        VALUES ($1, $2, $3, $4, 'ACTIVE', TRUE)
-                        RETURNING id
-                    """, m_id_int, device_sn, payload.device_type or "Display Soundbox", chat_id)
 
             return {
                 "status": "success",
