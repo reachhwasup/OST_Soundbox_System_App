@@ -257,8 +257,56 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_devices_supplier_id ON devices(supplier_id);
         """)
 
+        # 6. Sales Table (Device Sales Orders & Warranty Tracking)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS sales (
+                id SERIAL PRIMARY KEY,
+                device_id INT REFERENCES devices(id) ON DELETE SET NULL,
+                device_sn VARCHAR(100) NOT NULL,
+                merchant_id INT REFERENCES merchants(id) ON DELETE SET NULL,
+                sold_by_user_id INT REFERENCES users(id) ON DELETE SET NULL,
+                customer_name VARCHAR(150),
+                customer_phone VARCHAR(50),
+                price NUMERIC(10, 2) NOT NULL DEFAULT 29.00,
+                discount_type VARCHAR(20) DEFAULT 'NONE',
+                discount_percent NUMERIC(5, 2) DEFAULT 0.00,
+                discount_amount NUMERIC(10, 2) DEFAULT 0.00,
+                final_price NUMERIC(10, 2) NOT NULL DEFAULT 29.00,
+                currency VARCHAR(10) DEFAULT 'USD',
+                warranty_days INT DEFAULT 90,
+                warranty_start_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                warranty_end_date TIMESTAMP WITH TIME ZONE,
+                payment_method VARCHAR(50) DEFAULT 'CASH',
+                status VARCHAR(50) DEFAULT 'COMPLETED',
+                notes TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_sales_device_id ON sales(device_id);
+            CREATE INDEX IF NOT EXISTS idx_sales_device_sn ON sales(device_sn);
+            CREATE INDEX IF NOT EXISTS idx_sales_merchant_id ON sales(merchant_id);
+            CREATE INDEX IF NOT EXISTS idx_sales_sold_by ON sales(sold_by_user_id);
+            CREATE INDEX IF NOT EXISTS idx_sales_created_at ON sales(created_at);
 
-        # 5. Transactions Table
+            -- Auto-migrate existing sold or pending devices into sales ledger if not present
+            INSERT INTO sales (device_id, device_sn, merchant_id, price, discount_amount, discount_percent, final_price, warranty_days, warranty_start_date, warranty_end_date, status, created_at)
+            SELECT d.id, d.device_sn, 
+                   CASE WHEN d.merchant_id::text ~ '^[0-9]+$' THEN d.merchant_id::text::int ELSE NULL END,
+                   COALESCE(d.price, 29.00),
+                   COALESCE(d.discount_amount, 0.00),
+                   COALESCE(d.discount_percent, 0.00),
+                   COALESCE(d.final_price, d.price, 29.00),
+                   COALESCE(d.warranty_days, 90),
+                   COALESCE(d.warranty_start_date, d.created_at, CURRENT_TIMESTAMP),
+                   COALESCE(d.warranty_end_date, COALESCE(d.warranty_start_date, d.created_at, CURRENT_TIMESTAMP) + (COALESCE(d.warranty_days, 90) || ' days')::INTERVAL),
+                   'COMPLETED',
+                   COALESCE(d.warranty_start_date, d.created_at, CURRENT_TIMESTAMP)
+            FROM devices d
+            WHERE (d.status::text IN ('ACTIVE', 'PENDING') OR d.merchant_id IS NOT NULL)
+              AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.device_id = d.id);
+        """)
+
+        # 7. Transactions Table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS transactions (
                 id BIGSERIAL PRIMARY KEY,

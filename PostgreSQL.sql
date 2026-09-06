@@ -125,7 +125,39 @@ CREATE INDEX IF NOT EXISTS idx_devices_telegram ON devices(telegram_chat_id);
 CREATE INDEX IF NOT EXISTS idx_devices_status ON devices(status);
 
 
--- 5. Payment Transactions Table (Deduplication & Voice Broadcasting)
+-- 6. Sales Table (Device Sales Orders & Warranty Tracking)
+CREATE TABLE IF NOT EXISTS sales (
+    id SERIAL PRIMARY KEY,
+    device_id INT REFERENCES devices(id) ON DELETE SET NULL,
+    device_sn VARCHAR(100) NOT NULL,
+    merchant_id INT REFERENCES merchants(id) ON DELETE SET NULL,
+    sold_by_user_id INT REFERENCES users(id) ON DELETE SET NULL,
+    customer_name VARCHAR(150),
+    customer_phone VARCHAR(50),
+    price NUMERIC(10, 2) NOT NULL DEFAULT 29.00,
+    discount_type VARCHAR(20) DEFAULT 'NONE',
+    discount_percent NUMERIC(5, 2) DEFAULT 0.00,
+    discount_amount NUMERIC(10, 2) DEFAULT 0.00,
+    final_price NUMERIC(10, 2) NOT NULL DEFAULT 29.00,
+    currency VARCHAR(10) DEFAULT 'USD',
+    warranty_days INT DEFAULT 90,
+    warranty_start_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    warranty_end_date TIMESTAMP WITH TIME ZONE,
+    payment_method VARCHAR(50) DEFAULT 'CASH',
+    status VARCHAR(50) DEFAULT 'COMPLETED',
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sales_device_id ON sales(device_id);
+CREATE INDEX IF NOT EXISTS idx_sales_device_sn ON sales(device_sn);
+CREATE INDEX IF NOT EXISTS idx_sales_merchant_id ON sales(merchant_id);
+CREATE INDEX IF NOT EXISTS idx_sales_sold_by ON sales(sold_by_user_id);
+CREATE INDEX IF NOT EXISTS idx_sales_created_at ON sales(created_at);
+
+
+-- 7. Payment Transactions Table (Deduplication & Voice Broadcasting)
 CREATE TABLE IF NOT EXISTS transactions (
     id SERIAL PRIMARY KEY,
     txid VARCHAR(150),

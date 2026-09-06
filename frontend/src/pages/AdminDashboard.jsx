@@ -234,6 +234,14 @@ export default function AdminDashboard() {
   const [editingSupplierId, setEditingSupplierId] = useState(null);
   const [supplierSubmitting, setSupplierSubmitting] = useState(false);
 
+  // Sales Orders & History State
+  const [salesList, setSalesList] = useState([]);
+  const [salesTotalCount, setSalesTotalCount] = useState(0);
+  const [salesTotalRevenue, setSalesTotalRevenue] = useState(0);
+  const [isSalesModalOpen, setIsSalesModalOpen] = useState(false);
+  const [salesSearchTerm, setSalesSearchTerm] = useState('');
+  const [salesLoading, setSalesLoading] = useState(false);
+
   const [isDeviceDetailOpen, setIsDeviceDetailOpen] = useState(false);
   const [selectedDeviceDetail, setSelectedDeviceDetail] = useState(null);
 
@@ -369,10 +377,11 @@ export default function AdminDashboard() {
         api.get('/api/admin/stores'),
         api.get('/api/devices/'),
         api.get(`/api/admin/logs?search=${searchParam}&log_type=${logTypeFilter}&limit=100`),
-        api.get('/api/suppliers')
+        api.get('/api/suppliers'),
+        api.get('/api/sales?limit=100')
       ]);
 
-      const [statsRes, usersRes, storesRes, devicesRes, logsRes, suppliersRes] = results;
+      const [statsRes, usersRes, storesRes, devicesRes, logsRes, suppliersRes, salesRes] = results;
 
       if (statsRes.status === 'fulfilled' && statsRes.value?.data?.stats) {
         setStats(statsRes.value.data.stats);
@@ -391,6 +400,11 @@ export default function AdminDashboard() {
       }
       if (suppliersRes?.status === 'fulfilled' && suppliersRes.value?.data?.data) {
         setSuppliersList(suppliersRes.value.data.data);
+      }
+      if (salesRes?.status === 'fulfilled' && salesRes.value?.data?.status === 'success') {
+        setSalesList(salesRes.value.data.data || []);
+        setSalesTotalCount(salesRes.value.data.total || 0);
+        setSalesTotalRevenue(salesRes.value.data.total_revenue || 0);
       }
     } catch (err) {
       console.error(err);
@@ -485,6 +499,24 @@ export default function AdminDashboard() {
       fetchAllData();
     } catch (err) {
       showToast({ type: 'error', title: 'Error', message: err.response?.data?.detail || 'Failed to delete supplier.' });
+    }
+  };
+
+  // Sales Orders Fetcher
+  const fetchSales = async (search = '') => {
+    setSalesLoading(true);
+    try {
+      const q = search && search.trim() ? `?search=${encodeURIComponent(search.trim())}&limit=100` : '?limit=100';
+      const res = await api.get(`/api/sales${q}`);
+      if (res.data?.status === 'success') {
+        setSalesList(res.data.data || []);
+        setSalesTotalCount(res.data.total || 0);
+        setSalesTotalRevenue(res.data.total_revenue || 0);
+      }
+    } catch (err) {
+      console.error('Failed to fetch sales orders:', err);
+    } finally {
+      setSalesLoading(false);
     }
   };
 
@@ -754,22 +786,25 @@ export default function AdminDashboard() {
     const sn = sellTargetDevice.device_sn || sellTargetDevice.device_id;
 
     try {
-      await api.put(`/api/devices/${sellTargetDevice.id}`, {
-        device_sn: sellTargetDevice.device_sn,
-        device_type: sellTargetDevice.device_type || 'Display Soundbox',
-        device_model: sellTargetDevice.device_model || sellTargetDevice.device_type || 'Display Soundbox',
+      await api.post('/api/sales', {
+        device_id: sellTargetDevice.id,
+        device_sn: sn,
         merchant_id: null,
         price: basePrice,
-        discount_amount: discAmt,
+        discount_type: sellDiscountType,
         discount_percent: discPct,
+        discount_amount: discAmt,
         final_price: finalPrice,
         warranty_days: Number(sellWarrantyDays) || 90,
         warranty_start_date: sellWarrantyStartDate ? new Date(sellWarrantyStartDate).toISOString() : new Date().toISOString(),
-        status: 'PENDING'
+        target_status: 'PENDING',
+        payment_method: 'CASH',
+        notes: `Sold via Admin Dashboard`
       });
 
       setIsSellStockOpen(false);
       await fetchAllData();
+      await fetchSales();
 
       // Switch to Manage Devices tab and focus on this sold unit
       setDevFilterId(sn || '');
@@ -3669,6 +3704,22 @@ export default function AdminDashboard() {
                   <span>{t('suppliers', 'Suppliers')}</span>
                   <span className="px-1.5 py-0.2 bg-indigo-200/80 dark:bg-indigo-800 text-indigo-800 dark:text-indigo-200 text-[10px] font-bold rounded-full">
                     {suppliersList.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    fetchSales(salesSearchTerm);
+                    setIsSalesModalOpen(true);
+                  }}
+                  className="px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer touch-manipulation"
+                  title="View Sales History & Orders"
+                >
+                  <Receipt className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                  <span>{t('salesHistory', 'Sales')}</span>
+                  <span className="px-1.5 py-0.2 bg-amber-200/80 dark:bg-amber-800 text-amber-800 dark:text-amber-200 text-[10px] font-bold rounded-full">
+                    {salesTotalCount}
                   </span>
                 </button>
 
@@ -6727,6 +6778,222 @@ export default function AdminDashboard() {
               ))}
             </div>
           </div>
+        </div>
+      </Modal>
+
+      {/* Modal: Sales Orders & History */}
+      <Modal
+        isOpen={isSalesModalOpen}
+        onClose={() => {
+          setIsSalesModalOpen(false);
+          setSalesSearchTerm('');
+        }}
+        title={`🧾 ${t('salesOrders', 'Sales Orders & History')}`}
+        maxWidth="max-w-5xl"
+      >
+        <div className="space-y-4">
+          {/* Top Summary Bar & Search */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xs">
+                <ShoppingBag className="w-4 h-4 text-indigo-500" />
+                <div className="text-xs font-bold text-slate-900 dark:text-white">
+                  <span>{salesTotalCount}</span> <span className="text-slate-400 font-normal">Orders</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-xl shadow-2xs">
+                <DollarSign className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <div className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium mr-1">{t('totalRevenue', 'Total Revenue')}:</span>
+                  ${Number(salesTotalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+            </div>
+
+            {/* Live Search & Refresh */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-64">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={salesSearchTerm}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSalesSearchTerm(val);
+                    fetchSales(val);
+                  }}
+                  placeholder="Search SN, store, customer..."
+                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+                {salesSearchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSalesSearchTerm('');
+                      fetchSales('');
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => fetchSales(salesSearchTerm)}
+                disabled={salesLoading}
+                className="p-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-300 transition cursor-pointer disabled:opacity-50"
+                title="Refresh Sales"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${salesLoading ? 'animate-spin text-indigo-500' : ''}`} />
+              </button>
+            </div>
+          </div>
+
+          {/* Table / List */}
+          {salesLoading ? (
+            <div className="py-12 text-center text-slate-500 dark:text-slate-400 flex flex-col items-center justify-center gap-2">
+              <RefreshCw className="w-6 h-6 animate-spin text-indigo-500" />
+              <p className="text-xs">Loading sales orders...</p>
+            </div>
+          ) : salesList.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+              <Receipt className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-700 mb-2" />
+              <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">No sales orders found</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {salesSearchTerm ? 'Try adjusting your search criteria.' : 'Sell soundbox devices from warehouse stock to see sales records here.'}
+              </p>
+            </div>
+          ) : (
+            <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
+                  <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700 uppercase tracking-wider text-[10px]">
+                    <tr>
+                      <th className="px-3.5 py-2.5">Order / Date</th>
+                      <th className="px-3.5 py-2.5">Soundbox / SN</th>
+                      <th className="px-3.5 py-2.5">Store / Customer</th>
+                      <th className="px-3.5 py-2.5">Sold By</th>
+                      <th className="px-3.5 py-2.5 text-right">Pricing & Final</th>
+                      <th className="px-3.5 py-2.5">Warranty</th>
+                      <th className="px-3.5 py-2.5">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                    {salesList.map((sale) => (
+                      <tr key={sale.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-850/70 transition">
+                        <td className="px-3.5 py-3 align-top whitespace-nowrap">
+                          <div className="font-bold text-slate-900 dark:text-white font-mono text-[11px]">
+                            #ORD-{String(sale.id).padStart(4, '0')}
+                          </div>
+                          <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
+                            <Calendar className="w-2.5 h-2.5" />
+                            {sale.created_at ? new Date(sale.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                          </div>
+                        </td>
+
+                        <td className="px-3.5 py-3 align-top">
+                          <div className="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-xs flex items-center gap-1.5">
+                            <Volume2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span>{sale.device_sn}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            {sale.device_type && (
+                              <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                {sale.device_type}
+                              </span>
+                            )}
+                            {sale.supplier_name && (
+                              <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                                🏢 {sale.supplier_name}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="px-3.5 py-3 align-top">
+                          {sale.store_name ? (
+                            <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1">
+                              <Store className="w-3 h-3 text-emerald-500 shrink-0" />
+                              <span>{sale.store_name}</span>
+                            </div>
+                          ) : sale.customer_name ? (
+                            <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1">
+                              <User className="w-3 h-3 text-indigo-500 shrink-0" />
+                              <span>{sale.customer_name}</span>
+                            </div>
+                          ) : (
+                            <div className="text-slate-400 italic">Direct Sale</div>
+                          )}
+                          {(sale.customer_phone || sale.merchant_phone) && (
+                            <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
+                              <Phone className="w-2.5 h-2.5" />
+                              <span>{sale.customer_phone || sale.merchant_phone}</span>
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="px-3.5 py-3 align-top whitespace-nowrap">
+                          <div className="text-slate-700 dark:text-slate-300 font-medium text-xs">
+                            {sale.sold_by_name || 'Admin'}
+                          </div>
+                          {sale.sold_by_phone && (
+                            <div className="text-[10px] text-slate-400">
+                              {sale.sold_by_phone}
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="px-3.5 py-3 align-top text-right whitespace-nowrap">
+                          <div className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
+                            ${Number(sale.final_price ?? sale.price ?? 0).toFixed(2)}
+                          </div>
+                          {(sale.discount_percent > 0 || sale.discount_amount > 0) && (
+                            <div className="text-[10px] text-rose-500 dark:text-rose-400 line-through mt-0.5">
+                              ${Number(sale.price || 0).toFixed(2)}
+                              <span className="ml-1 text-[9px] no-underline font-semibold bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-300 px-1 py-0.2 rounded">
+                                {sale.discount_type === 'percent' ? `-${sale.discount_percent}%` : `-$${Number(sale.discount_amount).toFixed(2)}`}
+                              </span>
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="px-3.5 py-3 align-top whitespace-nowrap">
+                          <div className="text-slate-800 dark:text-slate-200 font-semibold text-xs flex items-center gap-1">
+                            <Shield className="w-3 h-3 text-indigo-500" />
+                            <span>{sale.warranty_days ? `${sale.warranty_days}d` : 'No warranty'}</span>
+                          </div>
+                          {sale.warranty_end_date && (
+                            <div className="text-[10px] text-slate-400 mt-0.5">
+                              Exp: {new Date(sale.warranty_end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="px-3.5 py-3 align-top whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            sale.status === 'COMPLETED'
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                              : sale.status === 'PENDING'
+                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                          }`}>
+                            {sale.status || 'COMPLETED'}
+                          </span>
+                          {sale.notes && (
+                            <div className="text-[10px] text-slate-400 mt-1 max-w-[120px] truncate" title={sale.notes}>
+                              📝 {sale.notes}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
 

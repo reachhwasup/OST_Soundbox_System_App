@@ -347,6 +347,13 @@ export const translations = {
     supplierCreated: "Supplier created successfully",
     supplierUpdated: "Supplier updated successfully",
     supplierDeleted: "Supplier deleted successfully",
+    salesHistory: "Sales History",
+    salesOrders: "Sales Orders",
+    saleId: "Sale #",
+    soldDate: "Sale Date",
+    soldBy: "Sold By",
+    totalRevenue: "Total Revenue",
+    recordedSales: "Recorded Sales",
     // Store & Location Filter Keys
     allProvinces: "All Provinces / Cities",
     allDistricts: "All Districts / Khans",
@@ -754,6 +761,13 @@ export const translations = {
     supplierCreated: "បានបន្ថែមអ្នកផ្គត់ផ្គង់ដោយជោគជ័យ",
     supplierUpdated: "បានកែប្រែអ្នកផ្គត់ផ្គង់ដោយជោគជ័យ",
     supplierDeleted: "បានលុបអ្នកផ្គត់ផ្គង់ដោយជោគជ័យ",
+    salesHistory: "ប្រវត្តិការលក់ (Sales)",
+    salesOrders: "បញ្ជីការលក់",
+    saleId: "លេខវិក្កយបត្រ",
+    soldDate: "កាលបរិច្ឆេទលក់",
+    soldBy: "អ្នកលក់",
+    totalRevenue: "ចំណូលសរុប",
+    recordedSales: "ការលក់ដែលបានកត់ត្រា",
     
     // Store & Location Filter Keys
     allProvinces: "គ្រប់ខេត្ត / រាជធានី",
