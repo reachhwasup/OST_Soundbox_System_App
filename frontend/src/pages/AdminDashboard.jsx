@@ -3358,60 +3358,17 @@ export default function AdminDashboard() {
                       </span>
                     </div>
 
-                    {/* Action buttons with touch-friendly layout */}
-                    <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => openDeviceCommandModal(d, 'VOICE_BROADCAST')}
-                          className="p-2.5 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 rounded-xl hover:bg-emerald-100 active:scale-95 transition cursor-pointer touch-manipulation"
-                          title="Voice Broadcast"
-                          aria-label="Voice Broadcast"
-                        >
-                          <Radio className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openDeviceCommandModal(d, 'SET_VOLUME')}
-                          className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-200 active:scale-95 transition cursor-pointer touch-manipulation"
-                          title="Volume"
-                          aria-label="Volume"
-                        >
-                          <Volume2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSendDeviceCommand(d.id, 'REBOOT')}
-                          className="p-2.5 bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 rounded-xl hover:bg-amber-100 active:scale-95 transition cursor-pointer touch-manipulation"
-                          title="Reboot"
-                          aria-label="Reboot"
-                        >
-                          <RotateCcw className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedDeviceForMerchant(d);
-                            setTargetMerchantStoreId(d.merchant_id ? String(d.merchant_id) : '');
-                            setIsEditMerchantOpen(true);
-                          }}
-                          className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-200 active:scale-95 transition cursor-pointer touch-manipulation"
-                          title="Reassign Store"
-                          aria-label="Reassign Store"
-                        >
-                          <Store className="w-4 h-4" />
-                        </button>
-                      </div>
-
+                    {/* Action: View Device Details (All remote actions like broadcast, volume, reboot, reassign are in Detail modal) */}
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
                       <button
                         type="button"
                         onClick={() => {
                           setSelectedDeviceDetail(d);
                           setIsDeviceDetailOpen(true);
                         }}
-                        className="py-2 px-3.5 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 active:scale-95 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer touch-manipulation"
+                        className="w-full py-2.5 px-4 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 active:scale-[0.98] text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-2xs cursor-pointer touch-manipulation min-h-[44px]"
                       >
-                        <Eye className="w-3.5 h-3.5 text-blue-500" />
+                        <Eye className="w-4 h-4 text-blue-500" />
                         <span>{t('detail', 'Detail')}</span>
                       </button>
                     </div>
