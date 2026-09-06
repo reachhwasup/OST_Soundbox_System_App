@@ -2531,8 +2531,8 @@ export default function UserDashboard() {
           setActiveCameraField(null);
           setIsDeviceModalOpen(false);
         }} 
-        title={isKhmer ? "ភ្ជាប់ឧបករណ៍ Soundbox ទៅកាន់ហាង" : "Link Soundbox Speakers to Store"}
-        maxWidth="max-w-xl"
+        title={isKhmer ? "ភ្ជាប់ឧបករណ៍ Soundbox" : "Link Soundbox Device"}
+        maxWidth="max-w-md"
       >
         <div className="space-y-4">
           {activeCameraField && (
@@ -2563,7 +2563,7 @@ export default function UserDashboard() {
             />
           )}
 
-          <form onSubmit={handleRegisterDevice} className="space-y-4">
+          <form onSubmit={handleRegisterDevice} className="space-y-3.5">
             {/* Target Store Dropdown if user has multiple stores */}
             {stores.length > 1 && (
               <div>
@@ -2573,7 +2573,7 @@ export default function UserDashboard() {
                 <select
                   value={targetStoreIdForNewDevice || activeStore?.id}
                   onChange={(e) => setTargetStoreIdForNewDevice(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white cursor-pointer"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white cursor-pointer"
                 >
                   {stores.map(s => (
                     <option key={s.merchant_id || s.id} value={s.merchant_id || s.id}>{s.merchant_name || s.name}</option>
@@ -2583,16 +2583,11 @@ export default function UserDashboard() {
             )}
 
             {/* Soundbox Devices List Section */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between pb-1">
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-800 dark:text-slate-200 tracking-wider">
-                    {t('soundboxDevicesCount', 'Soundbox Devices')} ({devicesToLink.length})
-                  </label>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    {isKhmer ? 'កំណត់លេខកូដ និងប្រភេទឧបករណ៍ដែលត្រូវភ្ជាប់' : 'Configure serial numbers & hardware types to link'}
-                  </p>
-                </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between pb-0.5">
+                <label className="block text-xs font-bold uppercase text-slate-700 dark:text-slate-300 tracking-wider">
+                  {t('soundboxDevicesCount', 'Soundbox Devices')}
+                </label>
                 <button
                   type="button"
                   onClick={() => {
@@ -2601,14 +2596,14 @@ export default function UserDashboard() {
                       { id: `dev-${Date.now()}`, deviceSn: '', deviceType: 'Display Soundbox', paymentQr: '' }
                     ]);
                   }}
-                  className="px-3 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 border border-emerald-300/80 dark:border-emerald-700/80 rounded-xl transition inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 inline-flex items-center gap-1 transition cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>{t('addAnotherDevice', '+ Add Another Soundbox')}</span>
+                  <span>{t('addAnotherDevice', 'Add Soundbox')}</span>
                 </button>
               </div>
 
-              <div className="space-y-3 max-h-[44vh] overflow-y-auto pr-1">
+              <div className="space-y-2.5 max-h-[46vh] overflow-y-auto pr-0.5">
                 {devicesToLink.map((item, index) => {
                   const isLcd = item.deviceType === 'Display Soundbox';
                   const snFeedback = scanFeedback.key === `sn-${item.id}` ? scanFeedback : null;
@@ -2618,103 +2613,17 @@ export default function UserDashboard() {
                   return (
                     <div 
                       key={item.id} 
-                      className="p-3.5 bg-slate-50/80 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3 transition-all"
+                      className="p-2.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2 transition-all"
                     >
-                      {/* Card Header */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center text-xs font-bold font-mono">
-                            #{index + 1}
-                          </div>
-                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                            {t('soundboxItem', 'Soundbox')} #{index + 1}
-                          </span>
-                          {index === 0 && (
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
-                              Primary
-                            </span>
-                          )}
-                        </div>
-
+                      {/* Top Row: Device SN + Type Select + Trash */}
+                      <div className="flex items-center gap-1.5">
                         {devicesToLink.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => setDevicesToLink(prev => prev.filter(d => d.id !== item.id))}
-                            className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50 p-1.5 rounded-lg transition cursor-pointer"
-                            title={t('removeSoundbox', 'Remove Soundbox')}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 shrink-0 w-4 text-center">
+                            #{index + 1}
+                          </span>
                         )}
-                      </div>
 
-                      {/* Soundbox Type Selector */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <label className="block text-[11px] font-semibold uppercase text-slate-600 dark:text-slate-400">
-                            {t('deviceType', 'Soundbox Type')}
-                          </label>
-                          {isLookingUp && (
-                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                              Detecting...
-                            </span>
-                          )}
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setDevicesToLink(prev => prev.map(d => d.id === item.id ? { ...d, deviceType: 'Display Soundbox' } : d))}
-                            className={`p-2 rounded-xl border text-left transition flex flex-col gap-0.5 cursor-pointer ${
-                              isLcd
-                                ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-500'
-                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:border-slate-300'
-                            }`}
-                          >
-                            <span className="text-xs font-bold flex items-center gap-1.5">
-                              🖥️ {t('hasLcdScreen', 'Display (LCD)')}
-                            </span>
-                            <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                              Dynamic screen QR
-                            </span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setDevicesToLink(prev => prev.map(d => d.id === item.id ? { ...d, deviceType: 'Standard Soundbox' } : d))}
-                            className={`p-2 rounded-xl border text-left transition flex flex-col gap-0.5 cursor-pointer ${
-                              !isLcd
-                                ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-500'
-                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:border-slate-300'
-                            }`}
-                          >
-                            <span className="text-xs font-bold flex items-center gap-1.5">
-                              🏷️ {t('noLcdScreen', 'Standard')}
-                            </span>
-                            <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                              Voice only, printed QR
-                            </span>
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Serial Number (SN) Input */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="block text-[11px] font-semibold uppercase text-slate-700 dark:text-slate-300">
-                            {t('deviceSn', 'Device Serial Number (SN)')} <span className="text-rose-500">*</span>
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => triggerScanFileUpload('sn', item.id)}
-                            className="text-[11px] text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium inline-flex items-center gap-1 transition cursor-pointer"
-                          >
-                            <Upload className="w-3 h-3" />
-                            <span>{t('uploadQrImage', 'Upload QR')}</span>
-                          </button>
-                        </div>
-
-                        <div className="relative">
+                        <div className="relative flex-1">
                           <input
                             type="text"
                             value={item.deviceSn}
@@ -2726,55 +2635,76 @@ export default function UserDashboard() {
                               }
                             }}
                             onBlur={() => lookupDeviceType(item.deviceSn, item.id)}
-                            placeholder={t('deviceSnPlaceholder', 'e.g. Y6B2026081501')}
-                            className="w-full pl-3 pr-10 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            placeholder={t('deviceSnPlaceholder', 'Device SN (e.g. Y6B...)')}
+                            className="w-full pl-2.5 pr-14 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1.5 focus:ring-emerald-500"
                             required
                           />
-                          <button
-                            type="button"
-                            onClick={() => setActiveCameraField(
-                              activeCameraField?.type === 'sn' && activeCameraField?.id === item.id 
-                                ? null 
-                                : { type: 'sn', id: item.id }
+                          <div className="absolute inset-y-0 right-1 flex items-center gap-0.5 text-slate-400">
+                            {isLookingUp && (
+                              <RefreshCw className="w-3.5 h-3.5 text-emerald-500 animate-spin mr-0.5" />
                             )}
-                            className={`absolute inset-y-0 right-0 pr-3 flex items-center transition cursor-pointer ${
-                              activeCameraField?.type === 'sn' && activeCameraField?.id === item.id 
-                                ? 'text-emerald-600' 
-                                : 'text-slate-400 hover:text-emerald-600'
-                            }`}
-                            title={t('scanWithCamera', 'Scan with Camera')}
-                          >
-                            <QrCode className="w-4 h-4" />
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => triggerScanFileUpload('sn', item.id)}
+                              className="p-1 hover:text-emerald-600 transition cursor-pointer"
+                              title={t('uploadQrImage', 'Upload QR Image')}
+                            >
+                              <Upload className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActiveCameraField(
+                                activeCameraField?.type === 'sn' && activeCameraField?.id === item.id 
+                                  ? null 
+                                  : { type: 'sn', id: item.id }
+                              )}
+                              className={`p-1 transition cursor-pointer ${
+                                activeCameraField?.type === 'sn' && activeCameraField?.id === item.id 
+                                  ? 'text-emerald-600' 
+                                  : 'hover:text-emerald-600'
+                              }`}
+                              title={t('scanWithCamera', 'Scan with Camera')}
+                            >
+                              <QrCode className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
 
-                        {snFeedback && (
-                          <div className={`mt-1 text-[11px] flex items-center gap-1 ${
-                            snFeedback.isError ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400 font-medium'
-                          }`}>
-                            {snFeedback.isError ? <AlertCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
-                            <span>{snFeedback.message}</span>
-                          </div>
+                        {/* Compact Type Select */}
+                        <select
+                          value={item.deviceType}
+                          onChange={(e) => setDevicesToLink(prev => prev.map(d => d.id === item.id ? { ...d, deviceType: e.target.value } : d))}
+                          className="px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1.5 focus:ring-emerald-500 cursor-pointer shrink-0"
+                        >
+                          <option value="Display Soundbox">🖥️ Display</option>
+                          <option value="Standard Soundbox">🏷️ Standard</option>
+                        </select>
+
+                        {devicesToLink.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setDevicesToLink(prev => prev.filter(d => d.id !== item.id))}
+                            className="p-1.5 text-slate-400 hover:text-rose-500 transition cursor-pointer shrink-0"
+                            title={t('removeSoundbox', 'Remove')}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         )}
                       </div>
 
-                      {/* Payment QR Code (LCD Display only) */}
-                      {isLcd && (
-                        <div className="p-2.5 bg-emerald-50/50 dark:bg-emerald-950/30 rounded-xl border border-emerald-200/80 dark:border-emerald-900/60 space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <label className="block text-[11px] font-bold uppercase text-emerald-900 dark:text-emerald-200">
-                              {t('paymentQrCode', 'Merchant Payment QR Code (LCD Screen)')} <span className="text-rose-500">*</span>
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() => triggerScanFileUpload('qr', item.id)}
-                              className="text-[11px] text-emerald-700 hover:text-emerald-800 dark:text-emerald-300 font-medium inline-flex items-center gap-1 transition cursor-pointer"
-                            >
-                              <Upload className="w-3 h-3" />
-                              <span>{t('uploadPaymentQr', 'Upload QR')}</span>
-                            </button>
-                          </div>
+                      {/* SN feedback */}
+                      {snFeedback && (
+                        <div className={`text-[11px] px-1 flex items-center gap-1 ${
+                          snFeedback.isError ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400 font-medium'
+                        }`}>
+                          {snFeedback.isError ? <AlertCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
+                          <span>{snFeedback.message}</span>
+                        </div>
+                      )}
 
+                      {/* Display QR Input (Sub-row if Display Soundbox) */}
+                      {isLcd && (
+                        <div className="space-y-1 pt-0.5">
                           <div className="relative">
                             <input
                               type="text"
@@ -2783,30 +2713,40 @@ export default function UserDashboard() {
                                 const val = e.target.value;
                                 setDevicesToLink(prev => prev.map(d => d.id === item.id ? { ...d, paymentQr: val } : d));
                               }}
-                              placeholder={t('paymentQrPlaceholder', 'Paste KHQR/Bakong payment string or URL...')}
-                              className="w-full pl-3 pr-10 py-2 bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              placeholder={t('paymentQrPlaceholder', 'Payment QR / KHQR string or URL...')}
+                              className="w-full pl-2.5 pr-14 py-1.5 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-300/80 dark:border-emerald-800/80 rounded-lg text-xs font-mono text-slate-900 dark:text-white placeholder:text-emerald-700/50 dark:placeholder:text-emerald-300/40 focus:outline-none focus:ring-1.5 focus:ring-emerald-500"
                               required
                             />
-                            <button
-                              type="button"
-                              onClick={() => setActiveCameraField(
-                                activeCameraField?.type === 'qr' && activeCameraField?.id === item.id 
-                                  ? null 
-                                  : { type: 'qr', id: item.id }
-                              )}
-                              className={`absolute inset-y-0 right-0 pr-3 flex items-center transition cursor-pointer ${
-                                activeCameraField?.type === 'qr' && activeCameraField?.id === item.id 
-                                  ? 'text-emerald-600' 
-                                  : 'text-slate-400 hover:text-emerald-600'
-                              }`}
-                              title={t('scanPaymentQrCamera', 'Scan Payment QR via Camera')}
-                            >
-                              <QrCode className="w-4 h-4" />
-                            </button>
+                            <div className="absolute inset-y-0 right-1 flex items-center gap-0.5 text-slate-400">
+                              <button
+                                type="button"
+                                onClick={() => triggerScanFileUpload('qr', item.id)}
+                                className="p-1 hover:text-emerald-600 transition cursor-pointer"
+                                title={t('uploadPaymentQr', 'Upload Payment QR Image')}
+                              >
+                                <Upload className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setActiveCameraField(
+                                  activeCameraField?.type === 'qr' && activeCameraField?.id === item.id 
+                                    ? null 
+                                    : { type: 'qr', id: item.id }
+                                )}
+                                className={`p-1 transition cursor-pointer ${
+                                  activeCameraField?.type === 'qr' && activeCameraField?.id === item.id 
+                                    ? 'text-emerald-600' 
+                                    : 'hover:text-emerald-600'
+                                }`}
+                                title={t('scanPaymentQrCamera', 'Scan Payment QR via Camera')}
+                              >
+                                <QrCode className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
 
                           {qrFeedback && (
-                            <div className={`mt-1 text-[11px] flex items-center gap-1 ${
+                            <div className={`text-[11px] px-1 flex items-center gap-1 ${
                               qrFeedback.isError ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400 font-medium'
                             }`}>
                               {qrFeedback.isError ? <AlertCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
@@ -2822,36 +2762,27 @@ export default function UserDashboard() {
             </div>
 
             {/* Telegram Notifications Section */}
-            <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2.5">
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
               <div className="flex items-center justify-between">
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-800 dark:text-slate-200 tracking-wider">
-                    {t('telegramBotsCount', 'Telegram Notifications (Bots / Groups)')}
-                  </label>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    {isKhmer ? 'ភ្ជាប់ Bot ឬ Group ដើម្បីទទួលដំណឹងការទូទាត់ប្រាក់' : 'Link Telegram bot or group chat IDs for live audio & payment alerts'}
-                  </p>
-                </div>
+                <label className="block text-xs font-bold uppercase text-slate-700 dark:text-slate-300 tracking-wider">
+                  Telegram Alerts <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                </label>
                 <button
                   type="button"
                   onClick={() => setTelegramChatIds(prev => [...prev, ''])}
-                  className="px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 border border-indigo-300/80 dark:border-indigo-700/80 rounded-xl transition inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 inline-flex items-center gap-1 transition cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>{t('addTelegramBot', '+ Add Telegram Bot / Group')}</span>
+                  <span>{t('addTelegramBot', 'Add Group')}</span>
                 </button>
               </div>
 
-              <div className="space-y-2 max-h-[25vh] overflow-y-auto pr-1">
+              <div className="space-y-1.5 max-h-36 overflow-y-auto pr-0.5">
                 {telegramChatIds.map((chatId, tgIdx) => {
                   const tgFeedback = scanFeedback.key === `telegram-${tgIdx}` ? scanFeedback : null;
                   return (
                     <div key={tgIdx} className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 flex items-center justify-center text-xs font-bold font-mono shrink-0">
-                          #{tgIdx + 1}
-                        </div>
-
+                      <div className="flex items-center gap-1.5">
                         <div className="relative flex-1">
                           <input
                             type="text"
@@ -2860,42 +2791,43 @@ export default function UserDashboard() {
                               const val = e.target.value;
                               setTelegramChatIds(prev => prev.map((t, i) => i === tgIdx ? val : t));
                             }}
-                            placeholder="e.g. -5394848588 (ABA Group Chat ID)"
-                            className="w-full pl-3 pr-10 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            placeholder="Telegram Chat ID (e.g. -100...)"
+                            className="w-full pl-2.5 pr-14 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1.5 focus:ring-indigo-500"
                           />
-                          <button
-                            type="button"
-                            onClick={() => setActiveCameraField(
-                              activeCameraField?.type === 'telegram' && activeCameraField?.telegramIdx === tgIdx 
-                                ? null 
-                                : { type: 'telegram', telegramIdx: tgIdx }
-                            )}
-                            className={`absolute inset-y-0 right-0 pr-3 flex items-center transition cursor-pointer ${
-                              activeCameraField?.type === 'telegram' && activeCameraField?.telegramIdx === tgIdx 
-                                ? 'text-indigo-600' 
-                                : 'text-slate-400 hover:text-indigo-600'
-                            }`}
-                            title={t('scanWithCamera', 'Scan with Camera')}
-                          >
-                            <QrCode className="w-4 h-4" />
-                          </button>
+                          <div className="absolute inset-y-0 right-1 flex items-center gap-0.5 text-slate-400">
+                            <button
+                              type="button"
+                              onClick={() => triggerScanFileUpload('telegram', null, tgIdx)}
+                              className="p-1 hover:text-indigo-600 transition cursor-pointer"
+                              title={t('uploadQrImage', 'Upload QR Image')}
+                            >
+                              <Upload className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActiveCameraField(
+                                activeCameraField?.type === 'telegram' && activeCameraField?.telegramIdx === tgIdx 
+                                  ? null 
+                                  : { type: 'telegram', telegramIdx: tgIdx }
+                              )}
+                              className={`p-1 transition cursor-pointer ${
+                                activeCameraField?.type === 'telegram' && activeCameraField?.telegramIdx === tgIdx 
+                                  ? 'text-indigo-600' 
+                                  : 'hover:text-indigo-600'
+                              }`}
+                              title={t('scanWithCamera', 'Scan with Camera')}
+                            >
+                              <QrCode className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
-
-                        <button
-                          type="button"
-                          onClick={() => triggerScanFileUpload('telegram', null, tgIdx)}
-                          className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-xl border border-slate-200 dark:border-slate-700 transition cursor-pointer shrink-0"
-                          title={t('uploadQrImage', 'Upload Telegram QR Image')}
-                        >
-                          <Upload className="w-4 h-4" />
-                        </button>
 
                         {telegramChatIds.length > 1 && (
                           <button
                             type="button"
                             onClick={() => setTelegramChatIds(prev => prev.filter((_, i) => i !== tgIdx))}
-                            className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-xl border border-slate-200 dark:border-slate-700 transition cursor-pointer shrink-0"
-                            title={t('removeTelegram', 'Remove Telegram Group')}
+                            className="p-1.5 text-slate-400 hover:text-rose-500 transition cursor-pointer shrink-0"
+                            title={t('removeTelegram', 'Remove')}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -2903,7 +2835,7 @@ export default function UserDashboard() {
                       </div>
 
                       {tgFeedback && (
-                        <div className={`text-[11px] pl-8 flex items-center gap-1 ${
+                        <div className={`text-[11px] px-1 flex items-center gap-1 ${
                           tgFeedback.isError ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400 font-medium'
                         }`}>
                           {tgFeedback.isError ? <AlertCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
@@ -2915,17 +2847,9 @@ export default function UserDashboard() {
                 })}
               </div>
 
-              <div className="p-2.5 bg-indigo-50/60 dark:bg-indigo-950/30 rounded-xl border border-indigo-200/60 dark:border-indigo-900/40 text-[11px] text-indigo-900 dark:text-indigo-200 flex items-start gap-2">
-                <span className="text-sm">💡</span>
-                <div>
-                  <span className="font-semibold">{t('howToGetChatId', 'How to get Telegram Verification Code (Chat ID)?')}</span>
-                  <p className="text-indigo-700/80 dark:text-indigo-300/80 mt-0.5">
-                    {isKhmer 
-                      ? 'បន្ថែម Soundbox Bot ចូលទៅក្នុង Telegram Group (ដូចជាគ្រុប ABA ឬ Wing) ដើម្បីទទួលសំឡេង និងវិក្កយបត្រស្វ័យប្រវត្តិ។' 
-                      : 'Add your Soundbox Bot to your Telegram groups (e.g. ABA Bank group, Wing group) to receive real-time voice & payment notifications.'}
-                  </p>
-                </div>
-              </div>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                💡 Add <code className="text-slate-600 dark:text-slate-300 font-mono">@ost_system_soundboxBot</code> to your Telegram group for live voice & payment alerts.
+              </p>
             </div>
 
             {/* Modal Footer Actions */}
@@ -2936,27 +2860,27 @@ export default function UserDashboard() {
                   setActiveCameraField(null);
                   setIsDeviceModalOpen(false);
                 }}
-                className="px-4 py-2.5 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-300 font-medium cursor-pointer"
+                className="px-3.5 py-2 text-xs text-slate-600 hover:text-slate-800 dark:text-slate-300 font-medium cursor-pointer"
               >
                 {t('cancel', 'Cancel')}
               </button>
               <button
                 type="submit"
                 disabled={savingDevice}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
               >
                 {savingDevice ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>{t('saving', 'Linking...')}</span>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>{t('linking', 'Linking...')}</span>
                   </>
                 ) : (
                   <>
-                    <Check className="w-4 h-4" />
+                    <Check className="w-3.5 h-3.5" />
                     <span>
                       {devicesToLink.length > 1 
-                        ? `${t('linkAllDevices', 'Link Soundbox Devices')} (${devicesToLink.length})` 
-                        : t('linkSoundbox', 'Link Soundbox')}
+                        ? (isKhmer ? `ភ្ជាប់ឧបករណ៍ទាំង (${devicesToLink.length})` : `Link (${devicesToLink.length}) Devices`)
+                        : (isKhmer ? 'ភ្ជាប់ឧបករណ៍' : 'Link Soundbox')}
                     </span>
                   </>
                 )}
@@ -3170,38 +3094,29 @@ export default function UserDashboard() {
             )}
 
             {/* Telegram Notifications Section */}
-            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2.5">
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2">
               <div className="flex items-center justify-between">
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-800 dark:text-slate-200 tracking-wider">
-                    {t('telegramBotsCount', 'Telegram Notifications (Bots / Groups)')}
-                  </label>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    {isKhmer ? 'ភ្ជាប់ Bot ឬ Group ដើម្បីទទួលដំណឹងការទូទាត់ប្រាក់' : 'Manage connected Telegram bot or group chat IDs'}
-                  </p>
-                </div>
+                <label className="block text-xs font-bold uppercase text-slate-700 dark:text-slate-300 tracking-wider">
+                  Telegram Alerts <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                </label>
                 <button
                   type="button"
                   onClick={() => setEditTelegramList(prev => [...prev, ''])}
-                  className="px-2.5 py-1 text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 border border-indigo-300/80 dark:border-indigo-700/80 rounded-xl transition inline-flex items-center gap-1 cursor-pointer shadow-2xs"
+                  className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 inline-flex items-center gap-1 transition cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>{t('addTelegramBot', '+ Add Telegram Bot / Group')}</span>
+                  <span>{t('addTelegramBot', 'Add Group')}</span>
                 </button>
               </div>
 
-              <div className="space-y-2 max-h-[22vh] overflow-y-auto pr-1">
+              <div className="space-y-1.5 max-h-36 overflow-y-auto pr-0.5">
                 {editTelegramList.map((chatId, tgIdx) => {
                   const isScanningThis = typeof editActiveCameraField === 'object' && editActiveCameraField?.type === 'telegram' && editActiveCameraField?.idx === tgIdx;
                   const tgFeedback = editScanFeedback.field === `telegram-${tgIdx}` ? editScanFeedback : null;
 
                   return (
                     <div key={tgIdx} className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 flex items-center justify-center text-xs font-bold font-mono shrink-0">
-                          #{tgIdx + 1}
-                        </div>
-
+                      <div className="flex items-center gap-1.5">
                         <div className="relative flex-1">
                           <input
                             type="text"
@@ -3210,18 +3125,18 @@ export default function UserDashboard() {
                               const val = e.target.value;
                               setEditTelegramList(prev => prev.map((t, i) => i === tgIdx ? val : t));
                             }}
-                            placeholder="e.g. -5394848588 (ABA Group Chat ID)"
-                            className="w-full pl-3 pr-10 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            placeholder="Telegram Chat ID (e.g. -100...)"
+                            className="w-full pl-2.5 pr-10 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1.5 focus:ring-indigo-500"
                           />
                           <button
                             type="button"
                             onClick={() => setEditActiveCameraField(isScanningThis ? null : { type: 'telegram', idx: tgIdx })}
-                            className={`absolute inset-y-0 right-0 pr-3 flex items-center transition cursor-pointer ${
+                            className={`absolute inset-y-0 right-1 pr-1.5 flex items-center transition cursor-pointer ${
                               isScanningThis ? 'text-indigo-600' : 'text-slate-400 hover:text-indigo-600'
                             }`}
                             title={t('scanTelegramQrCamera', 'Scan Telegram QR via Camera')}
                           >
-                            <QrCode className="w-4 h-4" />
+                            <QrCode className="w-3.5 h-3.5" />
                           </button>
                         </div>
 
@@ -3229,8 +3144,8 @@ export default function UserDashboard() {
                           <button
                             type="button"
                             onClick={() => setEditTelegramList(prev => prev.filter((_, i) => i !== tgIdx))}
-                            className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-xl border border-slate-200 dark:border-slate-700 transition cursor-pointer shrink-0"
-                            title={t('removeTelegram', 'Remove Telegram Group')}
+                            className="p-1.5 text-slate-400 hover:text-rose-500 transition cursor-pointer shrink-0"
+                            title={t('removeTelegram', 'Remove')}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -3238,10 +3153,10 @@ export default function UserDashboard() {
                       </div>
 
                       {tgFeedback && (
-                        <div className={`text-[11px] pl-8 flex items-center gap-1 ${
+                        <div className={`text-[11px] px-1 flex items-center gap-1 ${
                           tgFeedback.isError ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400 font-medium'
                         }`}>
-                          {tgFeedback.isError ? <AlertCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                          {tgFeedback.isError ? <AlertCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
                           <span>{tgFeedback.message}</span>
                         </div>
                       )}
@@ -3250,17 +3165,9 @@ export default function UserDashboard() {
                 })}
               </div>
 
-              <div className="p-2.5 bg-indigo-50/60 dark:bg-indigo-950/30 rounded-xl border border-indigo-200/60 dark:border-indigo-900/40 text-[11px] text-indigo-900 dark:text-indigo-200 flex items-start gap-2">
-                <span className="text-sm">💡</span>
-                <div>
-                  <span className="font-semibold">{t('howToGetChatId', 'How to get Telegram Verification Code (Chat ID)?')}</span>
-                  <p className="text-indigo-700/80 dark:text-indigo-300/80 mt-0.5">
-                    {isKhmer 
-                      ? 'បន្ថែម Soundbox Bot ចូលទៅក្នុង Telegram Group (ដូចជាគ្រុប ABA ឬ Wing) ដើម្បីទទួលដំណឹងទូទាត់ប្រាក់ភ្លាមៗ។' 
-                      : 'Add your Soundbox Bot to your Telegram groups (e.g. ABA Bank group, Wing group) to receive real-time notifications.'}
-                  </p>
-                </div>
-              </div>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                💡 Add <code className="text-slate-600 dark:text-slate-300 font-mono">@ost_system_soundboxBot</code> to your Telegram group for live voice & payment alerts.
+              </p>
             </div>
 
             {stores.length > 1 && (
