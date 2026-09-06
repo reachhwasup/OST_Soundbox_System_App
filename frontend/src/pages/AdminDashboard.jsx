@@ -84,7 +84,9 @@ import {
   Upload,
   User,
   PhoneCall,
-  ArrowUpDown
+  ArrowUpDown,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -253,6 +255,31 @@ export default function AdminDashboard() {
     notes: true,
     operation: true
   });
+
+  // Mobile & Tablet Collapsible Filter Toggles
+  const [isStockFiltersExpanded, setIsStockFiltersExpanded] = useState(false);
+  const [isDevFiltersExpanded, setIsDevFiltersExpanded] = useState(false);
+
+  const activeStockFilterCount = useMemo(() => {
+    let count = 0;
+    if (stockSearchTerm.trim()) count++;
+    if (stockTypeFilter && stockTypeFilter !== 'ALL') count++;
+    if (stockPriceFilter && stockPriceFilter !== 'ALL') count++;
+    if (stockDateFilter.trim()) count++;
+    if (stockSortBy && stockSortBy !== 'NEWEST') count++;
+    return count;
+  }, [stockSearchTerm, stockTypeFilter, stockPriceFilter, stockDateFilter, stockSortBy]);
+
+  const activeDevFilterCount = useMemo(() => {
+    let count = 0;
+    if (devFilterId && devFilterId.trim()) count++;
+    if (devFilterType && devFilterType !== 'ALL') count++;
+    if (devFilterStatus) count++;
+    if (devFilterMerchant && devFilterMerchant.trim()) count++;
+    if (devFilterWarranty && devFilterWarranty !== 'ALL') count++;
+    if (devFilterDate && devFilterDate.trim()) count++;
+    return count;
+  }, [devFilterId, devFilterType, devFilterStatus, devFilterMerchant, devFilterWarranty, devFilterDate]);
 
   // User Management Modals state
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -2782,23 +2809,77 @@ export default function AdminDashboard() {
           </div>
           
           {/* 1. Cloud Speaker Search & Filter Bar */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-5 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
-              
-              {/* Device ID / SN */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('deviceId', 'Device SN')}
-                </label>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-3.5">
+            
+            {/* Top Row: Primary Search + Mobile/Tablet Filter Toggle */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   value={devFilterId}
                   onChange={(e) => { setDevFilterId(e.target.value); setDevPage(1); }}
-                  placeholder={t('pleaseEnterDeviceId', 'Please enter Device ID / SN')}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
+                  placeholder={t('pleaseEnterDeviceId', 'Search by Device SN / ID...')}
+                  className="w-full pl-10 pr-4 py-2.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
                 />
+                {devFilterId && (
+                  <button
+                    type="button"
+                    onClick={() => { setDevFilterId(''); setDevPage(1); }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer font-bold text-sm"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
 
+              {/* Mobile/Tablet Filter Toggle Button */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDevFiltersExpanded(!isDevFiltersExpanded)}
+                  className={`lg:hidden flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl text-xs font-semibold border transition flex items-center justify-center gap-2 cursor-pointer touch-manipulation ${
+                    isDevFiltersExpanded || activeDevFilterCount > 0
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                      : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  <span>Filters</span>
+                  {activeDevFilterCount > 0 && (
+                    <span className="px-1.5 py-0.2 bg-emerald-600 text-white text-[10px] font-bold rounded-full">
+                      {activeDevFilterCount}
+                    </span>
+                  )}
+                  {isDevFiltersExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+
+                {activeDevFilterCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleResetDeviceFilters}
+                    className="px-3 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1 shrink-0 touch-manipulation"
+                    title="Reset Filters"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">{t('reset', 'Reset')}</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleExportDevicesCSV}
+                  className="px-3.5 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs shrink-0 touch-manipulation"
+                  title="Export CSV"
+                >
+                  <Download className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="hidden sm:inline">{t('exportCsv', 'Export')}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Secondary Filter Grid: Always visible on desktop (lg:grid), collapsible on mobile & tablet */}
+            <div className={`${isDevFiltersExpanded ? 'grid' : 'hidden lg:grid'} grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 pt-2 border-t border-slate-100 dark:border-slate-800/80`}>
               {/* Device Type */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
@@ -2807,7 +2888,7 @@ export default function AdminDashboard() {
                 <select
                   value={devFilterType}
                   onChange={(e) => { setDevFilterType(e.target.value); setDevPage(1); }}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
                 >
                   <option value="ALL">{t('allTypes', 'All Device Types')}</option>
                   <option value="Display">{t('displayScreenQr', '🖥️ Display (Screen QR)')}</option>
@@ -2823,7 +2904,7 @@ export default function AdminDashboard() {
                 <select
                   value={devFilterStatus}
                   onChange={(e) => { setDevFilterStatus(e.target.value); setDevPage(1); }}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
                 >
                   <option value="">{t('allStatuses', 'All Statuses')}</option>
                   <option value="Online">🟢 {t('online', 'Online')}</option>
@@ -2832,7 +2913,7 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-              {/* Assigned Store / Merchant */}
+              {/* Assigned Store */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('merchantStore', 'Assigned Store')}
@@ -2841,12 +2922,12 @@ export default function AdminDashboard() {
                   type="text"
                   value={devFilterMerchant}
                   onChange={(e) => { setDevFilterMerchant(e.target.value); setDevPage(1); }}
-                  placeholder={t('searchStorePlaceholder', 'Search assigned store or merchant...')}
+                  placeholder={t('searchStorePlaceholder', 'Search store...')}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
                 />
               </div>
 
-              {/* Warranty Coverage Status */}
+              {/* Warranty */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('warrantyStatus', 'Warranty Status')}
@@ -2854,19 +2935,19 @@ export default function AdminDashboard() {
                 <select
                   value={devFilterWarranty}
                   onChange={(e) => { setDevFilterWarranty(e.target.value); setDevPage(1); }}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
                 >
-                  <option value="ALL">{t('allWarranty', 'All Warranty Statuses')}</option>
+                  <option value="ALL">{t('allWarranty', 'All Warranty')}</option>
                   <option value="ACTIVE">{t('activeCoverage', '🟢 Active Coverage')}</option>
                   <option value="EXPIRING_SOON">{t('expiringSoon', '🟡 Expiring Soon (≤15d)')}</option>
                   <option value="EXPIRED">{t('expired', '🔴 Expired')}</option>
                 </select>
               </div>
 
-              {/* Registration / Deployment Date */}
+              {/* Deployment Date */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('deploymentDate', 'Deployment / Sold Date')}
+                  {t('deploymentDate', 'Deployment Date')}
                 </label>
                 <input
                   type="date"
@@ -2875,32 +2956,7 @@ export default function AdminDashboard() {
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
                 />
               </div>
-
             </div>
-
-            {/* Bottom Row: Action Buttons */}
-            <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800/80">
-                {(devFilterId.trim() || (devFilterType && devFilterType !== 'ALL') || devFilterStatus || devFilterMerchant.trim() || (devFilterWarranty && devFilterWarranty !== 'ALL') || devFilterDate.trim()) && (
-                  <button
-                    type="button"
-                    onClick={handleResetDeviceFilters}
-                    className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                    title="Reset Filters"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{t('reset', 'Reset')}</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleExportDevicesCSV}
-                  className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                >
-                  <Download className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{t('exportCsv', 'Export CSV')}</span>
-                </button>
-              </div>
           </div>
 
           {/* 2. Action Toolbar & Batch Operations */}
@@ -2940,8 +2996,8 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* 3. Cloud Speaker Data Table */}
-          <div className="hidden md:block mt-6 mb-4 bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
+          {/* 3. Cloud Speaker Data Table (Desktop >= lg) */}
+          <div className="hidden lg:block mt-6 mb-4 bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs min-w-[1100px]">
                 <thead>
@@ -3224,8 +3280,8 @@ export default function AdminDashboard() {
 
           </div>
 
-          {/* Mobile Device Cards (< md) */}
-          <div className="md:hidden space-y-3">
+          {/* Mobile & Tablet Device Cards (< lg) */}
+          <div className="lg:hidden grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {paginatedDevices.length > 0 ? (
               paginatedDevices.map((d) => {
                 const isSelected = devSelectedIds.includes(d.id || d.device_id || d.device_sn);
@@ -3236,27 +3292,27 @@ export default function AdminDashboard() {
                 return (
                   <div 
                     key={d.id || d.device_id || d.device_sn}
-                    className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3 shadow-2xs ${
+                    className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3 shadow-2xs hover:shadow-sm transition ${
                       isSelected ? 'border-emerald-500/60 bg-emerald-50/20 dark:bg-emerald-950/20' : ''
                     }`}
                   >
                     {/* Header: SN + Online Status */}
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
                           isOnline ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
                         }`}>
                           <Smartphone className="w-4 h-4" />
                         </div>
-                        <div>
-                          <span className="font-mono font-bold text-xs text-slate-900 dark:text-white block">
+                        <div className="min-w-0">
+                          <span className="font-mono font-bold text-xs text-slate-900 dark:text-white block truncate">
                             {d.device_sn || d.device_id}
                           </span>
                           <span className="text-[10px] text-slate-400 font-mono">ID: #{d.id}</span>
                         </div>
                       </div>
 
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1.5 ${
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1.5 shrink-0 ${
                         isOnline
                           ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                           : String(d.status).toUpperCase() === 'PENDING'
@@ -3302,51 +3358,58 @@ export default function AdminDashboard() {
                       </span>
                     </div>
 
-                    {/* Action buttons */}
-                    <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
-                      <button
-                        type="button"
-                        onClick={() => openDeviceCommandModal(d, 'VOICE_BROADCAST')}
-                        className="p-2 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 rounded-xl hover:bg-emerald-100 transition cursor-pointer"
-                        title="Voice Broadcast"
-                      >
-                        <Radio className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openDeviceCommandModal(d, 'SET_VOLUME')}
-                        className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-200 transition cursor-pointer"
-                        title="Volume"
-                      >
-                        <Volume2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSendDeviceCommand(d.id, 'REBOOT')}
-                        className="p-2 bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 rounded-xl hover:bg-amber-100 transition cursor-pointer"
-                        title="Reboot"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedDeviceForMerchant(d);
-                          setTargetMerchantStoreId(d.merchant_id ? String(d.merchant_id) : '');
-                          setIsEditMerchantOpen(true);
-                        }}
-                        className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-200 transition cursor-pointer"
-                        title="Reassign Store"
-                      >
-                        <Store className="w-3.5 h-3.5" />
-                      </button>
+                    {/* Action buttons with touch-friendly layout */}
+                    <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => openDeviceCommandModal(d, 'VOICE_BROADCAST')}
+                          className="p-2.5 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 rounded-xl hover:bg-emerald-100 active:scale-95 transition cursor-pointer touch-manipulation"
+                          title="Voice Broadcast"
+                          aria-label="Voice Broadcast"
+                        >
+                          <Radio className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openDeviceCommandModal(d, 'SET_VOLUME')}
+                          className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-200 active:scale-95 transition cursor-pointer touch-manipulation"
+                          title="Volume"
+                          aria-label="Volume"
+                        >
+                          <Volume2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSendDeviceCommand(d.id, 'REBOOT')}
+                          className="p-2.5 bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 rounded-xl hover:bg-amber-100 active:scale-95 transition cursor-pointer touch-manipulation"
+                          title="Reboot"
+                          aria-label="Reboot"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedDeviceForMerchant(d);
+                            setTargetMerchantStoreId(d.merchant_id ? String(d.merchant_id) : '');
+                            setIsEditMerchantOpen(true);
+                          }}
+                          className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-200 active:scale-95 transition cursor-pointer touch-manipulation"
+                          title="Reassign Store"
+                          aria-label="Reassign Store"
+                        >
+                          <Store className="w-4 h-4" />
+                        </button>
+                      </div>
+
                       <button
                         type="button"
                         onClick={() => {
                           setSelectedDeviceDetail(d);
                           setIsDeviceDetailOpen(true);
                         }}
-                        className="py-1.5 px-3 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50 transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                        className="py-2 px-3.5 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 active:scale-95 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer touch-manipulation"
                       >
                         <Eye className="w-3.5 h-3.5 text-blue-500" />
                         <span>{t('detail', 'Detail')}</span>
@@ -3356,14 +3419,14 @@ export default function AdminDashboard() {
                 );
               })
             ) : (
-              <div className="text-center py-10 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
+              <div className="col-span-full text-center py-10 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
                 {t('noDevicesFound', 'No soundbox devices match the specified filters.')}
               </div>
             )}
           </div>
 
-          {/* Mobile Device Pagination */}
-          <div className="md:hidden">
+          {/* Mobile & Tablet Device Pagination (< lg) */}
+          <div className="lg:hidden">
             {renderPaginationNumeration({
               currentPage: devPage,
               totalPages: totalDevPages,
@@ -3424,27 +3487,94 @@ export default function AdminDashboard() {
           {/* 1. Warehouse Stock Search & Filter Toolbar */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-3.5">
             
-            {/* Filter Grid Row 1: Search, Device Type */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              
-              {/* 1. Search by SN / Notes / Location */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('searchStock', 'Search Stock')}
-                </label>
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={stockSearchTerm}
-                    onChange={(e) => setStockSearchTerm(e.target.value)}
-                    placeholder={t('searchStockPlaceholder', 'Search Serial Number, Location, or Notes...')}
-                    className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
-                  />
-                </div>
+            {/* Top Row: Primary Search + Quick Actions + Filter Toggle */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={stockSearchTerm}
+                  onChange={(e) => setStockSearchTerm(e.target.value)}
+                  placeholder={t('searchStockPlaceholder', 'Search Serial Number, Location, or Notes...')}
+                  className="w-full pl-10 pr-4 py-2.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
+                />
+                {stockSearchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setStockSearchTerm('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer font-bold text-sm"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
 
-              {/* 2. Device Type Filter */}
+              {/* Action Buttons & Filter Toggle */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsStockModalOpen(true)}
+                  className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition cursor-pointer touch-manipulation shrink-0"
+                >
+                  <PackagePlus className="w-4 h-4" />
+                  <span>{t('addStockDevice', '+ Add Stock')}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsStockFiltersExpanded(!isStockFiltersExpanded)}
+                  className={`lg:hidden px-3.5 py-2.5 rounded-xl text-xs font-semibold border transition flex items-center justify-center gap-2 cursor-pointer touch-manipulation ${
+                    isStockFiltersExpanded || activeStockFilterCount > 0
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                      : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  <span>Filters</span>
+                  {activeStockFilterCount > 0 && (
+                    <span className="px-1.5 py-0.2 bg-emerald-600 text-white text-[10px] font-bold rounded-full">
+                      {activeStockFilterCount}
+                    </span>
+                  )}
+                  {isStockFiltersExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+
+                {activeStockFilterCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleResetStockFilters}
+                    className="px-3 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1 shrink-0 touch-manipulation"
+                    title="Reset Filters"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">{t('reset', 'Reset')}</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleExportStockCSV}
+                  className="px-3.5 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs shrink-0 touch-manipulation"
+                  title="Export CSV"
+                >
+                  <Download className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="hidden sm:inline">{t('exportCsv', 'Export')}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsStockColumnsModalOpen(true)}
+                  className="hidden sm:flex px-3 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer items-center gap-1.5 shadow-2xs shrink-0"
+                  title="Columns"
+                >
+                  <Columns className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+              </div>
+            </div>
+
+            {/* Secondary Filter Grid: Always visible on desktop (lg:grid), collapsible on mobile & tablet */}
+            <div className={`${isStockFiltersExpanded ? 'grid' : 'hidden lg:grid'} grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-slate-100 dark:border-slate-800/80`}>
+              {/* Device Type */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('deviceType', 'Device Type')}
@@ -3460,12 +3590,7 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-            </div>
-
-            {/* Filter Grid Row 2: Price Tier, Intake Date, Sort By */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
-
-              {/* 4. Price Tier */}
+              {/* Price Tier */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('priceTier', 'Price Tier')}
@@ -3481,7 +3606,7 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-              {/* 5. Registration Date */}
+              {/* Registration Date */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('registrationDate', 'Registration Date')}
@@ -3494,7 +3619,7 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              {/* 6. Sort By Selector */}
+              {/* Sort By */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('sortBy', 'Sort By')}
@@ -3512,50 +3637,7 @@ export default function AdminDashboard() {
                   <option value="PRICE_ASC">💵 {t('sortPriceAsc', 'Price (Lowest First)')}</option>
                 </select>
               </div>
-
             </div>
-
-            {/* Bottom Row: Action Buttons */}
-            <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800/80">
-                <button
-                  type="button"
-                  onClick={() => setIsStockModalOpen(true)}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-1.5 transition cursor-pointer"
-                >
-                  <PackagePlus className="w-4 h-4" />
-                  <span>{t('addStockDevice', '+ Add Stock Device')}</span>
-                </button>
-
-                {(stockSearchTerm || stockTypeFilter !== 'ALL' || stockPriceFilter !== 'ALL' || stockDateFilter || stockSortBy !== 'NEWEST') && (
-                  <button
-                    type="button"
-                    onClick={handleResetStockFilters}
-                    className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
-                    title="Reset Filters"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{t('reset', 'Reset')}</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleExportStockCSV}
-                  className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                >
-                  <Download className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{t('exportCsv', 'Export CSV')}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIsStockColumnsModalOpen(true)}
-                  className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                >
-                  <Columns className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{t('columns', 'Columns')}</span>
-                </button>
-              </div>
           </div>
 
           {/* 2. Warehouse Stock Table Card (Desktop >= lg) */}
@@ -3718,26 +3800,27 @@ export default function AdminDashboard() {
           </div>
 
           {/* Mobile & Tablet Stock Cards (< lg) */}
-          <div className="lg:hidden space-y-3">
+          <div className="lg:hidden grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {paginatedStockDevices.length > 0 ? (
               paginatedStockDevices.map((d) => (
                 <div 
                   key={d.id || d.device_sn}
-                  className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3 shadow-2xs"
+                  className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3 shadow-2xs hover:shadow-sm transition"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center shrink-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center shrink-0">
                         <Smartphone className="w-4 h-4" />
                       </div>
-                      <div>
-                        <span className="font-mono font-bold text-xs text-slate-900 dark:text-white block">
+                      <div className="min-w-0">
+                        <span className="font-mono font-bold text-xs text-slate-900 dark:text-white block truncate">
                           {d.device_sn || d.device_id}
                         </span>
+                        <span className="text-[10px] text-slate-400 font-mono">ID: #{d.id}</span>
                       </div>
                     </div>
 
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold shrink-0 ${
                       (d.device_type === 'Display Soundbox' || String(d.device_type || '').toLowerCase().includes('display'))
                         ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
                         : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
@@ -3755,14 +3838,16 @@ export default function AdminDashboard() {
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800">
-                    <span>Reg: {d.created_at ? new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Aug 30, 2026'}</span>
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      Reg: {d.created_at ? new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Aug 30'}
+                    </span>
                     
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => openSellStockModal(d)}
-                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs touch-manipulation"
+                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs touch-manipulation"
                       >
                         <ShoppingBag className="w-3.5 h-3.5" />
                         <span>{t('sellDevice', 'Sell')}</span>
@@ -3770,17 +3855,25 @@ export default function AdminDashboard() {
                       <button
                         type="button"
                         onClick={() => openEditDeviceModal(d)}
-                        className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 active:bg-slate-300 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 touch-manipulation"
+                        className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 active:scale-95 text-slate-700 dark:text-slate-200 rounded-xl transition cursor-pointer touch-manipulation"
+                        title={t('edit', 'Edit')}
                       >
-                        <Edit className="w-3 h-3 text-slate-400" />
-                        <span>{t('edit', 'Edit')}</span>
+                        <Edit className="w-3.5 h-3.5 text-slate-400" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openDeleteDeviceModal(d)}
+                        className="p-2 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 active:scale-95 text-rose-600 dark:text-rose-400 rounded-xl transition cursor-pointer touch-manipulation"
+                        title={t('delete', 'Delete')}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="text-center py-10 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
+              <div className="col-span-full text-center py-10 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
                 No warehouse stock devices match the specified filters.
               </div>
             )}
