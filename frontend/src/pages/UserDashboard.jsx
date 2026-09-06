@@ -424,58 +424,133 @@ export default function UserDashboard() {
   const [editVillageId, setEditVillageId] = useState('');
   const [editStreetOrLandmark, setEditStreetOrLandmark] = useState('');
 
-  // Device Link Form State (New)
-  const [deviceSn, setDeviceSn] = useState('');
-  const [deviceType, setDeviceType] = useState('Display Soundbox');
-  const [paymentQr, setPaymentQr] = useState('');
-  const [telegramChatId, setTelegramChatId] = useState('');
+  // Device Link Form State (Multi-Device & Multi-Telegram Support)
+  const [devicesToLink, setDevicesToLink] = useState([
+    { id: 'dev-1', deviceSn: '', deviceType: 'Display Soundbox', paymentQr: '' }
+  ]);
+  const [telegramChatIds, setTelegramChatIds] = useState(['']);
   const [targetStoreIdForNewDevice, setTargetStoreIdForNewDevice] = useState('');
   const [savingDevice, setSavingDevice] = useState(false);
-  const [isLookupLoading, setIsLookupLoading] = useState(false);
+  const [isLookupLoadingId, setIsLookupLoadingId] = useState(null);
   
-  // Field-specific Camera QR Scanner state for Link Modal ('sn' | 'qr' | 'telegram')
+  // Field-specific Camera QR Scanner state for Link Modal
+  // target: { type: 'sn' | 'qr' | 'telegram', deviceId?: string, telegramIdx?: number }
   const [activeCameraField, setActiveCameraField] = useState(null);
-  const [scanFeedback, setScanFeedback] = useState({ field: '', message: '', isError: false });
+  const [scanFeedback, setScanFeedback] = useState({ key: '', message: '', isError: false });
 
   // Device Edit Form State
   const [editDeviceSn, setEditDeviceSn] = useState('');
   const [editDeviceType, setEditDeviceType] = useState('Display Soundbox');
   const [editPaymentQr, setEditPaymentQr] = useState('');
   const [editTelegramChatId, setEditTelegramChatId] = useState('');
+  const [editTelegramList, setEditTelegramList] = useState(['']);
   const [editDeviceModel, setEditDeviceModel] = useState('Y6B');
   const [editDeviceMerchantId, setEditDeviceMerchantId] = useState('');
   const [editActiveCameraField, setEditActiveCameraField] = useState(null);
   const [editScanFeedback, setEditScanFeedback] = useState({ field: '', message: '', isError: false });
 
-  // Refs for hidden file inputs
-  const snFileInputRef = useRef(null);
-  const paymentQrFileInputRef = useRef(null);
-  const telegramFileInputRef = useRef(null);
+  // Refs for hidden file inputs in Edit Modal
   const editSnFileInputRef = useRef(null);
   const editPaymentQrFileInputRef = useRef(null);
   const editTelegramFileInputRef = useRef(null);
 
+  // Helper to open link modal cleanly
+  const handleOpenLinkModal = (storeId = null) => {
+    setTargetStoreIdForNewDevice(storeId || activeStore?.id || '');
+    setDevicesToLink([
+      { id: `dev-${Date.now()}`, deviceSn: '', deviceType: 'Display Soundbox', paymentQr: '' }
+    ]);
+    setTelegramChatIds(['']);
+    setActiveCameraField(null);
+    setScanFeedback({ key: '', message: '', isError: false });
+    setIsDeviceModalOpen(true);
+  };
+
+  // Dynamic Image File QR Decoder handler for Link Modal
+  const handleScanFile = (e, type, deviceId = null, telegramIdx = null) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    const feedbackKey = type === 'telegram' ? `telegram-${telegramIdx}` : `${type}-${deviceId}`;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+        
+        if (code && code.data) {
+          const clean = code.data.trim();
+          if (type === 'sn') {
+            setDevicesToLink(prev => prev.map(d => d.id === deviceId ? { ...d, deviceSn: clean } : d));
+            setScanFeedback({ key: feedbackKey, message: `Scanned SN: ${clean}`, isError: false });
+            lookupDeviceType(clean, deviceId);
+          } else if (type === 'qr') {
+            setDevicesToLink(prev => prev.map(d => d.id === deviceId ? { ...d, paymentQr: clean } : d));
+            setScanFeedback({ key: feedbackKey, message: `Scanned Payment QR`, isError: false });
+          } else if (type === 'telegram') {
+            setTelegramChatIds(prev => prev.map((t, idx) => idx === telegramIdx ? clean : t));
+            setScanFeedback({ key: feedbackKey, message: `Scanned Code: ${clean}`, isError: false });
+          }
+        } else {
+          setScanFeedback({ key: feedbackKey, message: 'Could not detect QR code in selected image.', isError: true });
+        }
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const triggerScanFileUpload = (type, deviceId = null, telegramIdx = null) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => handleScanFile(e, type, deviceId, telegramIdx);
+    input.click();
+  };
+
   // Auto-detect whether device has LCD screen by SN lookup
-  const lookupDeviceType = async (sn) => {
+  const lookupDeviceType = async (sn, deviceId) => {
     if (!sn || !sn.trim()) return;
     try {
-      setIsLookupLoading(true);
+      setIsLookupLoadingId(deviceId);
       const res = await api.get(`/api/devices/lookup/${encodeURIComponent(sn.trim())}`);
       if (res.data && res.data.found) {
-        if (res.data.has_lcd_screen !== undefined) {
-          setDeviceType(res.data.has_lcd_screen ? 'Display Soundbox' : 'Standard Soundbox');
-        }
-        if (res.data.qr_code && !paymentQr) {
-          setPaymentQr(res.data.qr_code);
-        }
-        if (res.data.telegram_chat_id && !telegramChatId) {
-          setTelegramChatId(res.data.telegram_chat_id);
+        setDevicesToLink(prev => prev.map(d => {
+          if (d.id === deviceId) {
+            return {
+              ...d,
+              deviceType: res.data.has_lcd_screen !== undefined 
+                ? (res.data.has_lcd_screen ? 'Display Soundbox' : 'Standard Soundbox') 
+                : d.deviceType,
+              paymentQr: (!d.paymentQr && res.data.qr_code) ? res.data.qr_code : d.paymentQr
+            };
+          }
+          return d;
+        }));
+        if (res.data.telegram_chat_id) {
+          setTelegramChatIds(prev => {
+            const trimmed = res.data.telegram_chat_id.trim();
+            if (!prev.some(t => t.trim() === trimmed)) {
+              if (prev.length === 1 && !prev[0].trim()) {
+                return [trimmed];
+              }
+              return [...prev, trimmed];
+            }
+            return prev;
+          });
         }
       }
     } catch (e) {
       console.warn('Device lookup failed', e);
     } finally {
-      setIsLookupLoading(false);
+      setIsLookupLoadingId(null);
     }
   };
 
@@ -756,52 +831,82 @@ export default function UserDashboard() {
     }
   };
 
-  // Handle Register Device
+  // Handle Register Device (Batch / Multi-Device & Multi-Telegram)
   const handleRegisterDevice = async (e) => {
     e.preventDefault();
     const targetStore = targetStoreIdForNewDevice ? stores.find(s => String(s.id) === String(targetStoreIdForNewDevice)) : activeStore;
-    if (!targetStore) return;
-    if (!deviceSn.trim()) {
-      setError('Please enter device Serial Number (SN).');
+    if (!targetStore) {
+      setError('Please select a store to link devices.');
       return;
     }
 
-    const hasLcd = deviceType === 'Display Soundbox' || String(deviceType).includes('Display');
-    if (hasLcd && !paymentQr.trim()) {
-      setError('Please scan or enter the Merchant Payment QR Code for the LCD screen.');
+    // Validate all devices in devicesToLink
+    const validDevices = [];
+    for (let i = 0; i < devicesToLink.length; i++) {
+      const d = devicesToLink[i];
+      const sn = (d.deviceSn || '').trim();
+      if (!sn) {
+        setError(`Please enter device Serial Number (SN) for Soundbox #${i + 1}.`);
+        return;
+      }
+      const hasLcd = d.deviceType === 'Display Soundbox' || String(d.deviceType).includes('Display');
+      if (hasLcd && !(d.paymentQr || '').trim()) {
+        setError(`Please scan or enter the Merchant Payment QR Code for Soundbox #${i + 1} (Display LCD).`);
+        return;
+      }
+      validDevices.push({
+        device_sn: sn,
+        device_type: hasLcd ? 'Display Soundbox' : 'Standard Soundbox',
+        device_model: hasLcd ? 'Display Soundbox' : 'Standard Soundbox',
+        qr_code: hasLcd ? d.paymentQr.trim() : null
+      });
+    }
+
+    if (validDevices.length === 0) {
+      setError('Please add at least one Soundbox device.');
       return;
     }
+
+    // Consolidated Telegram Chat IDs
+    const combinedChatIds = telegramChatIds
+      .map(id => (id || '').trim())
+      .filter(Boolean)
+      .join(', ');
 
     setSavingDevice(true);
     setError('');
 
     try {
-      await api.post('/api/devices/register', {
+      const res = await api.post('/api/devices/register-batch', {
         merchant_id: targetStore.id,
-        device_sn: deviceSn.trim(),
-        telegram_chat_id: telegramChatId.trim() || null,
-        device_type: hasLcd ? 'Display Soundbox' : 'Standard Soundbox',
-        device_model: hasLcd ? 'Display Soundbox' : 'Standard Soundbox',
-        qr_code: hasLcd ? (paymentQr.trim() || null) : null
+        devices: validDevices,
+        telegram_chat_id: combinedChatIds || null
       });
-      const dvcMsg = `Soundbox '${deviceSn.trim()}' linked to '${targetStore.name}'!`;
+
+      const count = res.data?.count || validDevices.length;
+      const storeDisplayName = targetStore.merchant_name || targetStore.name || 'Store';
+      const successMsg = count === 1 
+        ? `Soundbox '${validDevices[0].device_sn}' linked to '${storeDisplayName}'!`
+        : `Successfully linked ${count} Soundboxes to '${storeDisplayName}'!`;
+
       showToast({
         type: 'success',
-        title: 'Soundbox Linked',
-        message: dvcMsg,
+        title: count === 1 ? 'Soundbox Linked' : 'Soundboxes Linked',
+        message: successMsg,
         duration: 5000
       });
-      setDeviceSn('');
-      setPaymentQr('');
-      setDeviceType('Display Soundbox');
-      setTelegramChatId('');
+
+      setDevicesToLink([
+        { id: `dev-${Date.now()}`, deviceSn: '', deviceType: 'Display Soundbox', paymentQr: '' }
+      ]);
+      setTelegramChatIds(['']);
       setTargetStoreIdForNewDevice('');
       setActiveCameraField(null);
-      setScanFeedback({ field: '', message: '', isError: false });
+      setScanFeedback({ key: '', message: '', isError: false });
       setIsDeviceModalOpen(false);
       await fetchStoresData();
     } catch (err) {
-      const msg = getErrorMessage(err, 'Failed to link device.');
+      const msg = getErrorMessage(err, 'Failed to link devices.');
       setError(msg);
       showToast({
         type: 'error',
@@ -818,7 +923,10 @@ export default function UserDashboard() {
   const handleOpenEditDevice = (device) => {
     setSelectedDevice(device);
     setEditDeviceSn(device.device_sn || '');
-    setEditTelegramChatId(device.telegram_chat_id || '');
+    const rawTg = device.telegram_chat_id || '';
+    const tgArr = rawTg ? rawTg.split(',').map(s => s.trim()).filter(Boolean) : [''];
+    setEditTelegramList(tgArr.length > 0 ? tgArr : ['']);
+    setEditTelegramChatId(rawTg);
     setEditDeviceModel(device.device_model || 'Y6B');
     const isDisplay = device.device_type === 'Display Soundbox' || 
                       String(device.device_model || '').includes('Display') || 
@@ -847,13 +955,15 @@ export default function UserDashboard() {
       return;
     }
 
+    const combinedEditTg = editTelegramList.map(s => s.trim()).filter(Boolean).join(', ');
+
     setSavingDevice(true);
     setError('');
 
     try {
       await api.put(`/api/devices/${selectedDevice.id}`, {
         device_sn: editDeviceSn.trim(),
-        telegram_chat_id: editTelegramChatId.trim() || null,
+        telegram_chat_id: combinedEditTg || null,
         device_type: editHasLcd ? 'Display Soundbox' : 'Standard Soundbox',
         device_model: editDeviceModel.trim() || (editHasLcd ? 'Display Soundbox' : 'Standard Soundbox'),
         qr_code: editHasLcd ? (editPaymentQr.trim() || null) : null,
@@ -1029,45 +1139,7 @@ export default function UserDashboard() {
     showToast({ type: 'success', title: 'Export Complete', message: 'Transactions CSV downloaded successfully.' });
   };
 
-  // Image File QR Decoder handler for Link Modal
-  const handleScanFile = (e, field) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height);
-        
-        if (code && code.data) {
-          const clean = code.data.trim();
-          if (field === 'sn') {
-            setDeviceSn(clean);
-            setScanFeedback({ field: 'sn', message: `Scanned SN: ${clean}`, isError: false });
-            lookupDeviceType(clean);
-          } else if (field === 'qr') {
-            setPaymentQr(clean);
-            setScanFeedback({ field: 'qr', message: `Scanned Payment QR`, isError: false });
-          } else {
-            setTelegramChatId(clean);
-            setScanFeedback({ field: 'telegram', message: `Scanned Code: ${clean}`, isError: false });
-          }
-        } else {
-          setScanFeedback({ field, message: 'Could not detect QR code in selected image.', isError: true });
-        }
-      };
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  };
 
   // Image File QR Decoder handler for Edit Modal
   const handleEditScanFile = (e, field) => {
@@ -1715,12 +1787,7 @@ export default function UserDashboard() {
                                     {!r.hasDevice && (
                                       <button
                                         type="button"
-                                        onClick={() => {
-                                          setTargetStoreIdForNewDevice(r.storeId);
-                                          setDeviceSn('');
-                                          setTelegramChatId('');
-                                          setIsDeviceModalOpen(true);
-                                        }}
+                                        onClick={() => handleOpenLinkModal(r.storeId)}
                                         className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
                                         title={isKhmer ? 'ភ្ជាប់ឧបករណ៍ Soundbox' : 'Link'}
                                       >
@@ -1875,12 +1942,7 @@ export default function UserDashboard() {
                             ) : (
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setTargetStoreIdForNewDevice(r.storeId);
-                                  setDeviceSn('');
-                                  setTelegramChatId('');
-                                  setIsDeviceModalOpen(true);
-                                }}
+                                onClick={() => handleOpenLinkModal(r.storeId)}
                                 className="py-2 px-3 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
                               >
                                 <Plus className="w-3.5 h-3.5" />
@@ -2469,31 +2531,31 @@ export default function UserDashboard() {
           setActiveCameraField(null);
           setIsDeviceModalOpen(false);
         }} 
-        title="Link Soundbox Speaker to Store"
-        maxWidth="max-w-md"
+        title={isKhmer ? "ភ្ជាប់ឧបករណ៍ Soundbox ទៅកាន់ហាង" : "Link Soundbox Speakers to Store"}
+        maxWidth="max-w-xl"
       >
         <div className="space-y-4">
           {activeCameraField && (
             <FieldQRScanner 
               targetName={
-                activeCameraField === 'sn' 
-                  ? t('deviceSn', 'Device Serial Number (SN)') 
-                  : activeCameraField === 'qr' 
-                  ? t('paymentQrCode', 'Merchant Payment QR Code (LCD Screen)')
-                  : t('telegramChatId', 'Telegram Verification Code (Chat ID)')
+                activeCameraField.type === 'sn' 
+                  ? `${t('deviceSn', 'Device Serial Number (SN)')} (#${devicesToLink.findIndex(d => d.id === activeCameraField.id) + 1})`
+                  : activeCameraField.type === 'qr' 
+                  ? `${t('paymentQrCode', 'Merchant Payment QR Code')} (#${devicesToLink.findIndex(d => d.id === activeCameraField.id) + 1})`
+                  : `${t('telegramChatId', 'Telegram Chat ID / Bot')} (#${(activeCameraField.telegramIdx || 0) + 1})`
               }
               onScanSuccess={(decodedText) => {
                 const text = decodedText.trim();
-                if (activeCameraField === 'sn') {
-                  setDeviceSn(text);
-                  setScanFeedback({ field: 'sn', message: `Scanned SN: ${text}`, isError: false });
-                  lookupDeviceType(text);
-                } else if (activeCameraField === 'qr') {
-                  setPaymentQr(text);
-                  setScanFeedback({ field: 'qr', message: `Scanned Payment QR`, isError: false });
-                } else {
-                  setTelegramChatId(text);
-                  setScanFeedback({ field: 'telegram', message: `Scanned Code: ${text}`, isError: false });
+                if (activeCameraField.type === 'sn') {
+                  setDevicesToLink(prev => prev.map(d => d.id === activeCameraField.id ? { ...d, deviceSn: text } : d));
+                  setScanFeedback({ key: `sn-${activeCameraField.id}`, message: `Scanned SN: ${text}`, isError: false });
+                  lookupDeviceType(text, activeCameraField.id);
+                } else if (activeCameraField.type === 'qr') {
+                  setDevicesToLink(prev => prev.map(d => d.id === activeCameraField.id ? { ...d, paymentQr: text } : d));
+                  setScanFeedback({ key: `qr-${activeCameraField.id}`, message: `Scanned Payment QR`, isError: false });
+                } else if (activeCameraField.type === 'telegram') {
+                  setTelegramChatIds(prev => prev.map((t, idx) => idx === activeCameraField.telegramIdx ? text : t));
+                  setScanFeedback({ key: `telegram-${activeCameraField.telegramIdx}`, message: `Scanned Code: ${text}`, isError: false });
                 }
                 setActiveCameraField(null);
               }}
@@ -2520,240 +2582,353 @@ export default function UserDashboard() {
               </div>
             )}
 
-            {/* Soundbox Hardware Model / LCD Screen Option */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300">
-                  {t('deviceType', 'Soundbox Type')}
-                </label>
-                {isLookupLoading && (
-                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    Auto-detecting...
-                  </span>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDeviceType('Display Soundbox')}
-                  className={`p-2.5 rounded-xl border text-left transition flex flex-col gap-1 cursor-pointer ${
-                    deviceType === 'Display Soundbox'
-                      ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-500'
-                      : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:border-slate-300'
-                  }`}
-                >
-                  <span className="text-xs font-bold flex items-center gap-1.5">
-                    🖥️ {t('hasLcdScreen', 'Display (LCD Screen)')}
-                  </span>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                    {t('hasLcdScreenDesc', 'Dynamic QR on LCD screen for customer payment')}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setDeviceType('Standard Soundbox')}
-                  className={`p-2.5 rounded-xl border text-left transition flex flex-col gap-1 cursor-pointer ${
-                    deviceType !== 'Display Soundbox'
-                      ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-500'
-                      : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:border-slate-300'
-                  }`}
-                >
-                  <span className="text-xs font-bold flex items-center gap-1.5">
-                    🏷️ {t('noLcdScreen', 'Standard (No Screen)')}
-                  </span>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                    {t('noLcdScreenDesc', 'Voice announcements only, printed QR stand')}
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            {/* Field 1: Device SN */}
-            <div>
-              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
-                {t('deviceSn', 'Device Serial Number (SN)')} <span className="text-rose-500">*</span>
-              </label>
-              
-              <div className="relative">
-                <input
-                  type="text"
-                  value={deviceSn}
-                  onChange={(e) => {
-                    setDeviceSn(e.target.value);
-                    if (e.target.value.trim().length >= 4) {
-                      lookupDeviceType(e.target.value);
-                    }
-                  }}
-                  onBlur={() => lookupDeviceType(deviceSn)}
-                  placeholder={t('deviceSnPlaceholder', 'e.g. Y6B2026081501')}
-                  className="w-full pl-3 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setActiveCameraField(activeCameraField === 'sn' ? null : 'sn')}
-                  className={`absolute inset-y-0 right-0 pr-3 flex items-center transition cursor-pointer ${
-                    activeCameraField === 'sn' ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-600'
-                  }`}
-                  title={t('scanWithCamera', 'Scan with Camera')}
-                >
-                  <QrCode className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="mt-1.5 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => snFileInputRef.current?.click()}
-                  className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1 py-1 transition cursor-pointer"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  {t('uploadQrImage', 'Upload Soundbox QR Image')}
-                </button>
-                <input
-                  ref={snFileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleScanFile(e, 'sn')}
-                  className="hidden"
-                />
-              </div>
-
-              {scanFeedback.field === 'sn' && (
-                <div className={`mt-1.5 text-xs flex items-center gap-1 ${
-                  scanFeedback.isError ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400 font-medium'
-                }`}>
-                  {scanFeedback.isError ? <AlertCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                  <span>{scanFeedback.message}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Field 2 (Conditional): Payment QR Code for Devices with LCD Screen */}
-            {deviceType === 'Display Soundbox' && (
-              <div className="p-3 bg-emerald-50/60 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-900/60 space-y-2 transition-all">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold uppercase text-emerald-900 dark:text-emerald-200">
-                    {t('paymentQrCode', 'Merchant Payment QR Code (LCD Screen)')} <span className="text-rose-500">*</span>
+            {/* Soundbox Devices List Section */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between pb-1">
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-800 dark:text-slate-200 tracking-wider">
+                    {t('soundboxDevicesCount', 'Soundbox Devices')} ({devicesToLink.length})
                   </label>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-300">
-                    🖥️ LCD QR
-                  </span>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {isKhmer ? 'កំណត់លេខកូដ និងប្រភេទឧបករណ៍ដែលត្រូវភ្ជាប់' : 'Configure serial numbers & hardware types to link'}
+                  </p>
                 </div>
-
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={paymentQr}
-                    onChange={(e) => setPaymentQr(e.target.value)}
-                    placeholder={t('paymentQrPlaceholder', 'Paste KHQR/Bakong payment string or URL...')}
-                    className="w-full pl-3 pr-10 py-2.5 bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setActiveCameraField(activeCameraField === 'qr' ? null : 'qr')}
-                    className={`absolute inset-y-0 right-0 pr-3 flex items-center transition cursor-pointer ${
-                      activeCameraField === 'qr' ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-600'
-                    }`}
-                    title={t('scanPaymentQrCamera', 'Scan Payment QR via Camera')}
-                  >
-                    <QrCode className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <p className="text-[11px] text-emerald-700 dark:text-emerald-400">
-                  {t('paymentQrHint', '💡 For LCD Screen: Scan or upload merchant payment QR (KHQR/Bakong) to display on the soundbox screen.')}
-                </p>
-
-                <div className="flex items-center justify-between pt-0.5">
-                  <button
-                    type="button"
-                    onClick={() => paymentQrFileInputRef.current?.click()}
-                    className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1 py-1 transition cursor-pointer"
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    {t('uploadPaymentQr', 'Upload Payment QR Image')}
-                  </button>
-                  <input
-                    ref={paymentQrFileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleScanFile(e, 'qr')}
-                    className="hidden"
-                  />
-                </div>
-
-                {scanFeedback.field === 'qr' && (
-                  <div className={`mt-1 text-xs flex items-center gap-1 ${
-                    scanFeedback.isError ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400 font-medium'
-                  }`}>
-                    {scanFeedback.isError ? <AlertCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                    <span>{scanFeedback.message}</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Field 3: Telegram Verification Code */}
-            <div>
-              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
-                {t('telegramChatId', 'Telegram Verification Code (Chat ID)')}
-              </label>
-              
-              <div className="relative">
-                <input
-                  type="text"
-                  value={telegramChatId}
-                  onChange={(e) => setTelegramChatId(e.target.value)}
-                  placeholder="e.g. -5394848588 or -5394848588, -5467765507"
-                  className="w-full pl-3 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
                 <button
                   type="button"
-                  onClick={() => setActiveCameraField(activeCameraField === 'telegram' ? null : 'telegram')}
-                  className={`absolute inset-y-0 right-0 pr-3 flex items-center transition cursor-pointer ${
-                    activeCameraField === 'telegram' ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-600'
-                  }`}
-                  title={t('scanWithCamera', 'Scan with Camera')}
+                  onClick={() => {
+                    setDevicesToLink(prev => [
+                      ...prev,
+                      { id: `dev-${Date.now()}`, deviceSn: '', deviceType: 'Display Soundbox', paymentQr: '' }
+                    ]);
+                  }}
+                  className="px-3 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 border border-emerald-300/80 dark:border-emerald-700/80 rounded-xl transition inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
                 >
-                  <QrCode className="w-5 h-5" />
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{t('addAnotherDevice', '+ Add Another Soundbox')}</span>
                 </button>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                💡 {t('multiGroupHint', 'Tip: You can add multiple Telegram codes separated by commas (e.g. for ABA + Wing groups).')}
-              </p>
 
-              <div className="mt-1.5 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => telegramFileInputRef.current?.click()}
-                  className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1 py-1 transition cursor-pointer"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  {t('uploadQrImage', 'Upload Telegram QR Image')}
-                </button>
-                <input
-                  ref={telegramFileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleScanFile(e, 'telegram')}
-                  className="hidden"
-                />
+              <div className="space-y-3 max-h-[44vh] overflow-y-auto pr-1">
+                {devicesToLink.map((item, index) => {
+                  const isLcd = item.deviceType === 'Display Soundbox';
+                  const snFeedback = scanFeedback.key === `sn-${item.id}` ? scanFeedback : null;
+                  const qrFeedback = scanFeedback.key === `qr-${item.id}` ? scanFeedback : null;
+                  const isLookingUp = isLookupLoadingId === item.id;
+
+                  return (
+                    <div 
+                      key={item.id} 
+                      className="p-3.5 bg-slate-50/80 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3 transition-all"
+                    >
+                      {/* Card Header */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center text-xs font-bold font-mono">
+                            #{index + 1}
+                          </div>
+                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                            {t('soundboxItem', 'Soundbox')} #{index + 1}
+                          </span>
+                          {index === 0 && (
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                              Primary
+                            </span>
+                          )}
+                        </div>
+
+                        {devicesToLink.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setDevicesToLink(prev => prev.filter(d => d.id !== item.id))}
+                            className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50 p-1.5 rounded-lg transition cursor-pointer"
+                            title={t('removeSoundbox', 'Remove Soundbox')}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Soundbox Type Selector */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="block text-[11px] font-semibold uppercase text-slate-600 dark:text-slate-400">
+                            {t('deviceType', 'Soundbox Type')}
+                          </label>
+                          {isLookingUp && (
+                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              Detecting...
+                            </span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setDevicesToLink(prev => prev.map(d => d.id === item.id ? { ...d, deviceType: 'Display Soundbox' } : d))}
+                            className={`p-2 rounded-xl border text-left transition flex flex-col gap-0.5 cursor-pointer ${
+                              isLcd
+                                ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-500'
+                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                            }`}
+                          >
+                            <span className="text-xs font-bold flex items-center gap-1.5">
+                              🖥️ {t('hasLcdScreen', 'Display (LCD)')}
+                            </span>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                              Dynamic screen QR
+                            </span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setDevicesToLink(prev => prev.map(d => d.id === item.id ? { ...d, deviceType: 'Standard Soundbox' } : d))}
+                            className={`p-2 rounded-xl border text-left transition flex flex-col gap-0.5 cursor-pointer ${
+                              !isLcd
+                                ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-500'
+                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                            }`}
+                          >
+                            <span className="text-xs font-bold flex items-center gap-1.5">
+                              🏷️ {t('noLcdScreen', 'Standard')}
+                            </span>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                              Voice only, printed QR
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Serial Number (SN) Input */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[11px] font-semibold uppercase text-slate-700 dark:text-slate-300">
+                            {t('deviceSn', 'Device Serial Number (SN)')} <span className="text-rose-500">*</span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => triggerScanFileUpload('sn', item.id)}
+                            className="text-[11px] text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium inline-flex items-center gap-1 transition cursor-pointer"
+                          >
+                            <Upload className="w-3 h-3" />
+                            <span>{t('uploadQrImage', 'Upload QR')}</span>
+                          </button>
+                        </div>
+
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={item.deviceSn}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setDevicesToLink(prev => prev.map(d => d.id === item.id ? { ...d, deviceSn: val } : d));
+                              if (val.trim().length >= 4) {
+                                lookupDeviceType(val, item.id);
+                              }
+                            }}
+                            onBlur={() => lookupDeviceType(item.deviceSn, item.id)}
+                            placeholder={t('deviceSnPlaceholder', 'e.g. Y6B2026081501')}
+                            className="w-full pl-3 pr-10 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setActiveCameraField(
+                              activeCameraField?.type === 'sn' && activeCameraField?.id === item.id 
+                                ? null 
+                                : { type: 'sn', id: item.id }
+                            )}
+                            className={`absolute inset-y-0 right-0 pr-3 flex items-center transition cursor-pointer ${
+                              activeCameraField?.type === 'sn' && activeCameraField?.id === item.id 
+                                ? 'text-emerald-600' 
+                                : 'text-slate-400 hover:text-emerald-600'
+                            }`}
+                            title={t('scanWithCamera', 'Scan with Camera')}
+                          >
+                            <QrCode className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {snFeedback && (
+                          <div className={`mt-1 text-[11px] flex items-center gap-1 ${
+                            snFeedback.isError ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400 font-medium'
+                          }`}>
+                            {snFeedback.isError ? <AlertCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
+                            <span>{snFeedback.message}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Payment QR Code (LCD Display only) */}
+                      {isLcd && (
+                        <div className="p-2.5 bg-emerald-50/50 dark:bg-emerald-950/30 rounded-xl border border-emerald-200/80 dark:border-emerald-900/60 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <label className="block text-[11px] font-bold uppercase text-emerald-900 dark:text-emerald-200">
+                              {t('paymentQrCode', 'Merchant Payment QR Code (LCD Screen)')} <span className="text-rose-500">*</span>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => triggerScanFileUpload('qr', item.id)}
+                              className="text-[11px] text-emerald-700 hover:text-emerald-800 dark:text-emerald-300 font-medium inline-flex items-center gap-1 transition cursor-pointer"
+                            >
+                              <Upload className="w-3 h-3" />
+                              <span>{t('uploadPaymentQr', 'Upload QR')}</span>
+                            </button>
+                          </div>
+
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={item.paymentQr}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setDevicesToLink(prev => prev.map(d => d.id === item.id ? { ...d, paymentQr: val } : d));
+                              }}
+                              placeholder={t('paymentQrPlaceholder', 'Paste KHQR/Bakong payment string or URL...')}
+                              className="w-full pl-3 pr-10 py-2 bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              required
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setActiveCameraField(
+                                activeCameraField?.type === 'qr' && activeCameraField?.id === item.id 
+                                  ? null 
+                                  : { type: 'qr', id: item.id }
+                              )}
+                              className={`absolute inset-y-0 right-0 pr-3 flex items-center transition cursor-pointer ${
+                                activeCameraField?.type === 'qr' && activeCameraField?.id === item.id 
+                                  ? 'text-emerald-600' 
+                                  : 'text-slate-400 hover:text-emerald-600'
+                              }`}
+                              title={t('scanPaymentQrCamera', 'Scan Payment QR via Camera')}
+                            >
+                              <QrCode className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          {qrFeedback && (
+                            <div className={`mt-1 text-[11px] flex items-center gap-1 ${
+                              qrFeedback.isError ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400 font-medium'
+                            }`}>
+                              {qrFeedback.isError ? <AlertCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
+                              <span>{qrFeedback.message}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-
-              {scanFeedback.field === 'telegram' && (
-                <div className={`mt-1.5 text-xs flex items-center gap-1 ${
-                  scanFeedback.isError ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400 font-medium'
-                }`}>
-                  {scanFeedback.isError ? <AlertCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                  <span>{scanFeedback.message}</span>
-                </div>
-              )}
             </div>
 
+            {/* Telegram Notifications Section */}
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-800 dark:text-slate-200 tracking-wider">
+                    {t('telegramBotsCount', 'Telegram Notifications (Bots / Groups)')}
+                  </label>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {isKhmer ? 'ភ្ជាប់ Bot ឬ Group ដើម្បីទទួលដំណឹងការទូទាត់ប្រាក់' : 'Link Telegram bot or group chat IDs for live audio & payment alerts'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTelegramChatIds(prev => [...prev, ''])}
+                  className="px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 border border-indigo-300/80 dark:border-indigo-700/80 rounded-xl transition inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{t('addTelegramBot', '+ Add Telegram Bot / Group')}</span>
+                </button>
+              </div>
+
+              <div className="space-y-2 max-h-[25vh] overflow-y-auto pr-1">
+                {telegramChatIds.map((chatId, tgIdx) => {
+                  const tgFeedback = scanFeedback.key === `telegram-${tgIdx}` ? scanFeedback : null;
+                  return (
+                    <div key={tgIdx} className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 flex items-center justify-center text-xs font-bold font-mono shrink-0">
+                          #{tgIdx + 1}
+                        </div>
+
+                        <div className="relative flex-1">
+                          <input
+                            type="text"
+                            value={chatId}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setTelegramChatIds(prev => prev.map((t, i) => i === tgIdx ? val : t));
+                            }}
+                            placeholder="e.g. -5394848588 (ABA Group Chat ID)"
+                            className="w-full pl-3 pr-10 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setActiveCameraField(
+                              activeCameraField?.type === 'telegram' && activeCameraField?.telegramIdx === tgIdx 
+                                ? null 
+                                : { type: 'telegram', telegramIdx: tgIdx }
+                            )}
+                            className={`absolute inset-y-0 right-0 pr-3 flex items-center transition cursor-pointer ${
+                              activeCameraField?.type === 'telegram' && activeCameraField?.telegramIdx === tgIdx 
+                                ? 'text-indigo-600' 
+                                : 'text-slate-400 hover:text-indigo-600'
+                            }`}
+                            title={t('scanWithCamera', 'Scan with Camera')}
+                          >
+                            <QrCode className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => triggerScanFileUpload('telegram', null, tgIdx)}
+                          className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-xl border border-slate-200 dark:border-slate-700 transition cursor-pointer shrink-0"
+                          title={t('uploadQrImage', 'Upload Telegram QR Image')}
+                        >
+                          <Upload className="w-4 h-4" />
+                        </button>
+
+                        {telegramChatIds.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setTelegramChatIds(prev => prev.filter((_, i) => i !== tgIdx))}
+                            className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-xl border border-slate-200 dark:border-slate-700 transition cursor-pointer shrink-0"
+                            title={t('removeTelegram', 'Remove Telegram Group')}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+
+                      {tgFeedback && (
+                        <div className={`text-[11px] pl-8 flex items-center gap-1 ${
+                          tgFeedback.isError ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400 font-medium'
+                        }`}>
+                          {tgFeedback.isError ? <AlertCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
+                          <span>{tgFeedback.message}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="p-2.5 bg-indigo-50/60 dark:bg-indigo-950/30 rounded-xl border border-indigo-200/60 dark:border-indigo-900/40 text-[11px] text-indigo-900 dark:text-indigo-200 flex items-start gap-2">
+                <span className="text-sm">💡</span>
+                <div>
+                  <span className="font-semibold">{t('howToGetChatId', 'How to get Telegram Verification Code (Chat ID)?')}</span>
+                  <p className="text-indigo-700/80 dark:text-indigo-300/80 mt-0.5">
+                    {isKhmer 
+                      ? 'បន្ថែម Soundbox Bot ចូលទៅក្នុង Telegram Group (ដូចជាគ្រុប ABA ឬ Wing) ដើម្បីទទួលសំឡេង និងវិក្កយបត្រស្វ័យប្រវត្តិ។' 
+                      : 'Add your Soundbox Bot to your Telegram groups (e.g. ABA Bank group, Wing group) to receive real-time voice & payment notifications.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer Actions */}
             <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
               <button
                 type="button"
@@ -2768,9 +2943,23 @@ export default function UserDashboard() {
               <button
                 type="submit"
                 disabled={savingDevice}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-xs cursor-pointer"
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
               >
-                {savingDevice ? t('saving', 'Linking...') : t('linkSoundbox', 'Link Soundbox')}
+                {savingDevice ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>{t('saving', 'Linking...')}</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>
+                      {devicesToLink.length > 1 
+                        ? `${t('linkAllDevices', 'Link Soundbox Devices')} (${devicesToLink.length})` 
+                        : t('linkSoundbox', 'Link Soundbox')}
+                    </span>
+                  </>
+                )}
               </button>
             </div>
           </form>
@@ -2795,7 +2984,7 @@ export default function UserDashboard() {
                   ? t('deviceSn', 'Device Serial Number (SN)') 
                   : editActiveCameraField === 'qr' 
                   ? t('paymentQrCode', 'Merchant Payment QR Code (LCD Screen)')
-                  : t('telegramChatId', 'Telegram Chat ID (Code)')
+                  : `${t('telegramChatId', 'Telegram Chat ID (Code)')} (#${((typeof editActiveCameraField === 'object' ? editActiveCameraField.idx : 0) || 0) + 1})`
               }
               onScanSuccess={(decodedText) => {
                 const text = decodedText.trim();
@@ -2806,8 +2995,10 @@ export default function UserDashboard() {
                   setEditPaymentQr(text);
                   setEditScanFeedback({ field: 'qr', message: `Scanned Payment QR`, isError: false });
                 } else {
+                  const idx = (typeof editActiveCameraField === 'object' && editActiveCameraField.idx !== undefined) ? editActiveCameraField.idx : 0;
+                  setEditTelegramList(prev => prev.map((t, i) => i === idx ? text : t));
                   setEditTelegramChatId(text);
-                  setEditScanFeedback({ field: 'telegram', message: `Scanned Code: ${text}`, isError: false });
+                  setEditScanFeedback({ field: `telegram-${idx}`, message: `Scanned Code: ${text}`, isError: false });
                 }
                 setEditActiveCameraField(null);
               }}
@@ -2978,56 +3169,98 @@ export default function UserDashboard() {
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
-                {t('telegramChatId', 'Telegram Verification Code (Chat ID)')}
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={editTelegramChatId}
-                  onChange={(e) => setEditTelegramChatId(e.target.value)}
-                  placeholder="e.g. -5394848588 or -5394848588, -5467765507"
-                  className="w-full pl-3 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => setEditActiveCameraField(editActiveCameraField === 'telegram' ? null : 'telegram')}
-                  className={`absolute inset-y-0 right-0 pr-3 flex items-center transition ${
-                    editActiveCameraField === 'telegram' ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-600'
-                  }`}
-                  title={t('scanTelegramQrCamera', 'Scan Telegram QR via Camera')}
-                >
-                  <QrCode className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="mt-1.5 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => editTelegramFileInputRef.current?.click()}
-                  className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1 py-1 transition cursor-pointer"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  {t('uploadTelegramQr', 'Upload Telegram QR Image')}
-                </button>
-                <input
-                  ref={editTelegramFileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleEditScanFile(e, 'telegram')}
-                  className="hidden"
-                />
-              </div>
-
-              {editScanFeedback.field === 'telegram' && (
-                <div className={`mt-1.5 text-xs flex items-center gap-1 ${
-                  editScanFeedback.isError ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400 font-medium'
-                }`}>
-                  {editScanFeedback.isError ? <AlertCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                  <span>{editScanFeedback.message}</span>
+            {/* Telegram Notifications Section */}
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-800 dark:text-slate-200 tracking-wider">
+                    {t('telegramBotsCount', 'Telegram Notifications (Bots / Groups)')}
+                  </label>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {isKhmer ? 'ភ្ជាប់ Bot ឬ Group ដើម្បីទទួលដំណឹងការទូទាត់ប្រាក់' : 'Manage connected Telegram bot or group chat IDs'}
+                  </p>
                 </div>
-              )}
+                <button
+                  type="button"
+                  onClick={() => setEditTelegramList(prev => [...prev, ''])}
+                  className="px-2.5 py-1 text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 border border-indigo-300/80 dark:border-indigo-700/80 rounded-xl transition inline-flex items-center gap-1 cursor-pointer shadow-2xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{t('addTelegramBot', '+ Add Telegram Bot / Group')}</span>
+                </button>
+              </div>
+
+              <div className="space-y-2 max-h-[22vh] overflow-y-auto pr-1">
+                {editTelegramList.map((chatId, tgIdx) => {
+                  const isScanningThis = typeof editActiveCameraField === 'object' && editActiveCameraField?.type === 'telegram' && editActiveCameraField?.idx === tgIdx;
+                  const tgFeedback = editScanFeedback.field === `telegram-${tgIdx}` ? editScanFeedback : null;
+
+                  return (
+                    <div key={tgIdx} className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 flex items-center justify-center text-xs font-bold font-mono shrink-0">
+                          #{tgIdx + 1}
+                        </div>
+
+                        <div className="relative flex-1">
+                          <input
+                            type="text"
+                            value={chatId}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEditTelegramList(prev => prev.map((t, i) => i === tgIdx ? val : t));
+                            }}
+                            placeholder="e.g. -5394848588 (ABA Group Chat ID)"
+                            className="w-full pl-3 pr-10 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setEditActiveCameraField(isScanningThis ? null : { type: 'telegram', idx: tgIdx })}
+                            className={`absolute inset-y-0 right-0 pr-3 flex items-center transition cursor-pointer ${
+                              isScanningThis ? 'text-indigo-600' : 'text-slate-400 hover:text-indigo-600'
+                            }`}
+                            title={t('scanTelegramQrCamera', 'Scan Telegram QR via Camera')}
+                          >
+                            <QrCode className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {editTelegramList.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setEditTelegramList(prev => prev.filter((_, i) => i !== tgIdx))}
+                            className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-xl border border-slate-200 dark:border-slate-700 transition cursor-pointer shrink-0"
+                            title={t('removeTelegram', 'Remove Telegram Group')}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+
+                      {tgFeedback && (
+                        <div className={`text-[11px] pl-8 flex items-center gap-1 ${
+                          tgFeedback.isError ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400 font-medium'
+                        }`}>
+                          {tgFeedback.isError ? <AlertCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                          <span>{tgFeedback.message}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="p-2.5 bg-indigo-50/60 dark:bg-indigo-950/30 rounded-xl border border-indigo-200/60 dark:border-indigo-900/40 text-[11px] text-indigo-900 dark:text-indigo-200 flex items-start gap-2">
+                <span className="text-sm">💡</span>
+                <div>
+                  <span className="font-semibold">{t('howToGetChatId', 'How to get Telegram Verification Code (Chat ID)?')}</span>
+                  <p className="text-indigo-700/80 dark:text-indigo-300/80 mt-0.5">
+                    {isKhmer 
+                      ? 'បន្ថែម Soundbox Bot ចូលទៅក្នុង Telegram Group (ដូចជាគ្រុប ABA ឬ Wing) ដើម្បីទទួលដំណឹងទូទាត់ប្រាក់ភ្លាមៗ។' 
+                      : 'Add your Soundbox Bot to your Telegram groups (e.g. ABA Bank group, Wing group) to receive real-time notifications.'}
+                  </p>
+                </div>
+              </div>
             </div>
 
             {stores.length > 1 && (
@@ -3275,10 +3508,7 @@ export default function UserDashboard() {
                     type="button"
                     onClick={() => {
                       setIsDetailModalOpen(false);
-                      setTargetStoreIdForNewDevice(r.storeId);
-                      setDeviceSn('');
-                      setTelegramChatId('');
-                      setIsDeviceModalOpen(true);
+                      handleOpenLinkModal(r.storeId);
                     }}
                     className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition inline-flex items-center gap-1.5 cursor-pointer"
                   >

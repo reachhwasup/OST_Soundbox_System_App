@@ -28,6 +28,170 @@ class DeviceRegisterSchema(BaseModel):
     warranty_end_date: Optional[str] = None
 
 
+class BatchDeviceItem(BaseModel):
+    device_sn: str = Field(..., description="Serial Number of Soundbox")
+    device_type: Optional[str] = "Display Soundbox"
+    device_model: Optional[str] = "Display Soundbox"
+    qr_code: Optional[str] = None
+    price: Optional[float] = 29.00
+    discount_amount: Optional[float] = 0.00
+    discount_percent: Optional[float] = 0.00
+    warranty_days: Optional[int] = 90
+
+
+class DeviceBatchRegisterSchema(BaseModel):
+    merchant_id: Union[int, str]
+    devices: List[BatchDeviceItem]
+    telegram_chat_id: Optional[str] = None
+
+
+@router.post("/register-batch", status_code=status.HTTP_201_CREATED)
+async def register_devices_batch(
+    payload: DeviceBatchRegisterSchema,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    if not payload.devices:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No devices provided in batch.")
+
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        merchant = await conn.fetchrow(
+            "SELECT COALESCE(merchant_id, id::text) AS merchant_id, id, COALESCE(merchant_name, name) AS name, user_id, owner_phone FROM merchants WHERE id::text = $1::text OR merchant_id::text = $1::text",
+            str(payload.merchant_id)
+        )
+        if not merchant:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Store/Merchant not found.")
+
+        if current_user["role"] != "ADMIN":
+            if merchant["user_id"] != current_user["id"] and merchant["owner_phone"] != current_user["phone_number"]:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not own this store.")
+
+        # Ensure schema integrity
+        try:
+            await conn.execute("""
+                ALTER TABLE devices DROP CONSTRAINT IF EXISTS devices_merchant_id_fkey;
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_type VARCHAR(100) DEFAULT 'Display Soundbox';
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_model VARCHAR(100) DEFAULT 'Y6B';
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(255);
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS qr_code TEXT;
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'ACTIVE';
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+            """)
+        except Exception as mig_err:
+            logger.warning(f"Schema check in register_devices_batch: {mig_err}")
+
+        col_type = await conn.fetchval("""
+            SELECT data_type 
+            FROM information_schema.columns 
+            WHERE table_name = 'devices' AND column_name = 'merchant_id'
+        """)
+        if col_type in ('integer', 'bigint', 'smallint'):
+            m_id_target = int(payload.merchant_id)
+        else:
+            m_id_target = str(payload.merchant_id)
+
+        chat_id = payload.telegram_chat_id.strip() if payload.telegram_chat_id and payload.telegram_chat_id.strip() else None
+        linked_results = []
+        errors = []
+
+        for item in payload.devices:
+            dev_sn = item.device_sn.strip()
+            if not dev_sn:
+                continue
+
+            qr_val = item.qr_code.strip() if item.qr_code and item.qr_code.strip() else None
+            base_price = float(item.price or 29.00)
+            disc_amt = float(item.discount_amount or 0.0)
+            if item.discount_percent and float(item.discount_percent) > 0:
+                disc_amt = (float(item.discount_percent) / 100.0) * base_price
+            calc_final_price = max(0.0, base_price - disc_amt)
+            w_days = int(item.warranty_days or 90)
+            now_dt = datetime.now(timezone.utc)
+            w_end_dt = now_dt + timedelta(days=w_days)
+
+            try:
+                existing = await conn.fetchrow(
+                    "SELECT id, merchant_id, status FROM devices WHERE device_sn = $1",
+                    dev_sn
+                )
+                if existing:
+                    dev_id = existing["id"]
+                    try:
+                        await conn.execute("""
+                            UPDATE devices 
+                            SET merchant_id = $1, telegram_chat_id = $2, device_type = $3, device_model = $4, 
+                                price = $5, qr_code = COALESCE($6, qr_code),
+                                status = 'ACTIVE', is_active = TRUE, updated_at = CURRENT_TIMESTAMP
+                            WHERE id = $7
+                        """, m_id_target, chat_id, item.device_type or "Display Soundbox", item.device_model or "Display Soundbox", 
+                           base_price, qr_val, dev_id)
+                    except Exception:
+                        await conn.execute("""
+                            UPDATE devices 
+                            SET merchant_id = $1, telegram_chat_id = $2, qr_code = COALESCE($3, qr_code), status = 'ACTIVE', is_active = TRUE, updated_at = CURRENT_TIMESTAMP
+                            WHERE id = $4
+                        """, m_id_target, chat_id, qr_val, dev_id)
+                else:
+                    try:
+                        dev_id = await conn.fetchval("""
+                            INSERT INTO devices (
+                                merchant_id, device_sn, device_type, device_model, telegram_chat_id, 
+                                price, qr_code, status, is_active
+                            )
+                            VALUES ($1, $2, $3, $4, $5, $6, $7, 'ACTIVE', TRUE)
+                            RETURNING id
+                        """, m_id_target, dev_sn, item.device_type or "Display Soundbox", item.device_model or "Display Soundbox", chat_id, 
+                           base_price, qr_val)
+                    except Exception:
+                        dev_id = await conn.fetchval("""
+                            INSERT INTO devices (
+                                merchant_id, device_sn, device_type, telegram_chat_id, qr_code, status, is_active
+                            )
+                            VALUES ($1, $2, $3, $4, $5, 'ACTIVE', TRUE)
+                            RETURNING id
+                        """, m_id_target, dev_sn, item.device_type or "Display Soundbox", chat_id, qr_val)
+
+                # Record sales record
+                try:
+                    await conn.execute("""
+                        INSERT INTO sales (
+                            device_id, device_sn, merchant_id, sold_by_user_id,
+                            customer_name, customer_phone, price, discount_type,
+                            discount_percent, discount_amount, final_price, currency,
+                            warranty_days, warranty_start_date, warranty_end_date,
+                            payment_method, status
+                        )
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, 'PERCENTAGE', $8, $9, $10, 'USD', $11, $12, $13, 'CASH', 'COMPLETED')
+                    """, dev_id, dev_sn, merchant["id"], current_user.get("id"),
+                       merchant.get("name") or "Merchant", merchant.get("owner_phone"), base_price,
+                       float(item.discount_percent or 0.0), disc_amt, calc_final_price,
+                       w_days, now_dt, w_end_dt)
+                except Exception as sale_err:
+                    logger.warning(f"Batch sale insert warning for {dev_sn}: {sale_err}")
+
+                linked_results.append({
+                    "device_sn": dev_sn,
+                    "device_id": dev_id,
+                    "status": "linked"
+                })
+            except Exception as item_err:
+                logger.error(f"Error linking device {dev_sn} in batch: {item_err}")
+                errors.append({"device_sn": dev_sn, "error": str(item_err)})
+
+        if not linked_results and errors:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to link devices: {errors[0]['error']}")
+
+        return {
+            "status": "success",
+            "message": f"Successfully linked {len(linked_results)} soundbox device(s).",
+            "count": len(linked_results),
+            "devices": linked_results,
+            "errors": errors if errors else None
+        }
+
+
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def register_device(
