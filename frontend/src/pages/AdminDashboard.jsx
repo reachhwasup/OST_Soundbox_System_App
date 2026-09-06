@@ -6707,23 +6707,9 @@ export default function AdminDashboard() {
 
           <form onSubmit={handleSingleIntakeStock} className="space-y-4">
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  {isKhmer ? 'លេខស៊េរីឧបករណ៍ (SN)' : 'Soundbox Serial Number (SN)'} <span className="text-rose-500">*</span>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setIsStockSnScanning(!isStockSnScanning)}
-                  className={`text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer px-2.5 py-1 rounded-lg ${
-                    isStockSnScanning
-                      ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800'
-                      : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100'
-                  }`}
-                >
-                  <Camera className="w-3.5 h-3.5" />
-                  <span>{isStockSnScanning ? (isKhmer ? 'បិទកាមេរ៉ា' : 'Close Camera') : (isKhmer ? 'ស្កេនដោយកាមេរ៉ា' : 'Scan with Camera')}</span>
-                </button>
-              </div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                {isKhmer ? 'លេខស៊េរីឧបករណ៍ (SN)' : 'Soundbox Serial Number (SN)'} <span className="text-rose-500">*</span>
+              </label>
 
               <div className="relative">
                 <input
