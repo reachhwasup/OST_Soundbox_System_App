@@ -205,7 +205,7 @@ async def lookup_device_by_sn(
                    COALESCE(device_type, 'Display Soundbox') AS device_type,
                    COALESCE(device_model, 'Y6B') AS device_model,
                    qr_code, telegram_chat_id, status,
-                   COALESCE(supplier, 'Eishu') AS supplier
+                   COALESCE(supplier, 'Feishu') AS supplier
             FROM devices
             WHERE device_sn = $1 OR device_id = $1
             ORDER BY id DESC
@@ -222,7 +222,7 @@ async def lookup_device_by_sn(
                 "qr_code": None,
                 "telegram_chat_id": None,
                 "status": None,
-                "supplier": "Eishu"
+                "supplier": "Feishu"
             }
 
         d_type = str(row["device_type"] or "Display Soundbox")
@@ -246,7 +246,7 @@ async def lookup_device_by_sn(
             "qr_code": row["qr_code"],
             "telegram_chat_id": row["telegram_chat_id"],
             "status": row["status"],
-            "supplier": row["supplier"] or "Eishu"
+            "supplier": row["supplier"] or "Feishu"
         }
 
 
@@ -298,7 +298,7 @@ async def list_devices(
                    d.warranty_end_date,
                    COALESCE(d.telegram_chat_id, d.chat_id) AS telegram_chat_id,
                    d.qr_code,
-                   COALESCE(d.supplier, 'Eishu') AS supplier,
+                   COALESCE(d.supplier, 'Feishu') AS supplier,
                    COALESCE(NULLIF(d.status::text, ''), CASE WHEN d.merchant_id IS NULL THEN 'IN_STOCK' WHEN d.is_active = FALSE THEN 'Offline' ELSE 'Online' END, 'IN_STOCK') AS status,
                    COALESCE(d.battery, '100%') AS battery,
                    COALESCE(d.signal, 'Good') AS signal,
@@ -335,7 +335,7 @@ async def list_devices(
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_4g VARCHAR(100) DEFAULT 'Y6B_LCD_1605_V1.0';
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_wifi VARCHAR(100) DEFAULT 'esp32c2x_2M_OTA';
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier VARCHAR(100) DEFAULT 'Eishu';
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier VARCHAR(100) DEFAULT 'Feishu';
                 """)
                 devices = await conn.fetch(query, *params)
             except Exception as e2:
@@ -379,7 +379,7 @@ class DeviceBulkImportSchema(BaseModel):
     batch_no: Optional[str] = None
     notes: Optional[str] = None
     price: Optional[float] = 29.00
-    supplier: Optional[str] = "Eishu"
+    supplier: Optional[str] = "Feishu"
 
 
 @router.post("/bulk-import", status_code=status.HTTP_201_CREATED)
@@ -398,7 +398,7 @@ async def bulk_import_devices(
     if not raw_sns:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No valid serial numbers provided.")
 
-    supplier_val = (payload.supplier or "Eishu").strip()
+    supplier_val = (payload.supplier or "Feishu").strip()
 
     pool = await get_db_pool()
     async with pool.acquire() as conn:
@@ -424,7 +424,7 @@ async def bulk_import_devices(
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_type VARCHAR(100) DEFAULT 'Display Soundbox';
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier VARCHAR(100) DEFAULT 'Eishu';
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier VARCHAR(100) DEFAULT 'Feishu';
                 """)
                 await conn.execute("""
                     INSERT INTO devices (device_id, device_sn, notes, price, status, is_active, battery, signal, supplier)
@@ -448,7 +448,7 @@ class DeviceIntakeSchema(BaseModel):
     notes: Optional[str] = None
     merchant_id: Optional[Union[int, str]] = None
     price: Optional[float] = 29.00
-    supplier: Optional[str] = "Eishu"
+    supplier: Optional[str] = "Feishu"
 
 
 @router.post("/intake", status_code=status.HTTP_201_CREATED)
@@ -467,7 +467,7 @@ async def intake_single_device(
     if not sn:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Serial number is required.")
 
-    supplier_val = (payload.supplier or "Eishu").strip()
+    supplier_val = (payload.supplier or "Feishu").strip()
 
     pool = await get_db_pool()
     async with pool.acquire() as conn:
@@ -512,7 +512,7 @@ async def intake_single_device(
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_type VARCHAR(100) DEFAULT 'Display Soundbox';
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier VARCHAR(100) DEFAULT 'Eishu';
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier VARCHAR(100) DEFAULT 'Feishu';
                 """)
                 new_id = await conn.fetchval("""
                     INSERT INTO devices (
@@ -878,7 +878,7 @@ async def update_device(
 
         if payload.supplier is not None:
             updates.append(f"supplier = ${idx}")
-            params.append(payload.supplier.strip() if payload.supplier.strip() else "Eishu")
+            params.append(payload.supplier.strip() if payload.supplier.strip() else "Feishu")
             idx += 1
 
         if not updates:

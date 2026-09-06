@@ -336,7 +336,7 @@ export const translations = {
     awaitingStoreLink: "Awaiting Store Link",
     confirmSaleAndDeploy: "Confirm Sale",
     supplier: "Supplier",
-    supplierEishu: "Eishu",
+    supplierFeishu: "Feishu",
     supplierHemi: "Hemi",
     // Store & Location Filter Keys
     allProvinces: "All Provinces / Cities",
@@ -734,7 +734,7 @@ export const translations = {
     confirmSaleAndDeploy: "បញ្ជាក់ការលក់",
     awaitingStoreLink: "មិនទាន់ភ្ជាប់ហាង (រង់ចាំការចុះឈ្មោះ)",
     supplier: "អ្នកផ្គត់ផ្គង់ (Supplier)",
-    supplierEishu: "Eishu",
+    supplierFeishu: "Feishu",
     supplierHemi: "Hemi",
     
     // Store & Location Filter Keys

@@ -213,7 +213,7 @@ export default function AdminDashboard() {
   const [bulkModel, setBulkModel] = useState('Y6B');
   const [singleSnInput, setSingleSnInput] = useState('');
   const [singleType, setSingleType] = useState('Display Soundbox');
-  const [singleSupplier, setSingleSupplier] = useState('Eishu');
+  const [singleSupplier, setSingleSupplier] = useState('Feishu');
   const [singleStoreId, setSingleStoreId] = useState('');
   const [singleNotes, setSingleNotes] = useState('');
   const [singlePrice, setSinglePrice] = useState('39.00');
@@ -308,7 +308,7 @@ export default function AdminDashboard() {
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [editDeviceSn, setEditDeviceSn] = useState('');
   const [editDeviceType, setEditDeviceType] = useState('Display Soundbox');
-  const [editSupplier, setEditSupplier] = useState('Eishu');
+  const [editSupplier, setEditSupplier] = useState('Feishu');
   const [editDeviceTelegram, setEditDeviceTelegram] = useState('');
   const [editDeviceMerchantId, setEditDeviceMerchantId] = useState('');
   const [editDeviceStatus, setEditDeviceStatus] = useState('ACTIVE');
@@ -605,7 +605,7 @@ export default function AdminDashboard() {
     setSelectedDevice(d);
     setEditDeviceSn(d.device_sn || '');
     setEditDeviceType(d.device_type || 'Display Soundbox');
-    setEditSupplier(d.supplier || 'Eishu');
+    setEditSupplier(d.supplier || 'Feishu');
     setEditDeviceTelegram(d.telegram_chat_id || '');
     setEditDeviceStatus(d.status || 'ACTIVE');
     setEditDevicePrice(d.price ? String(d.price) : '39.00');
@@ -732,7 +732,7 @@ export default function AdminDashboard() {
         device_sn: editDeviceSn.trim(),
         device_type: editDeviceType.trim() || 'Display Soundbox',
         device_model: editDeviceType.trim() || 'Display Soundbox',
-        supplier: editSupplier || 'Eishu',
+        supplier: editSupplier || 'Feishu',
         telegram_chat_id: editDeviceTelegram.trim() || null,
         status: editDeviceStatus,
         price: basePrice,
@@ -1057,7 +1057,7 @@ export default function AdminDashboard() {
         const q = stockSearchTerm.toLowerCase().trim();
         const sn = String(d.device_sn || d.device_id || '').toLowerCase();
         const dtype = String(d.device_type || '').toLowerCase();
-        const supp = String(d.supplier || 'eishu').toLowerCase();
+        const supp = String(d.supplier || 'feishu').toLowerCase();
         const notes = String(d.notes || '').toLowerCase();
         if (!sn.includes(q) && !dtype.includes(q) && !notes.includes(q) && !supp.includes(q)) {
           return false;
@@ -1074,7 +1074,7 @@ export default function AdminDashboard() {
 
       if (stockSupplierFilter !== 'ALL') {
         const targetSupp = stockSupplierFilter.toLowerCase();
-        const dSupp = String(d.supplier || 'Eishu').toLowerCase();
+        const dSupp = String(d.supplier || 'Feishu').toLowerCase();
         if (dSupp !== targetSupp) {
           return false;
         }
@@ -1139,7 +1139,7 @@ export default function AdminDashboard() {
     const rows = filteredStockDevices.map(d => [
       `"${d.device_sn || ''}"`,
       `"${d.device_type || 'Display Soundbox'}"`,
-      `"${d.supplier || 'Eishu'}"`,
+      `"${d.supplier || 'Feishu'}"`,
       Number(d.price || 29).toFixed(2),
       `"${(d.notes || '').replace(/"/g, '""')}"`,
       `"${d.version_4g || ''}"`,
@@ -1532,7 +1532,7 @@ export default function AdminDashboard() {
       const res = await api.post('/api/devices/intake', {
         device_sn: singleSnInput.trim(),
         device_type: singleType || "Display Soundbox",
-        supplier: singleSupplier || "Eishu",
+        supplier: singleSupplier || "Feishu",
         notes: singleNotes,
         price: Number(singlePrice) || (singleType === 'Display Soundbox' ? 39.00 : 29.00),
         merchant_id: singleStoreId ? Number(singleStoreId) : null
@@ -1546,7 +1546,7 @@ export default function AdminDashboard() {
       setIsStockModalOpen(false);
       setIsStockSnScanning(false);
       setSingleSnInput('');
-      setSingleSupplier('Eishu');
+      setSingleSupplier('Feishu');
       setSingleStoreId('');
       setSingleNotes('');
       fetchAllData();
@@ -3160,11 +3160,11 @@ export default function AdminDashboard() {
                           {visibleColumns.supplier && (
                             <td className="py-3.5 px-3">
                               <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1 whitespace-nowrap ${
-                                (d.supplier || 'Eishu').toLowerCase() === 'hemi'
+                                (d.supplier || 'Feishu').toLowerCase() === 'hemi'
                                   ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                                   : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
                               }`}>
-                                {(d.supplier || 'Eishu').toLowerCase() === 'hemi' ? '🏭 Hemi' : '🏢 Eishu'}
+                                {(d.supplier || 'Feishu').toLowerCase() === 'hemi' ? '🏭 Hemi' : '🏢 Feishu'}
                               </span>
                             </td>
                           )}
@@ -3651,7 +3651,7 @@ export default function AdminDashboard() {
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer font-medium"
                 >
                   <option value="ALL">{isKhmer ? 'គ្រប់អ្នកផ្គត់ផ្គង់ (All Suppliers)' : 'All Suppliers'}</option>
-                  <option value="Eishu">🏢 Eishu</option>
+                  <option value="Feishu">🏢 Feishu</option>
                   <option value="Hemi">🏭 Hemi</option>
                 </select>
               </div>
@@ -3788,11 +3788,11 @@ export default function AdminDashboard() {
                         {visibleStockColumns.supplier && (
                           <td className="py-3.5 px-4 font-semibold text-xs">
                             <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1 whitespace-nowrap ${
-                              (d.supplier || 'Eishu').toLowerCase() === 'hemi'
+                              (d.supplier || 'Feishu').toLowerCase() === 'hemi'
                                 ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                                 : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
                             }`}>
-                              {(d.supplier || 'Eishu').toLowerCase() === 'hemi' ? '🏭 Hemi' : '🏢 Eishu'}
+                              {(d.supplier || 'Feishu').toLowerCase() === 'hemi' ? '🏭 Hemi' : '🏢 Feishu'}
                             </span>
                           </td>
                         )}
@@ -3902,11 +3902,11 @@ export default function AdminDashboard() {
 
                     <div className="flex items-center gap-1.5 shrink-0">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        (d.supplier || 'Eishu').toLowerCase() === 'hemi'
+                        (d.supplier || 'Feishu').toLowerCase() === 'hemi'
                           ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                           : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
                       }`}>
-                        {(d.supplier || 'Eishu').toLowerCase() === 'hemi' ? '🏭 Hemi' : '🏢 Eishu'}
+                        {(d.supplier || 'Feishu').toLowerCase() === 'hemi' ? '🏭 Hemi' : '🏢 Feishu'}
                       </span>
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         (d.device_type === 'Display Soundbox' || String(d.device_type || '').toLowerCase().includes('display'))
@@ -4725,7 +4725,7 @@ export default function AdminDashboard() {
                 onChange={(e) => setEditSupplier(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium"
               >
-                <option value="Eishu">🏢 Eishu</option>
+                <option value="Feishu">🏢 Feishu</option>
                 <option value="Hemi">🏭 Hemi</option>
               </select>
             </div>
@@ -5497,7 +5497,7 @@ export default function AdminDashboard() {
                       </span>
                       <span>•</span>
                       <span className="font-semibold text-slate-700 dark:text-slate-300">
-                        {t('supplier', 'Supplier')}: {(selectedDeviceDetail.supplier || 'Eishu').toLowerCase() === 'hemi' ? '🏭 Hemi' : '🏢 Eishu'}
+                        {t('supplier', 'Supplier')}: {(selectedDeviceDetail.supplier || 'Feishu').toLowerCase() === 'hemi' ? '🏭 Hemi' : '🏢 Feishu'}
                       </span>
                     </div>
                   </div>
@@ -6193,7 +6193,7 @@ export default function AdminDashboard() {
                 onChange={(e) => setSingleSupplier(e.target.value)}
                 className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer font-medium"
               >
-                <option value="Eishu">🏢 Eishu</option>
+                <option value="Feishu">🏢 Feishu</option>
                 <option value="Hemi">🏭 Hemi</option>
               </select>
             </div>

@@ -197,7 +197,10 @@ async def init_db():
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS chat_id VARCHAR(100);
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS qr_code TEXT;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
-            ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier VARCHAR(100) DEFAULT 'Eishu';
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier VARCHAR(100) DEFAULT 'Feishu';
+
+            -- Migrate any existing records with legacy or null supplier to Feishu
+            UPDATE devices SET supplier = 'Feishu' WHERE supplier = 'Eishu' OR supplier IS NULL;
 
             -- Auto-sync columns if existing records have legacy names
             UPDATE devices SET
