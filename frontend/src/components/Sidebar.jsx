@@ -244,6 +244,23 @@ export default function Sidebar({
                   )}
                 </button>
 
+                {/* Item 5: Sale History */}
+                <button
+                  type="button"
+                  onClick={() => handleAdminSubTabClick('sales')}
+                  title={isKhmer ? 'ប្រវត្តិការលក់ (Sales)' : 'Sale History'}
+                  className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
+                    isCollapsed 
+                      ? `h-12 justify-center ${currentSubTab === 'sales' || currentSubTab === 'sales_history' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
+                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'sales' || currentSubTab === 'sales_history' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                  }`}
+                >
+                  <Receipt className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-emerald-400'}`} />
+                  {!isCollapsed && (
+                    <span className="truncate">{isKhmer ? 'ប្រវត្តិការលក់' : 'Sale History'}</span>
+                  )}
+                </button>
+
                 {/* Item 5: User Activity */}
                 <button
                   type="button"

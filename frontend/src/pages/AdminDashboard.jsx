@@ -241,6 +241,12 @@ export default function AdminDashboard() {
   const [isSalesModalOpen, setIsSalesModalOpen] = useState(false);
   const [salesSearchTerm, setSalesSearchTerm] = useState('');
   const [salesLoading, setSalesLoading] = useState(false);
+  const [salesPage, setSalesPage] = useState(1);
+  const [salesPageSize, setSalesPageSize] = useState(25);
+  const [salesGoToPage, setSalesGoToPage] = useState('');
+  const [salesStatusFilter, setSalesStatusFilter] = useState('ALL');
+  const [salesSupplierFilter, setSalesSupplierFilter] = useState('ALL');
+  const [salesSortBy, setSalesSortBy] = useState('newest');
 
   const [isDeviceDetailOpen, setIsDeviceDetailOpen] = useState(false);
   const [selectedDeviceDetail, setSelectedDeviceDetail] = useState(null);
@@ -506,7 +512,7 @@ export default function AdminDashboard() {
   const fetchSales = async (search = '') => {
     setSalesLoading(true);
     try {
-      const q = search && search.trim() ? `?search=${encodeURIComponent(search.trim())}&limit=100` : '?limit=100';
+      const q = search && search.trim() ? `?search=${encodeURIComponent(search.trim())}&limit=500` : '?limit=500';
       const res = await api.get(`/api/sales${q}`);
       if (res.data?.status === 'success') {
         setSalesList(res.data.data || []);
@@ -519,6 +525,11 @@ export default function AdminDashboard() {
       setSalesLoading(false);
     }
   };
+
+  // Reset sales page when filters change
+  useEffect(() => {
+    setSalesPage(1);
+  }, [salesSearchTerm, salesStatusFilter, salesSupplierFilter, salesSortBy]);
 
   // Handle Add User
   const handleAddUser = async (e) => {
@@ -1281,6 +1292,42 @@ export default function AdminDashboard() {
     showToast({ type: 'success', title: 'Export Successful', message: `Exported ${filteredStockDevices.length} stock records.` });
   };
 
+  // Sales Export CSV
+  const handleExportSalesCSV = () => {
+    if (filteredSalesList.length === 0) {
+      showToast({ type: 'warning', title: 'No Data', message: 'No sales records to export.' });
+      return;
+    }
+    const headers = ['Order ID', 'Sale Date', 'Device SN', 'Device Type', 'Supplier', 'Customer / Store', 'Customer Phone', 'Sold By', 'Base Price ($)', 'Discount Type', 'Discount', 'Final Price ($)', 'Warranty (Days)', 'Warranty Expiry', 'Status', 'Notes'];
+    const rows = filteredSalesList.map(s => [
+      `"#ORD-${String(s.id).padStart(4, '0')}"`,
+      `"${s.created_at ? new Date(s.created_at).toISOString().slice(0, 10) : ''}"`,
+      `"${s.device_sn || ''}"`,
+      `"${s.device_type || 'Soundbox'}"`,
+      `"${s.supplier_name || 'Feishu'}"`,
+      `"${(s.store_name || s.customer_name || 'Direct Sale').replace(/"/g, '""')}"`,
+      `"${s.customer_phone || s.merchant_phone || ''}"`,
+      `"${s.sold_by_name || 'Admin'}"`,
+      Number(s.price || 0).toFixed(2),
+      `"${s.discount_type || 'NONE'}"`,
+      s.discount_type === 'percent' ? `${s.discount_percent}%` : `$${Number(s.discount_amount || 0).toFixed(2)}`,
+      Number(s.final_price || s.price || 0).toFixed(2),
+      s.warranty_days || 90,
+      `"${s.warranty_end_date ? new Date(s.warranty_end_date).toISOString().slice(0, 10) : ''}"`,
+      `"${s.status || 'COMPLETED'}"`,
+      `"${(s.notes || '').replace(/"/g, '""')}"`
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `soundbox_sales_orders_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast({ type: 'success', title: 'Export Successful', message: `Exported ${filteredSalesList.length} sales orders.` });
+  };
+
   // Derived User Activities (Merchant and customer operational actions, no payment txns)
   const userActivities = useMemo(() => {
     const list = [];
@@ -1457,6 +1504,48 @@ export default function AdminDashboard() {
     const start = (stockPage - 1) * stockPageSize;
     return filteredStockDevices.slice(start, start + stockPageSize);
   }, [filteredStockDevices, stockPage, stockPageSize]);
+
+  // Paginated Sales Orders Logic
+  const filteredSalesList = useMemo(() => {
+    let result = [...salesList];
+    if (salesStatusFilter !== 'ALL') {
+      result = result.filter(s => (s.status || 'COMPLETED').toUpperCase() === salesStatusFilter);
+    }
+    if (salesSupplierFilter !== 'ALL') {
+      result = result.filter(s => s.supplier_name === salesSupplierFilter);
+    }
+    if (salesSearchTerm.trim()) {
+      const q = salesSearchTerm.toLowerCase().trim();
+      result = result.filter(s => 
+        (s.device_sn && s.device_sn.toLowerCase().includes(q)) ||
+        (s.customer_name && s.customer_name.toLowerCase().includes(q)) ||
+        (s.customer_phone && s.customer_phone.includes(q)) ||
+        (s.store_name && s.store_name.toLowerCase().includes(q)) ||
+        (s.merchant_phone && s.merchant_phone.includes(q)) ||
+        (s.sold_by_name && s.sold_by_name.toLowerCase().includes(q)) ||
+        (s.device_type && s.device_type.toLowerCase().includes(q)) ||
+        (s.supplier_name && s.supplier_name.toLowerCase().includes(q)) ||
+        (s.notes && s.notes.toLowerCase().includes(q)) ||
+        String(s.id).includes(q)
+      );
+    }
+    if (salesSortBy === 'newest') {
+      result.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    } else if (salesSortBy === 'oldest') {
+      result.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+    } else if (salesSortBy === 'price_desc') {
+      result.sort((a, b) => Number(b.final_price ?? b.price ?? 0) - Number(a.final_price ?? a.price ?? 0));
+    } else if (salesSortBy === 'price_asc') {
+      result.sort((a, b) => Number(a.final_price ?? a.price ?? 0) - Number(b.final_price ?? b.price ?? 0));
+    }
+    return result;
+  }, [salesList, salesStatusFilter, salesSupplierFilter, salesSearchTerm, salesSortBy]);
+
+  const totalSalesPages = Math.max(1, Math.ceil(filteredSalesList.length / salesPageSize));
+  const paginatedSales = useMemo(() => {
+    const start = (salesPage - 1) * salesPageSize;
+    return filteredSalesList.slice(start, start + salesPageSize);
+  }, [filteredSalesList, salesPage, salesPageSize]);
 
   // Reusable Page Numeration Component for Admin Tables
   const renderPaginationNumeration = ({
@@ -2020,6 +2109,7 @@ export default function AdminDashboard() {
                adminTab === 'stores' ? t('storeMerchantBranches', 'Store & Merchant Branches') :
                adminTab === 'devices' ? t('deployedSoundboxFleet', 'Deployed Soundbox Fleet & Telemetry') :
                adminTab === 'inventory' ? t('warehouseStockBreadcrumb', 'Warehouse Stock & Inventory') :
+               adminTab === 'sales' || adminTab === 'sales_history' ? t('salesHistoryBreadcrumb', 'Device Sales & Order Ledger') :
                adminTab === 'user_activity' || adminTab === 'user_logs' || adminTab === 'logs' ? t('userActivityTitle', 'User Activity') :
                t('adminActivityTitle', 'Admin Activity')}
             </span>
@@ -2029,6 +2119,7 @@ export default function AdminDashboard() {
              adminTab === 'stores' ? t('storesMerchantLocations', 'Stores & Merchant Locations') :
              adminTab === 'devices' ? t('manageDevicesTitle', 'Manage Devices (Deployed Soundboxes)') :
              adminTab === 'inventory' ? t('stockInventory', 'Stock & Inventory (Warehouse)') :
+             adminTab === 'sales' || adminTab === 'sales_history' ? t('salesHistoryTitle', 'Sale History & Revenue') :
              adminTab === 'user_activity' || adminTab === 'user_logs' || adminTab === 'logs' ? t('userActivityTitle', 'User Activity') :
              t('adminActivityTitle', 'Admin Activity')}
           </h1>
@@ -3711,10 +3802,10 @@ export default function AdminDashboard() {
                   type="button"
                   onClick={() => {
                     fetchSales(salesSearchTerm);
-                    setIsSalesModalOpen(true);
+                    setAdminTab('sales');
                   }}
                   className="px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer touch-manipulation"
-                  title="View Sales History & Orders"
+                  title="Go to Sale History Tab"
                 >
                   <Receipt className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                   <span>{t('salesHistory', 'Sales')}</span>
@@ -4138,6 +4229,376 @@ export default function AdminDashboard() {
             })}
           </div>
 
+        </div>
+      )}
+
+
+      {/* ======================================================== */}
+      {/* TAB: DEDICATED SALE HISTORY & ORDERS                     */}
+      {/* ======================================================== */}
+      {(adminTab === 'sales' || adminTab === 'sales_history') && (
+        <div className="space-y-4 sm:space-y-5">
+          {/* Top Sales KPI Banner */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            {/* KPI 1: Gross Sales Revenue */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  {t('totalRevenue', 'Total Revenue')}
+                </span>
+                <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                ${Number(salesTotalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <p className="text-[11px] text-slate-400">
+                {isKhmer ? 'ចំណូលលក់ឧបករណ៍សរុប' : 'Total gross device revenue'}
+              </p>
+            </div>
+
+            {/* KPI 2: Total Recorded Sales Orders */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  {t('salesOrders', 'Sales Orders')}
+                </span>
+                <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+                  <ShoppingBag className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                {salesTotalCount}
+              </div>
+              <p className="text-[11px] text-slate-400">
+                {isKhmer ? 'ចំនួនការលក់ដែលបានកត់ត្រា' : 'Total units sold & registered'}
+              </p>
+            </div>
+
+            {/* KPI 3: Average Order Value */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  {t('avgOrderValue', 'Avg Order Value')}
+                </span>
+                <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+                  <Tag className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                ${salesList.length > 0 ? (salesTotalRevenue / salesList.length).toFixed(2) : '0.00'}
+              </div>
+              <p className="text-[11px] text-slate-400">
+                {isKhmer ? 'តម្លៃលក់ជាមធ្យមក្នុងមួយគ្រឿង' : 'Average realized price per unit'}
+              </p>
+            </div>
+
+            {/* KPI 4: Completed vs Pending Setup */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Order Statuses
+                </span>
+                <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <span className="text-emerald-600 dark:text-emerald-400">{salesList.filter(s => (s.status || 'COMPLETED') === 'COMPLETED').length} Done</span>
+                <span className="text-slate-300 dark:text-slate-700">/</span>
+                <span className="text-amber-600 dark:text-amber-400">{salesList.filter(s => s.status === 'PENDING').length} Pending</span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Active deployed vs pending setup
+              </p>
+            </div>
+          </div>
+
+          {/* Sales Filter & Action Toolbar */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-3.5">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              {/* Primary Search */}
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={salesSearchTerm}
+                  onChange={(e) => setSalesSearchTerm(e.target.value)}
+                  placeholder="Search Serial Number, Customer, Store, Seller, or Notes..."
+                  className="w-full pl-10 pr-4 py-2.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
+                />
+                {salesSearchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSalesSearchTerm('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer font-bold text-sm"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleExportSalesCSV}
+                  className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 transition flex items-center gap-1.5 shadow-2xs cursor-pointer touch-manipulation"
+                  title="Export Sales to CSV"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{t('exportCsv', 'Export CSV')}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => fetchSales(salesSearchTerm)}
+                  disabled={salesLoading}
+                  className="p-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 transition flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                  title="Refresh Sales"
+                >
+                  <RefreshCw className={`w-4 h-4 ${salesLoading ? 'animate-spin text-emerald-500' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Dropdowns Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 border-t border-slate-100 dark:border-slate-800/80">
+              {/* Filter 1: Status */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                  Order Status
+                </label>
+                <select
+                  value={salesStatusFilter}
+                  onChange={(e) => setSalesStatusFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                >
+                  <option value="ALL">All Statuses ({salesList.length})</option>
+                  <option value="COMPLETED">Completed ({salesList.filter(s => (s.status || 'COMPLETED') === 'COMPLETED').length})</option>
+                  <option value="PENDING">Pending Setup ({salesList.filter(s => s.status === 'PENDING').length})</option>
+                </select>
+              </div>
+
+              {/* Filter 2: Supplier */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                  Supplier
+                </label>
+                <select
+                  value={salesSupplierFilter}
+                  onChange={(e) => setSalesSupplierFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                >
+                  <option value="ALL">All Suppliers</option>
+                  {suppliersList.map(supp => (
+                    <option key={supp.id} value={supp.name}>
+                      {supp.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filter 3: Sort Order */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                  Sort By
+                </label>
+                <select
+                  value={salesSortBy}
+                  onChange={(e) => setSalesSortBy(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                >
+                  <option value="newest">Sale Date: Newest First</option>
+                  <option value="oldest">Sale Date: Oldest First</option>
+                  <option value="price_desc">Price: Highest First</option>
+                  <option value="price_asc">Price: Lowest First</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Sales Orders Table */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
+            {salesLoading ? (
+              <div className="py-20 text-center text-slate-500 dark:text-slate-400 flex flex-col items-center justify-center gap-2.5">
+                <RefreshCw className="w-7 h-7 animate-spin text-emerald-500" />
+                <p className="text-xs font-semibold">Loading sales orders...</p>
+              </div>
+            ) : paginatedSales.length === 0 ? (
+              <div className="py-20 text-center text-slate-400 flex flex-col items-center justify-center gap-2">
+                <Receipt className="w-12 h-12 text-slate-300 dark:text-slate-700" />
+                <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No sales orders found</p>
+                <p className="text-xs text-slate-400 max-w-sm">
+                  {salesSearchTerm || salesStatusFilter !== 'ALL' || salesSupplierFilter !== 'ALL'
+                    ? 'No records match your active search or filter criteria. Try clearing filters.'
+                    : 'Soundbox devices sold from warehouse stock will appear here automatically.'}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs min-w-[860px]">
+                  <thead className="bg-slate-50/80 dark:bg-slate-800/70 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                      <th className="px-4 py-3">Order / Date</th>
+                      <th className="px-4 py-3">Soundbox / SN</th>
+                      <th className="px-4 py-3">Store / Customer</th>
+                      <th className="px-4 py-3">Sold By</th>
+                      <th className="px-4 py-3 text-right">Price & Discount</th>
+                      <th className="px-4 py-3">Warranty</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300">
+                    {paginatedSales.map((sale) => (
+                      <tr key={sale.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-850/60 transition">
+                        {/* Order & Date */}
+                        <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                          <div className="font-mono font-bold text-slate-900 dark:text-white text-xs">
+                            #ORD-{String(sale.id).padStart(4, '0')}
+                          </div>
+                          <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            <span>{sale.created_at ? new Date(sale.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
+                          </div>
+                        </td>
+
+                        {/* Soundbox & SN */}
+                        <td className="px-4 py-3.5 align-top">
+                          <div className="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-xs flex items-center gap-1.5">
+                            <Volume2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span>{sale.device_sn}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            {sale.device_type && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                {sale.device_type}
+                              </span>
+                            )}
+                            {sale.supplier_name && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                                🏢 {sale.supplier_name}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Store / Customer */}
+                        <td className="px-4 py-3.5 align-top">
+                          {sale.store_name ? (
+                            <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                              <Store className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                              <span>{sale.store_name}</span>
+                            </div>
+                          ) : sale.customer_name ? (
+                            <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                              <User className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                              <span>{sale.customer_name}</span>
+                            </div>
+                          ) : (
+                            <div className="text-slate-400 italic">Direct Sale</div>
+                          )}
+                          {(sale.customer_phone || sale.merchant_phone) && (
+                            <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
+                              <Phone className="w-2.5 h-2.5" />
+                              <span>{sale.customer_phone || sale.merchant_phone}</span>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Sold By */}
+                        <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                          <div className="text-slate-800 dark:text-slate-200 font-semibold text-xs">
+                            {sale.sold_by_name || 'Admin'}
+                          </div>
+                          {sale.sold_by_phone && (
+                            <div className="text-[10px] text-slate-400">
+                              {sale.sold_by_phone}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Price & Discount */}
+                        <td className="px-4 py-3.5 align-top text-right whitespace-nowrap">
+                          <div className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
+                            ${Number(sale.final_price ?? sale.price ?? 0).toFixed(2)}
+                          </div>
+                          {(sale.discount_percent > 0 || sale.discount_amount > 0) && (
+                            <div className="text-[10px] text-rose-500 dark:text-rose-400 line-through mt-0.5">
+                              ${Number(sale.price || 0).toFixed(2)}
+                              <span className="ml-1 text-[9px] no-underline font-semibold bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-300 px-1 py-0.2 rounded">
+                                {sale.discount_type === 'percent' ? `-${sale.discount_percent}%` : `-$${Number(sale.discount_amount).toFixed(2)}`}
+                              </span>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Warranty */}
+                        <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                          <div className="text-slate-800 dark:text-slate-200 font-semibold text-xs flex items-center gap-1">
+                            <Shield className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                            <span>{sale.warranty_days ? `${sale.warranty_days} days` : 'No warranty'}</span>
+                          </div>
+                          {sale.warranty_end_date && (
+                            <div className="text-[10px] text-slate-400 mt-0.5">
+                              Exp: {new Date(sale.warranty_end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Status */}
+                        <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            sale.status === 'COMPLETED'
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                              : sale.status === 'PENDING'
+                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                          }`}>
+                            {sale.status || 'COMPLETED'}
+                          </span>
+                          {sale.notes && (
+                            <div className="text-[10px] text-slate-400 mt-1 max-w-[140px] truncate" title={sale.notes}>
+                              📝 {sale.notes}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Actions */}
+                        <td className="px-4 py-3.5 align-top text-right whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(sale.device_sn);
+                              showToast({ type: 'success', title: 'Copied', message: `Copied SN ${sale.device_sn} to clipboard.` });
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
+                            title="Copy Serial Number"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {renderPaginationNumeration({
+              currentPage: salesPage,
+              totalPages: totalSalesPages,
+              totalItems: filteredSalesList.length,
+              pageSize: salesPageSize,
+              onPageChange: setSalesPage,
+              onPageSizeChange: setSalesPageSize,
+              goToPageVal: salesGoToPage,
+              setGoToPageVal: setSalesGoToPage
+            })}
+          </div>
         </div>
       )}
 
