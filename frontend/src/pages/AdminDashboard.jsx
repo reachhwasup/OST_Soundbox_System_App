@@ -607,6 +607,7 @@ export default function AdminDashboard() {
     setSellWarrantyStartDate(new Date().toISOString().split('T')[0]);
     setIsSellStockOpen(true);
   };
+  const openSellModal = openSellStockModal;
 
   // Confirm Sale & Deploy
   const handleConfirmSellAndProceedToPairing = async (e) => {
@@ -3557,8 +3558,8 @@ export default function AdminDashboard() {
               </div>
           </div>
 
-          {/* 2. Warehouse Stock Table Card */}
-          <div className="hidden md:block mt-6 mb-4 bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
+          {/* 2. Warehouse Stock Table Card (Desktop >= lg) */}
+          <div className="hidden lg:block mt-6 mb-4 bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs min-w-[760px]">
                 <thead>
@@ -3716,8 +3717,8 @@ export default function AdminDashboard() {
 
           </div>
 
-          {/* Mobile Stock Cards (< md) */}
-          <div className="md:hidden space-y-3">
+          {/* Mobile & Tablet Stock Cards (< lg) */}
+          <div className="lg:hidden space-y-3">
             {paginatedStockDevices.length > 0 ? (
               paginatedStockDevices.map((d) => (
                 <div 
@@ -3760,16 +3761,16 @@ export default function AdminDashboard() {
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => openSellModal(d)}
-                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1"
+                        onClick={() => openSellStockModal(d)}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs touch-manipulation"
                       >
-                        <DollarSign className="w-3 h-3" />
-                        <span>{t('sell', 'Sell')}</span>
+                        <ShoppingBag className="w-3.5 h-3.5" />
+                        <span>{t('sellDevice', 'Sell')}</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => openEditDeviceModal(d)}
-                        className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1"
+                        className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 active:bg-slate-300 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 touch-manipulation"
                       >
                         <Edit className="w-3 h-3 text-slate-400" />
                         <span>{t('edit', 'Edit')}</span>
@@ -3785,8 +3786,8 @@ export default function AdminDashboard() {
             )}
           </div>
 
-          {/* Mobile Stock Pagination */}
-          <div className="md:hidden">
+          {/* Mobile & Tablet Stock Pagination (< lg) */}
+          <div className="lg:hidden">
             {renderPaginationNumeration({
               currentPage: stockPage,
               totalPages: totalStockPages,
