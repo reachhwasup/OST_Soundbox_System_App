@@ -208,48 +208,17 @@ async def init_db():
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS batch_no VARCHAR(100);
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
-            ALTER TABLE devices ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(10, 2) DEFAULT 0.00;
-            ALTER TABLE devices ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(5, 2) DEFAULT 0.00;
-            ALTER TABLE devices ADD COLUMN IF NOT EXISTS final_price NUMERIC(10, 2) DEFAULT 29.00;
-            ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_days INT DEFAULT 90;
-            ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_start_date TIMESTAMP WITH TIME ZONE;
-            ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_end_date TIMESTAMP WITH TIME ZONE;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS last_online TIMESTAMP WITH TIME ZONE;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_id VARCHAR(100);
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_name VARCHAR(255);
-            ALTER TABLE devices ADD COLUMN IF NOT EXISTS chat_id VARCHAR(100);
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS qr_code TEXT;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
-            ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier VARCHAR(100) DEFAULT 'Feishu';
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier_id INT REFERENCES suppliers(id) ON DELETE SET NULL;
 
-            -- Migrate any existing records with legacy or null supplier to Feishu
-            UPDATE devices SET supplier = 'Feishu' WHERE supplier = 'Eishu' OR supplier IS NULL;
-
-            -- Auto-link supplier_id based on supplier name
-            UPDATE devices d
-            SET supplier_id = s.id
-            FROM suppliers s
-            WHERE LOWER(TRIM(d.supplier)) = LOWER(TRIM(s.name)) AND d.supplier_id IS NULL;
-
-            -- Fallback: assign any remaining unlinked devices to Feishu
+            -- Fallback: assign any remaining unlinked devices to Feishu supplier
             UPDATE devices
             SET supplier_id = (SELECT id FROM suppliers WHERE name = 'Feishu' LIMIT 1)
             WHERE supplier_id IS NULL;
-
-            -- Synchronize supplier string from supplier_id
-            UPDATE devices d
-            SET supplier = s.name
-            FROM suppliers s
-            WHERE d.supplier_id = s.id AND (d.supplier IS NULL OR d.supplier != s.name);
-
-            -- Auto-sync columns if existing records have legacy names
-            UPDATE devices SET
-                device_sn = COALESCE(device_sn, device_id, id::text),
-                device_model = COALESCE(device_model, device_name, 'Y6B'),
-                telegram_chat_id = COALESCE(telegram_chat_id, chat_id),
-                last_heartbeat = COALESCE(last_heartbeat, last_online)
-            WHERE device_sn IS NULL OR telegram_chat_id IS NULL;
 
             ALTER TABLE devices DROP CONSTRAINT IF EXISTS devices_telegram_chat_id_key;
             CREATE INDEX IF NOT EXISTS idx_devices_telegram_chat_id ON devices(telegram_chat_id);
@@ -288,22 +257,40 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_sales_sold_by ON sales(sold_by_user_id);
             CREATE INDEX IF NOT EXISTS idx_sales_created_at ON sales(created_at);
 
-            -- Auto-migrate existing sold or pending devices into sales ledger if not present
-            INSERT INTO sales (device_id, device_sn, merchant_id, price, discount_amount, discount_percent, final_price, warranty_days, warranty_start_date, warranty_end_date, status, created_at)
-            SELECT d.id, d.device_sn, 
-                   CASE WHEN d.merchant_id::text ~ '^[0-9]+$' THEN d.merchant_id::text::int ELSE NULL END,
-                   COALESCE(d.price, 29.00),
-                   COALESCE(d.discount_amount, 0.00),
-                   COALESCE(d.discount_percent, 0.00),
-                   COALESCE(d.final_price, d.price, 29.00),
-                   COALESCE(d.warranty_days, 90),
-                   COALESCE(d.warranty_start_date, d.created_at, CURRENT_TIMESTAMP),
-                   COALESCE(d.warranty_end_date, COALESCE(d.warranty_start_date, d.created_at, CURRENT_TIMESTAMP) + (COALESCE(d.warranty_days, 90) || ' days')::INTERVAL),
-                   'COMPLETED',
-                   COALESCE(d.warranty_start_date, d.created_at, CURRENT_TIMESTAMP)
-            FROM devices d
-            WHERE (d.status::text IN ('ACTIVE', 'PENDING') OR d.merchant_id IS NOT NULL)
-              AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.device_id = d.id);
+            -- Ensure any existing active/sold devices are safely registered in sales before dropping columns
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'devices' AND column_name = 'discount_amount'
+                ) THEN
+                    INSERT INTO sales (device_id, device_sn, merchant_id, price, discount_amount, discount_percent, final_price, warranty_days, warranty_start_date, warranty_end_date, status, created_at)
+                    SELECT d.id, d.device_sn, 
+                           CASE WHEN d.merchant_id::text ~ '^[0-9]+$' THEN d.merchant_id::text::int ELSE NULL END,
+                           COALESCE(d.price, 29.00),
+                           COALESCE(d.discount_amount, 0.00),
+                           COALESCE(d.discount_percent, 0.00),
+                           COALESCE(d.final_price, d.price, 29.00),
+                           COALESCE(d.warranty_days, 90),
+                           COALESCE(d.warranty_start_date, d.created_at, CURRENT_TIMESTAMP),
+                           COALESCE(d.warranty_end_date, COALESCE(d.warranty_start_date, d.created_at, CURRENT_TIMESTAMP) + (COALESCE(d.warranty_days, 90) || ' days')::INTERVAL),
+                           'COMPLETED',
+                           COALESCE(d.warranty_start_date, d.created_at, CURRENT_TIMESTAMP)
+                    FROM devices d
+                    WHERE (d.status::text IN ('ACTIVE', 'PENDING') OR d.merchant_id IS NOT NULL)
+                      AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.device_id = d.id);
+                END IF;
+            END $$;
+
+            -- Clean and normalize devices schema by removing redundant transaction and duplicate columns
+            ALTER TABLE devices DROP COLUMN IF EXISTS discount_amount;
+            ALTER TABLE devices DROP COLUMN IF EXISTS discount_percent;
+            ALTER TABLE devices DROP COLUMN IF EXISTS final_price;
+            ALTER TABLE devices DROP COLUMN IF EXISTS warranty_days;
+            ALTER TABLE devices DROP COLUMN IF EXISTS warranty_start_date;
+            ALTER TABLE devices DROP COLUMN IF EXISTS warranty_end_date;
+            ALTER TABLE devices DROP COLUMN IF EXISTS supplier;
+            ALTER TABLE devices DROP COLUMN IF EXISTS chat_id;
         """)
 
         # 7. Transactions Table

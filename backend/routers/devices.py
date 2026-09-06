@@ -61,7 +61,7 @@ async def register_device(
         chat_id = payload.telegram_chat_id.strip() if payload.telegram_chat_id and payload.telegram_chat_id.strip() else None
         qr_code_val = payload.qr_code.strip() if payload.qr_code and payload.qr_code.strip() else None
 
-        # Eager schema migration to ensure all optional/new columns exist
+        # Eager schema migration to ensure all core hardware columns exist
         try:
             await conn.execute("""
                 ALTER TABLE devices DROP CONSTRAINT IF EXISTS devices_merchant_id_fkey;
@@ -70,12 +70,6 @@ async def register_device(
                 ALTER TABLE devices ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(255);
                 ALTER TABLE devices ADD COLUMN IF NOT EXISTS qr_code TEXT;
                 ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(10, 2) DEFAULT 0.00;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(5, 2) DEFAULT 0.00;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS final_price NUMERIC(10, 2) DEFAULT 29.00;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_days INT DEFAULT 90;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_start_date TIMESTAMPTZ;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_end_date TIMESTAMPTZ;
                 ALTER TABLE devices ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
                 ALTER TABLE devices ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'ACTIVE';
                 ALTER TABLE devices ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
@@ -94,7 +88,7 @@ async def register_device(
         else:
             m_id_target = str(payload.merchant_id)
 
-        # Base price and discount calculation
+        # Base price and discount calculation for sales recording
         base_price = float(payload.price or 29.00)
         disc_amt = float(payload.discount_amount or 0.0)
         if payload.discount_percent and float(payload.discount_percent) > 0:
@@ -106,20 +100,16 @@ async def register_device(
 
         if existing_device:
             dev_id = existing_device["id"]
-            # Reassign / link to this merchant and activate with warranty
+            # Reassign / link to this merchant and activate hardware
             try:
                 await conn.execute("""
                     UPDATE devices 
                     SET merchant_id = $1, telegram_chat_id = $2, device_type = $3, device_model = $4, 
-                        price = $5, discount_amount = $6, discount_percent = $7, final_price = $8,
-                        warranty_days = $9, 
-                        warranty_start_date = COALESCE(warranty_start_date, $10),
-                        warranty_end_date = COALESCE(warranty_end_date, $11),
-                        qr_code = COALESCE($12, qr_code),
+                        price = $5, qr_code = COALESCE($6, qr_code),
                         status = 'ACTIVE', is_active = TRUE, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $13
+                    WHERE id = $7
                 """, m_id_target, chat_id, payload.device_type or "Display Soundbox", payload.device_model or "Display Soundbox", 
-                   base_price, disc_amt, float(payload.discount_percent or 0.0), calc_final_price, w_days, now_dt, w_end_dt, qr_code_val, dev_id)
+                   base_price, qr_code_val, dev_id)
             except Exception as update_err:
                 logger.warning(f"Full device link update failed: {update_err}. Running minimal fallback...")
                 try:
@@ -132,28 +122,44 @@ async def register_device(
                     logger.error(f"Device link update completely failed: {final_update_err}", exc_info=True)
                     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to link device: {str(final_update_err)}")
 
+            # Record commercial sale transaction in sales table
+            try:
+                await conn.execute("""
+                    INSERT INTO sales (
+                        device_id, device_sn, merchant_id, sold_by_user_id,
+                        customer_name, customer_phone, price, discount_type,
+                        discount_percent, discount_amount, final_price, currency,
+                        warranty_days, warranty_start_date, warranty_end_date,
+                        payment_method, status
+                    )
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, 'PERCENTAGE', $8, $9, $10, 'USD', $11, $12, $13, 'CASH', 'COMPLETED')
+                """, dev_id, device_sn, merchant["id"], current_user.get("id"),
+                   merchant.get("name") or "Merchant", merchant.get("owner_phone"), base_price,
+                   float(payload.discount_percent or 0.0), disc_amt, calc_final_price,
+                   w_days, now_dt, w_end_dt)
+            except Exception as sale_err:
+                logger.warning(f"Could not auto-insert sale record during device link: {sale_err}")
+
             return {
                 "status": "success",
                 "message": f"Soundbox '{device_sn}' linked successfully.",
                 "device_id": dev_id
             }
         else:
-            # Insert new device linked to merchant with warranty
+            # Insert new hardware device linked to merchant
             try:
                 new_id = await conn.fetchval("""
                     INSERT INTO devices (
                         merchant_id, device_sn, device_type, device_model, telegram_chat_id, 
-                        price, discount_amount, discount_percent, final_price, 
-                        warranty_days, warranty_start_date, warranty_end_date, qr_code, status, is_active
+                        price, qr_code, status, is_active
                     )
                     VALUES (
                         $1, $2, $3, $4, $5, 
-                        $6, $7, $8, $9, 
-                        $10, $11, $12, $13, 'ACTIVE', TRUE
+                        $6, $7, 'ACTIVE', TRUE
                     )
                     RETURNING id
                 """, m_id_target, device_sn, payload.device_type or "Display Soundbox", payload.device_model or "Display Soundbox", chat_id, 
-                   base_price, disc_amt, float(payload.discount_percent or 0.0), calc_final_price, w_days, now_dt, w_end_dt, qr_code_val)
+                   base_price, qr_code_val)
             except Exception as insert_err:
                 logger.warning(f"Standard device link insert failed: {insert_err}. Retrying with fallback schema...")
                 try:
@@ -180,6 +186,24 @@ async def register_device(
                             status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"Failed to link Soundbox: {str(final_err)}"
                         )
+
+            # Record commercial sale transaction in sales table
+            try:
+                await conn.execute("""
+                    INSERT INTO sales (
+                        device_id, device_sn, merchant_id, sold_by_user_id,
+                        customer_name, customer_phone, price, discount_type,
+                        discount_percent, discount_amount, final_price, currency,
+                        warranty_days, warranty_start_date, warranty_end_date,
+                        payment_method, status
+                    )
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, 'PERCENTAGE', $8, $9, $10, 'USD', $11, $12, $13, 'CASH', 'COMPLETED')
+                """, new_id, device_sn, merchant["id"], current_user.get("id"),
+                   merchant.get("name") or "Merchant", merchant.get("owner_phone"), base_price,
+                   float(payload.discount_percent or 0.0), disc_amt, calc_final_price,
+                   w_days, now_dt, w_end_dt)
+            except Exception as sale_err:
+                logger.warning(f"Could not auto-insert sale record during new device link: {sale_err}")
 
             return {
                 "status": "success",
@@ -230,7 +254,7 @@ async def lookup_device_by_sn(
                    COALESCE(d.device_model, 'Y6B') AS device_model,
                    d.qr_code, d.telegram_chat_id, d.status,
                    d.supplier_id,
-                   COALESCE(s.name, d.supplier, 'Feishu') AS supplier
+                   COALESCE(s.name, 'Feishu') AS supplier
             FROM devices d
             LEFT JOIN suppliers s ON d.supplier_id = s.id
             WHERE d.device_sn = $1 OR d.device_id = $1
@@ -318,16 +342,16 @@ async def list_devices(
                    d.batch_no,
                    d.notes,
                    COALESCE(d.price, 29.00) AS price,
-                   COALESCE(d.discount_amount, 0.00) AS discount_amount,
-                   COALESCE(d.discount_percent, 0.00) AS discount_percent,
-                   COALESCE(d.final_price, d.price, 29.00) AS final_price,
-                   COALESCE(d.warranty_days, 90) AS warranty_days,
-                   d.warranty_start_date,
-                   d.warranty_end_date,
-                   COALESCE(d.telegram_chat_id, d.chat_id) AS telegram_chat_id,
+                   COALESCE(latest_sale.discount_amount, 0.00) AS discount_amount,
+                   COALESCE(latest_sale.discount_percent, 0.00) AS discount_percent,
+                   COALESCE(latest_sale.final_price, d.price, 29.00) AS final_price,
+                   COALESCE(latest_sale.warranty_days, 90) AS warranty_days,
+                   latest_sale.warranty_start_date,
+                   latest_sale.warranty_end_date,
+                   d.telegram_chat_id,
                    d.qr_code,
                    d.supplier_id,
-                   COALESCE(s.name, d.supplier, 'Feishu') AS supplier,
+                   COALESCE(s.name, 'Feishu') AS supplier,
                    COALESCE(NULLIF(d.status::text, ''), CASE WHEN d.merchant_id IS NULL THEN 'IN_STOCK' WHEN d.is_active = FALSE THEN 'Offline' ELSE 'Online' END, 'IN_STOCK') AS status,
                    COALESCE(d.battery, '100%') AS battery,
                    COALESCE(d.signal, 'Good') AS signal,
@@ -343,6 +367,14 @@ async def list_devices(
                    COALESCE(u.full_name, m.merchant_name, m.name) AS owner_name
             FROM devices d
             LEFT JOIN suppliers s ON d.supplier_id = s.id
+            LEFT JOIN LATERAL (
+                SELECT s_order.id, s_order.price, s_order.discount_amount, s_order.discount_percent, s_order.final_price,
+                       s_order.warranty_days, s_order.warranty_start_date, s_order.warranty_end_date
+                FROM sales s_order
+                WHERE s_order.device_id = d.id OR s_order.device_sn = d.device_sn
+                ORDER BY s_order.id DESC
+                LIMIT 1
+            ) latest_sale ON true
             LEFT JOIN merchants m ON (d.merchant_id::text = m.merchant_id::text OR d.merchant_id::text = m.id::text)
             LEFT JOIN users u ON m.user_id = u.id OR (m.user_id IS NULL AND m.owner_phone = u.phone_number)
             WHERE {where_sql}
@@ -356,16 +388,9 @@ async def list_devices(
             try:
                 await conn.execute("""
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS batch_no VARCHAR(100) DEFAULT 'BATCH-STD';
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(10,2) DEFAULT 0.00;
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(5,2) DEFAULT 0.00;
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS final_price NUMERIC(10,2) DEFAULT 29.00;
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_days INT DEFAULT 90;
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_start_date TIMESTAMPTZ;
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_end_date TIMESTAMPTZ;
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_4g VARCHAR(100) DEFAULT 'Y6B_LCD_1605_V1.0';
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_wifi VARCHAR(100) DEFAULT 'esp32c2x_2M_OTA';
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier VARCHAR(100) DEFAULT 'Feishu';
                 """)
                 devices = await conn.fetch(query, *params)
             except Exception as e2:
@@ -443,9 +468,9 @@ async def bulk_import_devices(
 
             try:
                 await conn.execute("""
-                    INSERT INTO devices (device_id, device_sn, device_model, batch_no, notes, price, status, is_active, battery, signal, supplier_id, supplier)
-                    VALUES ($1, $1, $2, $3, $4, $5, 'IN_STOCK', FALSE, '100%', 'Good', $6, $7)
-                """, sn, payload.device_model or "Y6B", payload.batch_no, payload.notes, payload.price or 29.00, supp_id, supp_name)
+                    INSERT INTO devices (device_id, device_sn, device_model, batch_no, notes, price, status, is_active, battery, signal, supplier_id)
+                    VALUES ($1, $1, $2, $3, $4, $5, 'IN_STOCK', FALSE, '100%', 'Good', $6)
+                """, sn, payload.device_model or "Y6B", payload.batch_no, payload.notes, payload.price or 29.00, supp_id)
             except Exception as e:
                 # Auto-heal missing columns if running against older DB schema
                 await conn.execute("""
@@ -455,12 +480,11 @@ async def bulk_import_devices(
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier_id INT;
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier VARCHAR(100) DEFAULT 'Feishu';
                 """)
                 await conn.execute("""
-                    INSERT INTO devices (device_id, device_sn, notes, price, status, is_active, battery, signal, supplier_id, supplier)
-                    VALUES ($1, $1, $2, $3, 'IN_STOCK', FALSE, '100%', 'Good', $4, $5)
-                """, sn, payload.notes, payload.price or 29.00, supp_id, supp_name)
+                    INSERT INTO devices (device_id, device_sn, notes, price, status, is_active, battery, signal, supplier_id)
+                    VALUES ($1, $1, $2, $3, 'IN_STOCK', FALSE, '100%', 'Good', $4)
+                """, sn, payload.notes, payload.price or 29.00, supp_id)
             imported_count += 1
 
         return {
@@ -529,11 +553,11 @@ async def intake_single_device(
             new_id = await conn.fetchval("""
                 INSERT INTO devices (
                     device_id, device_sn, device_type, device_model, 
-                    merchant_id, batch_no, notes, price, status, is_active, battery, signal, supplier_id, supplier
+                    merchant_id, batch_no, notes, price, status, is_active, battery, signal, supplier_id
                 )
-                VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9, '100%', 'Good', $10, $11)
+                VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9, '100%', 'Good', $10)
                 RETURNING id
-            """, sn, payload.device_type or "Display Soundbox", payload.device_model or "Y6B", m_id_target, payload.batch_no, payload.notes, payload.price or 29.00, initial_status, is_active, supp_id, supp_name)
+            """, sn, payload.device_type or "Display Soundbox", payload.device_model or "Y6B", m_id_target, payload.batch_no, payload.notes, payload.price or 29.00, initial_status, is_active, supp_id)
         except Exception as insert_err:
             logger.warning(f"Standard device intake failed: {insert_err}. Attempting schema auto-heal and fallback...")
             try:
@@ -545,16 +569,15 @@ async def intake_single_device(
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier_id INT;
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier VARCHAR(100) DEFAULT 'Feishu';
                 """)
                 new_id = await conn.fetchval("""
                     INSERT INTO devices (
                         device_id, device_sn, device_type, 
-                        merchant_id, notes, price, status, is_active, battery, signal, supplier_id, supplier
+                        merchant_id, notes, price, status, is_active, battery, signal, supplier_id
                     )
-                    VALUES ($1, $1, $2, $3, $4, $5, $6, $7, '100%', 'Good', $8, $9)
+                    VALUES ($1, $1, $2, $3, $4, $5, $6, $7, '100%', 'Good', $8)
                     RETURNING id
-                """, sn, payload.device_type or "Display Soundbox", m_id_target, payload.notes, payload.price or 29.00, initial_status, is_active, supp_id, supp_name)
+                """, sn, payload.device_type or "Display Soundbox", m_id_target, payload.notes, payload.price or 29.00, initial_status, is_active, supp_id)
             except Exception as final_err:
                 logger.error(f"Device intake permanently failed for SN '{sn}': {final_err}", exc_info=True)
                 raise HTTPException(
@@ -806,67 +829,56 @@ async def update_device(
             params.append(float(payload.price))
             idx += 1
 
-        if payload.discount_amount is not None:
-            updates.append(f"discount_amount = ${idx}")
-            params.append(float(payload.discount_amount))
-            idx += 1
-
-        if payload.discount_percent is not None:
-            updates.append(f"discount_percent = ${idx}")
-            params.append(float(payload.discount_percent))
-            idx += 1
-
-        if payload.final_price is not None:
-            updates.append(f"final_price = ${idx}")
-            params.append(float(payload.final_price))
-            idx += 1
-        elif payload.price is not None or payload.discount_amount is not None or payload.discount_percent is not None:
-            # Auto-compute final price if components provided
-            p_val = float(payload.price if payload.price is not None else 29.0)
-            d_amt = float(payload.discount_amount if payload.discount_amount is not None else 0.0)
-            if payload.discount_percent and float(payload.discount_percent) > 0:
-                d_amt = (float(payload.discount_percent) / 100.0) * p_val
-            f_val = max(0.0, p_val - d_amt)
-            updates.append(f"final_price = ${idx}")
-            params.append(f_val)
-            idx += 1
-
-        # Warranty days and dates handling
-        if payload.warranty_days is not None:
-            updates.append(f"warranty_days = ${idx}")
-            params.append(int(payload.warranty_days))
-            idx += 1
-
-        w_days_val = int(payload.warranty_days) if payload.warranty_days is not None else 90
-
-        if payload.warranty_start_date is not None:
+        # Synchronize sales & warranty updates to the sales table if any commercial fields are supplied
+        has_sales_update = any(v is not None for v in [
+            payload.discount_amount, payload.discount_percent, payload.final_price,
+            payload.warranty_days, payload.warranty_start_date, payload.warranty_end_date
+        ])
+        if has_sales_update:
             try:
-                clean_str = payload.warranty_start_date.replace("Z", "+00:00")
-                start_dt = datetime.fromisoformat(clean_str)
-            except Exception:
-                start_dt = datetime.now(timezone.utc)
-            updates.append(f"warranty_start_date = ${idx}")
-            params.append(start_dt)
-            idx += 1
+                latest_sale = await conn.fetchrow("""
+                    SELECT s.id, s.price, s.discount_amount, s.discount_percent, s.final_price,
+                           s.warranty_days, s.warranty_start_date, s.warranty_end_date
+                    FROM sales s
+                    JOIN devices d ON (s.device_id = d.id OR s.device_sn = d.device_sn)
+                    WHERE d.id = $1
+                    ORDER BY s.id DESC
+                    LIMIT 1
+                """, device_id)
+                if latest_sale:
+                    s_id = latest_sale["id"]
+                    s_price = float(payload.price if payload.price is not None else (latest_sale["price"] or 29.0))
+                    s_disc_pct = float(payload.discount_percent if payload.discount_percent is not None else (latest_sale["discount_percent"] or 0.0))
+                    s_disc_amt = float(payload.discount_amount if payload.discount_amount is not None else (latest_sale["discount_amount"] or 0.0))
+                    if payload.discount_percent is not None and s_disc_pct > 0:
+                        s_disc_amt = (s_disc_pct / 100.0) * s_price
+                    s_final = float(payload.final_price if payload.final_price is not None else max(0.0, s_price - s_disc_amt))
+                    s_wdays = int(payload.warranty_days if payload.warranty_days is not None else (latest_sale["warranty_days"] or 90))
+                    
+                    s_start = latest_sale["warranty_start_date"]
+                    if payload.warranty_start_date:
+                        try:
+                            s_start = datetime.fromisoformat(payload.warranty_start_date.replace("Z", "+00:00"))
+                        except Exception:
+                            pass
+                    s_end = latest_sale["warranty_end_date"]
+                    if payload.warranty_end_date:
+                        try:
+                            s_end = datetime.fromisoformat(payload.warranty_end_date.replace("Z", "+00:00"))
+                        except Exception:
+                            pass
+                    elif s_start and payload.warranty_days is not None:
+                        s_end = s_start + timedelta(days=s_wdays)
 
-            if payload.warranty_end_date is not None:
-                try:
-                    clean_end = payload.warranty_end_date.replace("Z", "+00:00")
-                    end_dt = datetime.fromisoformat(clean_end)
-                except Exception:
-                    end_dt = start_dt + timedelta(days=w_days_val)
-            else:
-                end_dt = start_dt + timedelta(days=w_days_val)
-            updates.append(f"warranty_end_date = ${idx}")
-            params.append(end_dt)
-            idx += 1
-        elif payload.merchant_id is not None or payload.warranty_days is not None:
-            now_dt = datetime.now(timezone.utc)
-            end_dt = now_dt + timedelta(days=w_days_val)
-            updates.append("warranty_start_date = COALESCE(warranty_start_date, CURRENT_TIMESTAMP)")
-            updates.append(f"warranty_end_date = COALESCE(warranty_start_date, CURRENT_TIMESTAMP) + (${idx}::INT * INTERVAL '1 day')")
-            params.append(w_days_val)
-            idx += 1
+                    await conn.execute("""
+                        UPDATE sales
+                        SET price = $1, discount_percent = $2, discount_amount = $3, final_price = $4,
+                            warranty_days = $5, warranty_start_date = $6, warranty_end_date = $7,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = $8
+                    """, s_price, s_disc_pct, s_disc_amt, s_final, s_wdays, s_start, s_end, s_id)
+            except Exception as s_err:
+                logger.warning(f"Could not synchronize sale updates for device {device_id}: {s_err}")
 
         if payload.status is not None:
             st_val = payload.status.strip().upper()
@@ -914,9 +926,6 @@ async def update_device(
             supp_id, supp_name = await resolve_supplier(conn, payload.supplier_id, payload.supplier)
             updates.append(f"supplier_id = ${idx}")
             params.append(supp_id)
-            idx += 1
-            updates.append(f"supplier = ${idx}")
-            params.append(supp_name)
             idx += 1
 
         if not updates:

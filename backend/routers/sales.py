@@ -124,26 +124,12 @@ async def create_device_sale(
             UPDATE devices SET
                 status = $1::device_status,
                 is_active = $2,
-                price = $3,
-                discount_amount = $4,
-                discount_percent = $5,
-                final_price = $6,
-                warranty_days = $7,
-                warranty_start_date = $8,
-                warranty_end_date = $9,
-                merchant_id = COALESCE($10, merchant_id),
+                merchant_id = COALESCE($3, merchant_id),
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = $11
+            WHERE id = $4
         """,
             target_status,
             is_active,
-            payload.price,
-            payload.discount_amount,
-            payload.discount_percent,
-            payload.final_price,
-            payload.warranty_days,
-            start_dt,
-            end_dt,
             str(target_merchant_id) if target_merchant_id is not None else None,
             device["id"]
         )
@@ -215,7 +201,7 @@ async def list_sales(
                    COALESCE(m.merchant_name, m.name) AS store_name,
                    u.full_name AS seller_name,
                    d.device_type,
-                   COALESCE(supp.name, d.supplier, 'Feishu') AS supplier
+                   COALESCE(supp.name, 'Feishu') AS supplier
             FROM sales s
             LEFT JOIN merchants m ON s.merchant_id = m.id
             LEFT JOIN users u ON s.sold_by_user_id = u.id
@@ -277,7 +263,7 @@ async def get_sale_detail(
                    COALESCE(m.merchant_name, m.name) AS store_name,
                    u.full_name AS seller_name,
                    d.device_type,
-                   COALESCE(supp.name, d.supplier, 'Feishu') AS supplier
+                   COALESCE(supp.name, 'Feishu') AS supplier
             FROM sales s
             LEFT JOIN merchants m ON s.merchant_id = m.id
             LEFT JOIN users u ON s.sold_by_user_id = u.id
