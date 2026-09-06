@@ -204,7 +204,8 @@ async def lookup_device_by_sn(
             SELECT id, device_sn, 
                    COALESCE(device_type, 'Display Soundbox') AS device_type,
                    COALESCE(device_model, 'Y6B') AS device_model,
-                   qr_code, telegram_chat_id, status
+                   qr_code, telegram_chat_id, status,
+                   COALESCE(supplier, 'Eishu') AS supplier
             FROM devices
             WHERE device_sn = $1 OR device_id = $1
             ORDER BY id DESC
@@ -220,7 +221,8 @@ async def lookup_device_by_sn(
                 "has_lcd_screen": True,
                 "qr_code": None,
                 "telegram_chat_id": None,
-                "status": None
+                "status": None,
+                "supplier": "Eishu"
             }
 
         d_type = str(row["device_type"] or "Display Soundbox")
@@ -243,7 +245,8 @@ async def lookup_device_by_sn(
             "has_lcd_screen": has_lcd,
             "qr_code": row["qr_code"],
             "telegram_chat_id": row["telegram_chat_id"],
-            "status": row["status"]
+            "status": row["status"],
+            "supplier": row["supplier"] or "Eishu"
         }
 
 
@@ -295,6 +298,7 @@ async def list_devices(
                    d.warranty_end_date,
                    COALESCE(d.telegram_chat_id, d.chat_id) AS telegram_chat_id,
                    d.qr_code,
+                   COALESCE(d.supplier, 'Eishu') AS supplier,
                    COALESCE(NULLIF(d.status::text, ''), CASE WHEN d.merchant_id IS NULL THEN 'IN_STOCK' WHEN d.is_active = FALSE THEN 'Offline' ELSE 'Online' END, 'IN_STOCK') AS status,
                    COALESCE(d.battery, '100%') AS battery,
                    COALESCE(d.signal, 'Good') AS signal,
@@ -331,6 +335,7 @@ async def list_devices(
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_4g VARCHAR(100) DEFAULT 'Y6B_LCD_1605_V1.0';
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_wifi VARCHAR(100) DEFAULT 'esp32c2x_2M_OTA';
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier VARCHAR(100) DEFAULT 'Eishu';
                 """)
                 devices = await conn.fetch(query, *params)
             except Exception as e2:
@@ -374,6 +379,7 @@ class DeviceBulkImportSchema(BaseModel):
     batch_no: Optional[str] = None
     notes: Optional[str] = None
     price: Optional[float] = 29.00
+    supplier: Optional[str] = "Eishu"
 
 
 @router.post("/bulk-import", status_code=status.HTTP_201_CREATED)
@@ -392,6 +398,8 @@ async def bulk_import_devices(
     if not raw_sns:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No valid serial numbers provided.")
 
+    supplier_val = (payload.supplier or "Eishu").strip()
+
     pool = await get_db_pool()
     async with pool.acquire() as conn:
         imported_count = 0
@@ -405,9 +413,9 @@ async def bulk_import_devices(
 
             try:
                 await conn.execute("""
-                    INSERT INTO devices (device_id, device_sn, device_model, batch_no, notes, price, status, is_active, battery, signal)
-                    VALUES ($1, $1, $2, $3, $4, $5, 'IN_STOCK', FALSE, '100%', 'Good')
-                """, sn, payload.device_model or "Y6B", payload.batch_no, payload.notes, payload.price or 29.00)
+                    INSERT INTO devices (device_id, device_sn, device_model, batch_no, notes, price, status, is_active, battery, signal, supplier)
+                    VALUES ($1, $1, $2, $3, $4, $5, 'IN_STOCK', FALSE, '100%', 'Good', $6)
+                """, sn, payload.device_model or "Y6B", payload.batch_no, payload.notes, payload.price or 29.00, supplier_val)
             except Exception as e:
                 # Auto-heal missing columns if running against older DB schema
                 await conn.execute("""
@@ -416,11 +424,12 @@ async def bulk_import_devices(
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_type VARCHAR(100) DEFAULT 'Display Soundbox';
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier VARCHAR(100) DEFAULT 'Eishu';
                 """)
                 await conn.execute("""
-                    INSERT INTO devices (device_id, device_sn, notes, price, status, is_active, battery, signal)
-                    VALUES ($1, $1, $2, $3, 'IN_STOCK', FALSE, '100%', 'Good')
-                """, sn, payload.notes, payload.price or 29.00)
+                    INSERT INTO devices (device_id, device_sn, notes, price, status, is_active, battery, signal, supplier)
+                    VALUES ($1, $1, $2, $3, 'IN_STOCK', FALSE, '100%', 'Good', $4)
+                """, sn, payload.notes, payload.price or 29.00, supplier_val)
             imported_count += 1
 
         return {
@@ -439,6 +448,7 @@ class DeviceIntakeSchema(BaseModel):
     notes: Optional[str] = None
     merchant_id: Optional[Union[int, str]] = None
     price: Optional[float] = 29.00
+    supplier: Optional[str] = "Eishu"
 
 
 @router.post("/intake", status_code=status.HTTP_201_CREATED)
@@ -456,6 +466,8 @@ async def intake_single_device(
     sn = payload.device_sn.strip()
     if not sn:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Serial number is required.")
+
+    supplier_val = (payload.supplier or "Eishu").strip()
 
     pool = await get_db_pool()
     async with pool.acquire() as conn:
@@ -485,11 +497,11 @@ async def intake_single_device(
             new_id = await conn.fetchval("""
                 INSERT INTO devices (
                     device_id, device_sn, device_type, device_model, 
-                    merchant_id, batch_no, notes, price, status, is_active, battery, signal
+                    merchant_id, batch_no, notes, price, status, is_active, battery, signal, supplier
                 )
-                VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9, '100%', 'Good')
+                VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9, '100%', 'Good', $10)
                 RETURNING id
-            """, sn, payload.device_type or "Display Soundbox", payload.device_model or "Y6B", m_id_target, payload.batch_no, payload.notes, payload.price or 29.00, initial_status, is_active)
+            """, sn, payload.device_type or "Display Soundbox", payload.device_model or "Y6B", m_id_target, payload.batch_no, payload.notes, payload.price or 29.00, initial_status, is_active, supplier_val)
         except Exception as insert_err:
             logger.warning(f"Standard device intake failed: {insert_err}. Attempting schema auto-heal and fallback...")
             try:
@@ -500,15 +512,16 @@ async def intake_single_device(
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_type VARCHAR(100) DEFAULT 'Display Soundbox';
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier VARCHAR(100) DEFAULT 'Eishu';
                 """)
                 new_id = await conn.fetchval("""
                     INSERT INTO devices (
                         device_id, device_sn, device_type, 
-                        merchant_id, notes, price, status, is_active, battery, signal
+                        merchant_id, notes, price, status, is_active, battery, signal, supplier
                     )
-                    VALUES ($1, $1, $2, $3, $4, $5, $6, $7, '100%', 'Good')
+                    VALUES ($1, $1, $2, $3, $4, $5, $6, $7, '100%', 'Good', $8)
                     RETURNING id
-                """, sn, payload.device_type or "Display Soundbox", m_id_target, payload.notes, payload.price or 29.00, initial_status, is_active)
+                """, sn, payload.device_type or "Display Soundbox", m_id_target, payload.notes, payload.price or 29.00, initial_status, is_active, supplier_val)
             except Exception as final_err:
                 logger.error(f"Device intake permanently failed for SN '{sn}': {final_err}", exc_info=True)
                 raise HTTPException(
@@ -673,6 +686,7 @@ class DeviceUpdateSchema(BaseModel):
     warranty_days: Optional[int] = None
     warranty_start_date: Optional[str] = None
     warranty_end_date: Optional[str] = None
+    supplier: Optional[str] = None
 
 
 @router.put("/{device_id}")
@@ -861,6 +875,11 @@ async def update_device(
             if payload.status is None:
                 updates.append("status = 'ACTIVE'::device_status")
                 updates.append("is_active = TRUE")
+
+        if payload.supplier is not None:
+            updates.append(f"supplier = ${idx}")
+            params.append(payload.supplier.strip() if payload.supplier.strip() else "Eishu")
+            idx += 1
 
         if not updates:
             return {"status": "success", "message": "No changes requested."}

@@ -335,6 +335,9 @@ export const translations = {
     waitingForRegistration: "Waiting for Registration",
     awaitingStoreLink: "Awaiting Store Link",
     confirmSaleAndDeploy: "Confirm Sale",
+    supplier: "Supplier",
+    supplierEishu: "Eishu",
+    supplierHemi: "Hemi",
     // Store & Location Filter Keys
     allProvinces: "All Provinces / Cities",
     allDistricts: "All Districts / Khans",
@@ -730,6 +733,9 @@ export const translations = {
     waitingForRegistration: "រង់ចាំការចុះឈ្មោះ",
     confirmSaleAndDeploy: "បញ្ជាក់ការលក់",
     awaitingStoreLink: "មិនទាន់ភ្ជាប់ហាង (រង់ចាំការចុះឈ្មោះ)",
+    supplier: "អ្នកផ្គត់ផ្គង់ (Supplier)",
+    supplierEishu: "Eishu",
+    supplierHemi: "Hemi",
     
     // Store & Location Filter Keys
     allProvinces: "គ្រប់ខេត្ត / រាជធានី",
