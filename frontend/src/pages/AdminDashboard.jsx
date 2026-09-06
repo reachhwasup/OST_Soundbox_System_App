@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -216,6 +216,8 @@ export default function AdminDashboard() {
   const [singleNotes, setSingleNotes] = useState('');
   const [singlePrice, setSinglePrice] = useState('39.00');
   const [stockSubmitting, setStockSubmitting] = useState(false);
+  const [isStockSnScanning, setIsStockSnScanning] = useState(false);
+  const stockFileInputRef = useRef(null);
 
   const [isDeviceDetailOpen, setIsDeviceDetailOpen] = useState(false);
   const [selectedDeviceDetail, setSelectedDeviceDetail] = useState(null);
@@ -1522,6 +1524,7 @@ export default function AdminDashboard() {
         duration: 5000
       });
       setIsStockModalOpen(false);
+      setIsStockSnScanning(false);
       setSingleSnInput('');
       setSingleStoreId('');
       setSingleNotes('');
@@ -1532,6 +1535,47 @@ export default function AdminDashboard() {
     } finally {
       setStockSubmitting(false);
     }
+  };
+
+  // Upload soundbox QR/Barcode sticker image to auto-detect SN for stock
+  const handleUploadStockSnImage = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+        if (code && code.data) {
+          const clean = code.data.trim();
+          setSingleSnInput(clean);
+          showToast({
+            type: 'success',
+            title: isKhmer ? 'ស្កេន SN ជោគជ័យ' : 'SN Scanned Successfully',
+            message: `Scanned SN: ${clean}`,
+            duration: 4000
+          });
+        } else {
+          showToast({
+            type: 'error',
+            title: isKhmer ? 'មិនអាចរកឃើញ QR' : 'Scan Failed',
+            message: isKhmer ? 'មិនអាចរកឃើញកូដ QR ពីរូបភាពដែលបានជ្រើសរើសទេ។' : 'Could not detect a QR code from the selected image.',
+            duration: 4000
+          });
+        }
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   // Handle Return Device to Warehouse Stock
@@ -5937,23 +5981,96 @@ export default function AdminDashboard() {
       {/* Modal: Warehouse Stock Intake */}
       <Modal
         isOpen={isStockModalOpen}
-        onClose={() => !stockSubmitting && setIsStockModalOpen(false)}
-        title="Add Soundbox Device to Stock"
+        onClose={() => {
+          if (!stockSubmitting) {
+            setIsStockModalOpen(false);
+            setIsStockSnScanning(false);
+          }
+        }}
+        title={isKhmer ? "បន្ថែមឧបករណ៍ទៅក្នុងស្តុកឃ្លាំង" : "Add Soundbox Device to Stock"}
       >
-        <form onSubmit={handleSingleIntakeStock} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Soundbox Serial Number (SN) <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={singleSnInput}
-              onChange={(e) => setSingleSnInput(e.target.value)}
-              placeholder="e.g. 6152608110099"
-              required
-              className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+        <div className="space-y-4">
+          {/* Live Camera Scanner Banner for SN */}
+          {isStockSnScanning && (
+            <FieldQRScanner 
+              targetName={isKhmer ? 'លេខស៊េរីឧបករណ៍ (SN)' : 'Device Serial Number (SN)'}
+              onScanSuccess={(decodedText) => {
+                const text = decodedText.trim();
+                setSingleSnInput(text);
+                setIsStockSnScanning(false);
+                showToast({
+                  type: 'success',
+                  title: isKhmer ? 'ស្កេន SN បានជោគជ័យ' : 'SN Scanned Successfully',
+                  message: `Scanned SN: ${text}`,
+                  duration: 4000
+                });
+              }}
+              onClose={() => setIsStockSnScanning(false)}
             />
-          </div>
+          )}
+
+          <form onSubmit={handleSingleIntakeStock} className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  {isKhmer ? 'លេខស៊េរីឧបករណ៍ (SN)' : 'Soundbox Serial Number (SN)'} <span className="text-rose-500">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsStockSnScanning(!isStockSnScanning)}
+                  className={`text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer px-2.5 py-1 rounded-lg ${
+                    isStockSnScanning
+                      ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800'
+                      : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100'
+                  }`}
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>{isStockSnScanning ? (isKhmer ? 'បិទកាមេរ៉ា' : 'Close Camera') : (isKhmer ? 'ស្កេនដោយកាមេរ៉ា' : 'Scan with Camera')}</span>
+                </button>
+              </div>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  value={singleSnInput}
+                  onChange={(e) => setSingleSnInput(e.target.value)}
+                  placeholder={isKhmer ? 'ឧទាហរណ៍៖ 6152608110099' : 'e.g. 6152608110099'}
+                  required
+                  className="w-full pl-3 pr-10 py-2.5 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsStockSnScanning(!isStockSnScanning)}
+                  className={`absolute inset-y-0 right-0 pr-3 flex items-center transition cursor-pointer ${
+                    isStockSnScanning ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400'
+                  }`}
+                  title={isKhmer ? 'ស្កេន QR / Barcode ដោយកាមេរ៉ា' : 'Scan QR / Barcode with Camera'}
+                >
+                  <QrCode className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="mt-1.5 flex items-center justify-between text-xs">
+                <span className="text-[11px] text-slate-400">
+                  {isKhmer ? 'ស្កេនស្ទីកឃ័រ QR/Barcode ឬវាយបញ្ចូលដោយដៃ' : 'Scan QR/Barcode sticker or enter manually'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => stockFileInputRef.current?.click()}
+                  className="text-amber-600 hover:text-amber-700 dark:text-amber-400 font-medium flex items-center gap-1 transition cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{isKhmer ? 'ផ្ទុកឡើងរូបភាព QR' : 'Upload QR Image'}</span>
+                </button>
+                <input
+                  type="file"
+                  ref={stockFileInputRef}
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleUploadStockSnImage}
+                />
+              </div>
+            </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -6030,6 +6147,7 @@ export default function AdminDashboard() {
             </button>
           </div>
         </form>
+        </div>
       </Modal>
 
       {/* Modal 1: Sell Device from Stock */}

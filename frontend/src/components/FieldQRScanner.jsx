@@ -7,9 +7,23 @@ export default function FieldQRScanner({ targetName, onScanSuccess, onClose }) {
   const canvasRef = useRef(null);
   const animFrameIdRef = useRef(null);
   const streamRef = useRef(null);
+  const barcodeDetectorRef = useRef(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Initialize native BarcodeDetector if available for 1D Barcodes & QR
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
+      try {
+        barcodeDetectorRef.current = new window.BarcodeDetector({
+          formats: ['qr_code', 'code_128', 'code_39', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'itf', 'data_matrix']
+        });
+      } catch (e) {
+        console.warn('BarcodeDetector init error:', e);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -58,7 +72,7 @@ export default function FieldQRScanner({ targetName, onScanSuccess, onClose }) {
     };
   }, []);
 
-  const scanFrame = () => {
+  const scanFrame = async () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
@@ -67,6 +81,23 @@ export default function FieldQRScanner({ targetName, onScanSuccess, onClose }) {
       return;
     }
 
+    // 1. Try hardware-accelerated BarcodeDetector (reads 1D barcodes and 2D QR codes)
+    if (barcodeDetectorRef.current) {
+      try {
+        const barcodes = await barcodeDetectorRef.current.detect(video);
+        if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop());
+          }
+          onScanSuccess(barcodes[0].rawValue);
+          return;
+        }
+      } catch (e) {
+        // Fallback to canvas and jsQR
+      }
+    }
+
+    // 2. Fallback to canvas + jsQR
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -94,7 +125,7 @@ export default function FieldQRScanner({ targetName, onScanSuccess, onClose }) {
       <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
         <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
           <Camera className="w-3.5 h-3.5 animate-pulse" />
-          <span>Point camera at {targetName} QR</span>
+          <span>Point camera at {targetName} (Barcode / QR)</span>
         </div>
         <button
           type="button"
