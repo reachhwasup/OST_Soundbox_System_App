@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.database import init_db, get_db_pool
-from backend.routers import auth, stores, devices, admin
+from backend.routers import auth, stores, devices, admin, suppliers
 
 # --- LOGGING CONFIGURATION ---
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -57,6 +57,7 @@ app.include_router(auth.router)
 app.include_router(stores.router)
 app.include_router(devices.router)
 app.include_router(admin.router)
+app.include_router(suppliers.router)
 
 
 @app.get("/health", tags=["System"])

@@ -65,12 +65,37 @@ CREATE INDEX IF NOT EXISTS idx_merchants_user_id ON merchants(user_id);
 CREATE INDEX IF NOT EXISTS idx_merchants_owner_phone ON merchants(owner_phone);
 
 
--- 4. Soundbox Devices Table (Hardware Fleet & Telemetry)
+-- 4. Suppliers Table
+CREATE TABLE IF NOT EXISTS suppliers (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(150) NOT NULL UNIQUE,
+    contact_person VARCHAR(150),
+    phone VARCHAR(50),
+    email VARCHAR(150),
+    address TEXT,
+    notes TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_suppliers_name ON suppliers(name);
+CREATE INDEX IF NOT EXISTS idx_suppliers_active ON suppliers(is_active);
+
+-- Seed default suppliers
+INSERT INTO suppliers (name, is_active)
+VALUES ('Feishu', TRUE), ('Hemi', TRUE)
+ON CONFLICT (name) DO NOTHING;
+
+
+-- 5. Soundbox Devices Table (Hardware Fleet & Telemetry)
 CREATE TABLE IF NOT EXISTS devices (
     id SERIAL PRIMARY KEY,
     device_id VARCHAR(100),
     device_sn VARCHAR(100) UNIQUE NOT NULL,
     merchant_id INT REFERENCES merchants(id) ON DELETE SET NULL,
+    supplier_id INT REFERENCES suppliers(id) ON DELETE SET NULL,
+    supplier VARCHAR(100) DEFAULT 'Feishu',
     device_type VARCHAR(50) DEFAULT 'Display Soundbox',
     price NUMERIC(10, 2) DEFAULT 29.00,
     discount_amount NUMERIC(10, 2) DEFAULT 0.00,
@@ -95,6 +120,7 @@ CREATE TABLE IF NOT EXISTS devices (
 
 CREATE INDEX IF NOT EXISTS idx_devices_sn ON devices(device_sn);
 CREATE INDEX IF NOT EXISTS idx_devices_merchant_id ON devices(merchant_id);
+CREATE INDEX IF NOT EXISTS idx_devices_supplier_id ON devices(supplier_id);
 CREATE INDEX IF NOT EXISTS idx_devices_telegram ON devices(telegram_chat_id);
 CREATE INDEX IF NOT EXISTS idx_devices_status ON devices(status);
 

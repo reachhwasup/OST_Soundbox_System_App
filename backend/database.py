@@ -146,7 +146,30 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_merchants_owner_phone ON merchants(owner_phone);
         """)
 
-        # 4. Devices Table (Multiple Soundbox speakers can share the same Telegram group)
+        # 4. Suppliers Table
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS suppliers (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(150) NOT NULL UNIQUE,
+                contact_person VARCHAR(150),
+                phone VARCHAR(50),
+                email VARCHAR(150),
+                address TEXT,
+                notes TEXT,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_suppliers_name ON suppliers(name);
+            CREATE INDEX IF NOT EXISTS idx_suppliers_active ON suppliers(is_active);
+
+            -- Ensure default suppliers exist
+            INSERT INTO suppliers (name, is_active)
+            VALUES ('Feishu', TRUE), ('Hemi', TRUE)
+            ON CONFLICT (name) DO NOTHING;
+        """)
+
+        # 5. Devices Table (Multiple Soundbox speakers can share the same Telegram group)
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS devices (
                 id SERIAL PRIMARY KEY,
@@ -198,9 +221,27 @@ async def init_db():
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS qr_code TEXT;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier VARCHAR(100) DEFAULT 'Feishu';
+            ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier_id INT REFERENCES suppliers(id) ON DELETE SET NULL;
 
             -- Migrate any existing records with legacy or null supplier to Feishu
             UPDATE devices SET supplier = 'Feishu' WHERE supplier = 'Eishu' OR supplier IS NULL;
+
+            -- Auto-link supplier_id based on supplier name
+            UPDATE devices d
+            SET supplier_id = s.id
+            FROM suppliers s
+            WHERE LOWER(TRIM(d.supplier)) = LOWER(TRIM(s.name)) AND d.supplier_id IS NULL;
+
+            -- Fallback: assign any remaining unlinked devices to Feishu
+            UPDATE devices
+            SET supplier_id = (SELECT id FROM suppliers WHERE name = 'Feishu' LIMIT 1)
+            WHERE supplier_id IS NULL;
+
+            -- Synchronize supplier string from supplier_id
+            UPDATE devices d
+            SET supplier = s.name
+            FROM suppliers s
+            WHERE d.supplier_id = s.id AND (d.supplier IS NULL OR d.supplier != s.name);
 
             -- Auto-sync columns if existing records have legacy names
             UPDATE devices SET
@@ -213,6 +254,7 @@ async def init_db():
             ALTER TABLE devices DROP CONSTRAINT IF EXISTS devices_telegram_chat_id_key;
             CREATE INDEX IF NOT EXISTS idx_devices_telegram_chat_id ON devices(telegram_chat_id);
             CREATE INDEX IF NOT EXISTS idx_devices_sn ON devices(device_sn);
+            CREATE INDEX IF NOT EXISTS idx_devices_supplier_id ON devices(supplier_id);
         """)
 
 

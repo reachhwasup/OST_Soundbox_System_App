@@ -221,6 +221,19 @@ export default function AdminDashboard() {
   const [isStockSnScanning, setIsStockSnScanning] = useState(false);
   const stockFileInputRef = useRef(null);
 
+  // Suppliers Management State
+  const [suppliersList, setSuppliersList] = useState([
+    { id: 1, name: 'Feishu', device_count: 0 },
+    { id: 2, name: 'Hemi', device_count: 0 }
+  ]);
+  const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
+  const [supplierFormName, setSupplierFormName] = useState('');
+  const [supplierFormContact, setSupplierFormContact] = useState('');
+  const [supplierFormPhone, setSupplierFormPhone] = useState('');
+  const [supplierFormEmail, setSupplierFormEmail] = useState('');
+  const [editingSupplierId, setEditingSupplierId] = useState(null);
+  const [supplierSubmitting, setSupplierSubmitting] = useState(false);
+
   const [isDeviceDetailOpen, setIsDeviceDetailOpen] = useState(false);
   const [selectedDeviceDetail, setSelectedDeviceDetail] = useState(null);
 
@@ -355,10 +368,11 @@ export default function AdminDashboard() {
         api.get(`/api/admin/users?search=${searchParam}&role=${roleParam}&status=${statusParam}`),
         api.get('/api/admin/stores'),
         api.get('/api/devices/'),
-        api.get(`/api/admin/logs?search=${searchParam}&log_type=${logTypeFilter}&limit=100`)
+        api.get(`/api/admin/logs?search=${searchParam}&log_type=${logTypeFilter}&limit=100`),
+        api.get('/api/suppliers')
       ]);
 
-      const [statsRes, usersRes, storesRes, devicesRes, logsRes] = results;
+      const [statsRes, usersRes, storesRes, devicesRes, logsRes, suppliersRes] = results;
 
       if (statsRes.status === 'fulfilled' && statsRes.value?.data?.stats) {
         setStats(statsRes.value.data.stats);
@@ -374,6 +388,9 @@ export default function AdminDashboard() {
       }
       if (logsRes.status === 'fulfilled' && logsRes.value?.data?.logs) {
         setLogs(logsRes.value.data.logs);
+      }
+      if (suppliersRes?.status === 'fulfilled' && suppliersRes.value?.data?.data) {
+        setSuppliersList(suppliersRes.value.data.data);
       }
     } catch (err) {
       console.error(err);
@@ -397,6 +414,78 @@ export default function AdminDashboard() {
     setSearchTerm('');
     setRoleFilter('');
     setStatusFilter('');
+  };
+
+  // Supplier Management Handlers
+  const handleOpenNewSupplierModal = () => {
+    setSupplierFormName('');
+    setSupplierFormContact('');
+    setSupplierFormPhone('');
+    setSupplierFormEmail('');
+    setEditingSupplierId(null);
+    setIsSupplierModalOpen(true);
+  };
+
+  const handleOpenEditSupplierModal = (supp) => {
+    setEditingSupplierId(supp.id);
+    setSupplierFormName(supp.name || '');
+    setSupplierFormContact(supp.contact_person || '');
+    setSupplierFormPhone(supp.phone || '');
+    setSupplierFormEmail(supp.email || '');
+    setIsSupplierModalOpen(true);
+  };
+
+  const handleSaveSupplier = async (e) => {
+    e.preventDefault();
+    if (!supplierFormName.trim()) {
+      showToast({ type: 'error', title: 'Error', message: 'Supplier name is required.' });
+      return;
+    }
+    setSupplierSubmitting(true);
+    try {
+      if (editingSupplierId) {
+        await api.put(`/api/suppliers/${editingSupplierId}`, {
+          name: supplierFormName.trim(),
+          contact_person: supplierFormContact.trim() || null,
+          phone: supplierFormPhone.trim() || null,
+          email: supplierFormEmail.trim() || null
+        });
+        showToast({ type: 'update', title: 'Supplier Updated', message: t('supplierUpdated', 'Supplier updated successfully.') });
+      } else {
+        await api.post('/api/suppliers', {
+          name: supplierFormName.trim(),
+          contact_person: supplierFormContact.trim() || null,
+          phone: supplierFormPhone.trim() || null,
+          email: supplierFormEmail.trim() || null
+        });
+        showToast({ type: 'add', title: 'Supplier Created', message: t('supplierCreated', 'Supplier created successfully.') });
+      }
+      setSupplierFormName('');
+      setSupplierFormContact('');
+      setSupplierFormPhone('');
+      setSupplierFormEmail('');
+      setEditingSupplierId(null);
+      const sRes = await api.get('/api/suppliers');
+      if (sRes.data?.data) setSuppliersList(sRes.data.data);
+      fetchAllData();
+    } catch (err) {
+      showToast({ type: 'error', title: 'Error', message: err.response?.data?.detail || 'Failed to save supplier.' });
+    } finally {
+      setSupplierSubmitting(false);
+    }
+  };
+
+  const handleDeleteSupplier = async (supp) => {
+    if (!window.confirm(`Are you sure you want to delete or deactivate supplier '${supp.name}'?`)) return;
+    try {
+      const res = await api.delete(`/api/suppliers/${supp.id}`);
+      showToast({ type: 'unlink', title: 'Supplier Removed', message: res.data?.message || t('supplierDeleted', 'Supplier deleted successfully.') });
+      const sRes = await api.get('/api/suppliers');
+      if (sRes.data?.data) setSuppliersList(sRes.data.data);
+      fetchAllData();
+    } catch (err) {
+      showToast({ type: 'error', title: 'Error', message: err.response?.data?.detail || 'Failed to delete supplier.' });
+    }
   };
 
   // Handle Add User
@@ -3572,6 +3661,19 @@ export default function AdminDashboard() {
 
                 <button
                   type="button"
+                  onClick={handleOpenNewSupplierModal}
+                  className="px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer touch-manipulation"
+                  title="Manage Suppliers"
+                >
+                  <Building className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                  <span>{t('suppliers', 'Suppliers')}</span>
+                  <span className="px-1.5 py-0.2 bg-indigo-200/80 dark:bg-indigo-800 text-indigo-800 dark:text-indigo-200 text-[10px] font-bold rounded-full">
+                    {suppliersList.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setIsStockFiltersExpanded(!isStockFiltersExpanded)}
                   className={`lg:hidden px-3.5 py-2.5 rounded-xl text-xs font-semibold border transition flex items-center justify-center gap-2 cursor-pointer touch-manipulation ${
                     isStockFiltersExpanded || activeStockFilterCount > 0
@@ -3651,8 +3753,11 @@ export default function AdminDashboard() {
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer font-medium"
                 >
                   <option value="ALL">{isKhmer ? 'គ្រប់អ្នកផ្គត់ផ្គង់ (All Suppliers)' : 'All Suppliers'}</option>
-                  <option value="Feishu">🏢 Feishu</option>
-                  <option value="Hemi">🏭 Hemi</option>
+                  {suppliersList.map((s) => (
+                    <option key={s.id} value={s.name}>
+                      {s.name.toLowerCase() === 'hemi' ? '🏭' : '🏢'} {s.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -4725,8 +4830,11 @@ export default function AdminDashboard() {
                 onChange={(e) => setEditSupplier(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium"
               >
-                <option value="Feishu">🏢 Feishu</option>
-                <option value="Hemi">🏭 Hemi</option>
+                {suppliersList.map((s) => (
+                  <option key={s.id} value={s.name}>
+                    {s.name.toLowerCase() === 'hemi' ? '🏭' : '🏢'} {s.name}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
@@ -6193,8 +6301,11 @@ export default function AdminDashboard() {
                 onChange={(e) => setSingleSupplier(e.target.value)}
                 className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer font-medium"
               >
-                <option value="Feishu">🏢 Feishu</option>
-                <option value="Hemi">🏭 Hemi</option>
+                {suppliersList.map((s) => (
+                  <option key={s.id} value={s.name}>
+                    {s.name.toLowerCase() === 'hemi' ? '🏭' : '🏢'} {s.name}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -6444,6 +6555,179 @@ export default function AdminDashboard() {
             </div>
           </form>
         )}
+      </Modal>
+
+      {/* Modal: Manage Suppliers */}
+      <Modal
+        isOpen={isSupplierModalOpen}
+        onClose={() => {
+          setIsSupplierModalOpen(false);
+          setEditingSupplierId(null);
+          setSupplierFormName('');
+          setSupplierFormContact('');
+          setSupplierFormPhone('');
+          setSupplierFormEmail('');
+        }}
+        title={`🏢 ${t('manageSuppliers', 'Manage Suppliers')}`}
+      >
+        <div className="space-y-5">
+          {/* Add / Edit Supplier Form */}
+          <form onSubmit={handleSaveSupplier} className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <Building className="w-3.5 h-3.5 text-indigo-500" />
+                <span>{editingSupplierId ? t('editSupplier', 'Edit Supplier') : t('addSupplier', 'Add New Supplier')}</span>
+              </h4>
+              {editingSupplierId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingSupplierId(null);
+                    setSupplierFormName('');
+                    setSupplierFormContact('');
+                    setSupplierFormPhone('');
+                    setSupplierFormEmail('');
+                  }}
+                  className="text-[11px] text-rose-500 hover:underline cursor-pointer"
+                >
+                  Cancel Edit
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('supplierName', 'Supplier Name')} <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={supplierFormName}
+                  onChange={(e) => setSupplierFormName(e.target.value)}
+                  placeholder="e.g. Feishu, Hemi, Foxconn"
+                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  {t('contactPerson', 'Contact Person')}
+                </label>
+                <input
+                  type="text"
+                  value={supplierFormContact}
+                  onChange={(e) => setSupplierFormContact(e.target.value)}
+                  placeholder="e.g. John Doe / Manager"
+                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  Phone
+                </label>
+                <input
+                  type="text"
+                  value={supplierFormPhone}
+                  onChange={(e) => setSupplierFormPhone(e.target.value)}
+                  placeholder="e.g. 012 345 678"
+                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={supplierFormEmail}
+                  onChange={(e) => setSupplierFormEmail(e.target.value)}
+                  placeholder="e.g. contact@supplier.com"
+                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="submit"
+                disabled={supplierSubmitting}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {supplierSubmitting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>{editingSupplierId ? t('saveChanges', 'Save Changes') : t('addSupplier', 'Add Supplier')}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+
+          {/* Suppliers Table List */}
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+              Existing Suppliers ({suppliersList.length})
+            </h4>
+            <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
+              {suppliersList.map((supp) => (
+                <div key={supp.id} className="p-3.5 bg-white dark:bg-slate-900 flex items-center justify-between gap-3 hover:bg-slate-50/80 dark:hover:bg-slate-850 transition">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-base">
+                      {supp.name.toLowerCase() === 'hemi' ? '🏭' : '🏢'}
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-2">
+                        <span>{supp.name}</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                          {supp.device_count ?? 0} {supp.device_count === 1 ? 'device' : 'devices'}
+                        </span>
+                        {supp.is_active === false && (
+                          <span className="px-1.5 py-0.2 rounded text-[10px] bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                            Inactive
+                          </span>
+                        )}
+                      </div>
+                      {(supp.contact_person || supp.phone || supp.email) && (
+                        <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2">
+                          {supp.contact_person && <span>👤 {supp.contact_person}</span>}
+                          {supp.phone && <span>📞 {supp.phone}</span>}
+                          {supp.email && <span>✉️ {supp.email}</span>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditSupplierModal(supp)}
+                      className="p-1.5 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-lg transition cursor-pointer"
+                      title="Edit"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteSupplier(supp)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition cursor-pointer"
+                      title="Delete / Deactivate"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </Modal>
 
     </div>
