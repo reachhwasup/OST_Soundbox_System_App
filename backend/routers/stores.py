@@ -117,19 +117,33 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
                 try:
                     devices = await conn.fetch(
                         """
-                        SELECT id, device_sn, 
-                               COALESCE(device_type, 'Soundbox') AS device_type,
-                               device_model, telegram_chat_id, 
-                               COALESCE(qr_code, '') AS qr_code,
-                               status,
-                               COALESCE(price, 29.00) AS price,
-                               COALESCE(battery, '100%') AS battery,
-                               COALESCE(signal, 'Good') AS signal,
-                               COALESCE(last_online, last_heartbeat, updated_at, created_at) AS last_active,
-                               last_online, last_heartbeat, created_at, updated_at
-                        FROM devices
-                        WHERE merchant_id::text = $1 OR merchant_id::text = $2
-                        ORDER BY id ASC
+                        SELECT d.id, d.device_sn, 
+                               COALESCE(d.device_type, 'Soundbox') AS device_type,
+                               d.device_model, d.telegram_chat_id, 
+                               COALESCE(d.qr_code, '') AS qr_code,
+                               d.status,
+                               COALESCE(d.price, 29.00) AS price,
+                               COALESCE(latest_sale.discount_amount, 0.00) AS discount_amount,
+                               COALESCE(latest_sale.discount_percent, 0.00) AS discount_percent,
+                               COALESCE(latest_sale.final_price, d.price, 29.00) AS final_price,
+                               COALESCE(latest_sale.warranty_days, 90) AS warranty_days,
+                               latest_sale.warranty_start_date,
+                               latest_sale.warranty_end_date,
+                               COALESCE(d.battery, '100%') AS battery,
+                               COALESCE(d.signal, 'Good') AS signal,
+                               COALESCE(d.last_online, d.last_heartbeat, d.updated_at, d.created_at) AS last_active,
+                               d.last_online, d.last_heartbeat, d.created_at, d.updated_at
+                        FROM devices d
+                        LEFT JOIN LATERAL (
+                            SELECT s_order.price, s_order.discount_amount, s_order.discount_percent, s_order.final_price,
+                                   s_order.warranty_days, s_order.warranty_start_date, s_order.warranty_end_date
+                            FROM sales s_order
+                            WHERE s_order.device_id = d.id OR s_order.device_sn = d.device_sn
+                            ORDER BY s_order.id DESC
+                            LIMIT 1
+                        ) latest_sale ON true
+                        WHERE d.merchant_id::text = $1 OR d.merchant_id::text = $2
+                        ORDER BY d.id ASC
                         """,
                         store_id, alt_store_id
                     )
@@ -202,6 +216,13 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
                         d_d = dict(d)
                         formatted_devices.append({
                             **d_d,
+                            "price": float(d_d["price"] or 0.0),
+                            "final_price": float(d_d.get("final_price") or d_d["price"] or 0.0),
+                            "discount_amount": float(d_d.get("discount_amount") or 0.0),
+                            "discount_percent": float(d_d.get("discount_percent") or 0.0),
+                            "warranty_days": int(d_d.get("warranty_days") or 90),
+                            "warranty_start_date": d_d["warranty_start_date"].isoformat() if hasattr(d_d.get("warranty_start_date"), "isoformat") else (str(d_d["warranty_start_date"]) if d_d.get("warranty_start_date") else None),
+                            "warranty_end_date": d_d["warranty_end_date"].isoformat() if hasattr(d_d.get("warranty_end_date"), "isoformat") else (str(d_d["warranty_end_date"]) if d_d.get("warranty_end_date") else None),
                             "created_at": d_d["created_at"].isoformat() if d_d.get("created_at") else None,
                             "last_heartbeat": d_d["last_heartbeat"].isoformat() if d_d.get("last_heartbeat") else None
                         })

@@ -231,13 +231,6 @@ async def update_supplier(
 
         updated_row = await conn.fetchrow(query, *params)
 
-        # If supplier name changed, also sync devices string column
-        if name_changed and new_name:
-            await conn.execute(
-                "UPDATE devices SET supplier = $1 WHERE supplier_id = $2",
-                new_name, supplier_id
-            )
-
     return {
         "status": "success",
         "message": "Supplier updated successfully.",
