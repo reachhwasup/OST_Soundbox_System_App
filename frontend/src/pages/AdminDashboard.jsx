@@ -5450,6 +5450,19 @@ export default function AdminDashboard() {
                       {selectedDeviceDetail.telegram_chat_id || (isKhmer ? 'មិនទាន់ភ្ជាប់' : 'Not linked')}
                     </div>
                   </div>
+
+                  {/* Payment QR Code on LCD Screen */}
+                  {selectedDeviceDetail.qr_code && (
+                    <div className="col-span-full p-2.5 bg-emerald-50/60 dark:bg-emerald-950/30 rounded-xl border border-emerald-200/80 dark:border-emerald-800/60">
+                      <div className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase font-semibold flex items-center gap-1">
+                        <QrCode className="w-3 h-3 text-emerald-500" />
+                        <span>{t('paymentQrCode', 'LCD Screen Payment QR')}</span>
+                      </div>
+                      <div className="font-mono font-semibold text-emerald-900 dark:text-emerald-200 mt-1 truncate text-xs">
+                        {selectedDeviceDetail.qr_code}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Location Address */}

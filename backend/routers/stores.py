@@ -119,7 +119,9 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
                         """
                         SELECT id, device_sn, 
                                COALESCE(device_type, 'Soundbox') AS device_type,
-                               device_model, telegram_chat_id, status,
+                               device_model, telegram_chat_id, 
+                               COALESCE(qr_code, '') AS qr_code,
+                               status,
                                COALESCE(price, 29.00) AS price,
                                COALESCE(battery, '100%') AS battery,
                                COALESCE(signal, 'Good') AS signal,

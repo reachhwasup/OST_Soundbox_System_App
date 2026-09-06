@@ -18,6 +18,7 @@ class DeviceRegisterSchema(BaseModel):
     telegram_chat_id: Optional[str] = None
     device_type: str = "Display Soundbox"
     device_model: str = "Display Soundbox"
+    qr_code: Optional[str] = None
     price: Optional[float] = 29.00
     discount_amount: Optional[float] = 0.00
     discount_percent: Optional[float] = 0.00
@@ -58,6 +59,7 @@ async def register_device(
         )
 
         chat_id = payload.telegram_chat_id.strip() if payload.telegram_chat_id and payload.telegram_chat_id.strip() else None
+        qr_code_val = payload.qr_code.strip() if payload.qr_code and payload.qr_code.strip() else None
 
         # Eager schema migration to ensure all optional/new columns exist
         try:
@@ -66,6 +68,7 @@ async def register_device(
                 ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_type VARCHAR(100) DEFAULT 'Display Soundbox';
                 ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_model VARCHAR(100) DEFAULT 'Y6B';
                 ALTER TABLE devices ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(255);
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS qr_code TEXT;
                 ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
                 ALTER TABLE devices ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(10, 2) DEFAULT 0.00;
                 ALTER TABLE devices ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(5, 2) DEFAULT 0.00;
@@ -112,18 +115,19 @@ async def register_device(
                         warranty_days = $9, 
                         warranty_start_date = COALESCE(warranty_start_date, $10),
                         warranty_end_date = COALESCE(warranty_end_date, $11),
+                        qr_code = COALESCE($12, qr_code),
                         status = 'ACTIVE', is_active = TRUE, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $12
+                    WHERE id = $13
                 """, m_id_target, chat_id, payload.device_type or "Display Soundbox", payload.device_model or "Display Soundbox", 
-                   base_price, disc_amt, float(payload.discount_percent or 0.0), calc_final_price, w_days, now_dt, w_end_dt, dev_id)
+                   base_price, disc_amt, float(payload.discount_percent or 0.0), calc_final_price, w_days, now_dt, w_end_dt, qr_code_val, dev_id)
             except Exception as update_err:
                 logger.warning(f"Full device link update failed: {update_err}. Running minimal fallback...")
                 try:
                     await conn.execute("""
                         UPDATE devices 
-                        SET merchant_id = $1, telegram_chat_id = $2, status = 'ACTIVE', is_active = TRUE, updated_at = CURRENT_TIMESTAMP
-                        WHERE id = $3
-                    """, m_id_target, chat_id, dev_id)
+                        SET merchant_id = $1, telegram_chat_id = $2, qr_code = COALESCE($3, qr_code), status = 'ACTIVE', is_active = TRUE, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = $4
+                    """, m_id_target, chat_id, qr_code_val, dev_id)
                 except Exception as final_update_err:
                     logger.error(f"Device link update completely failed: {final_update_err}", exc_info=True)
                     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to link device: {str(final_update_err)}")
@@ -140,36 +144,36 @@ async def register_device(
                     INSERT INTO devices (
                         merchant_id, device_sn, device_type, device_model, telegram_chat_id, 
                         price, discount_amount, discount_percent, final_price, 
-                        warranty_days, warranty_start_date, warranty_end_date, status, is_active
+                        warranty_days, warranty_start_date, warranty_end_date, qr_code, status, is_active
                     )
                     VALUES (
                         $1, $2, $3, $4, $5, 
                         $6, $7, $8, $9, 
-                        $10, $11, $12, 'ACTIVE', TRUE
+                        $10, $11, $12, $13, 'ACTIVE', TRUE
                     )
                     RETURNING id
                 """, m_id_target, device_sn, payload.device_type or "Display Soundbox", payload.device_model or "Display Soundbox", chat_id, 
-                   base_price, disc_amt, float(payload.discount_percent or 0.0), calc_final_price, w_days, now_dt, w_end_dt)
+                   base_price, disc_amt, float(payload.discount_percent or 0.0), calc_final_price, w_days, now_dt, w_end_dt, qr_code_val)
             except Exception as insert_err:
                 logger.warning(f"Standard device link insert failed: {insert_err}. Retrying with fallback schema...")
                 try:
                     new_id = await conn.fetchval("""
                         INSERT INTO devices (
-                            merchant_id, device_sn, device_type, telegram_chat_id, status, is_active
+                            merchant_id, device_sn, device_type, telegram_chat_id, qr_code, status, is_active
                         )
-                        VALUES ($1, $2, $3, $4, 'ACTIVE', TRUE)
+                        VALUES ($1, $2, $3, $4, $5, 'ACTIVE', TRUE)
                         RETURNING id
-                    """, m_id_target, device_sn, payload.device_type or "Display Soundbox", chat_id)
+                    """, m_id_target, device_sn, payload.device_type or "Display Soundbox", chat_id, qr_code_val)
                 except Exception as fallback_err:
                     alt_m_id = str(payload.merchant_id) if isinstance(m_id_target, int) else (int(payload.merchant_id) if str(payload.merchant_id).isdigit() else payload.merchant_id)
                     try:
                         new_id = await conn.fetchval("""
                             INSERT INTO devices (
-                                merchant_id, device_sn, device_type, telegram_chat_id, status, is_active
+                                merchant_id, device_sn, device_type, telegram_chat_id, qr_code, status, is_active
                             )
-                            VALUES ($1, $2, $3, $4, 'ACTIVE', TRUE)
+                            VALUES ($1, $2, $3, $4, $5, 'ACTIVE', TRUE)
                             RETURNING id
-                        """, alt_m_id, device_sn, payload.device_type or "Display Soundbox", chat_id)
+                        """, alt_m_id, device_sn, payload.device_type or "Display Soundbox", chat_id, qr_code_val)
                     except Exception as final_err:
                         logger.error(f"Device insert failed completely: {final_err}", exc_info=True)
                         raise HTTPException(
@@ -182,6 +186,65 @@ async def register_device(
                 "message": f"Soundbox '{device_sn}' registered and linked successfully.",
                 "device_id": new_id
             }
+
+
+@router.get("/lookup/{device_sn}")
+async def lookup_device_by_sn(
+    device_sn: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Look up device details (model, type, whether it has an LCD screen, existing QR code) by serial number.
+    Used by dashboard linking modals to dynamically show or hide the Payment QR code field.
+    """
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        sn = device_sn.strip()
+        row = await conn.fetchrow("""
+            SELECT id, device_sn, 
+                   COALESCE(device_type, 'Display Soundbox') AS device_type,
+                   COALESCE(device_model, 'Y6B') AS device_model,
+                   qr_code, telegram_chat_id, status
+            FROM devices
+            WHERE device_sn = $1 OR device_id = $1
+            ORDER BY id DESC
+            LIMIT 1
+        """, sn)
+
+        if not row:
+            return {
+                "found": False,
+                "device_sn": sn,
+                "device_type": "Display Soundbox",
+                "device_model": "Display Soundbox",
+                "has_lcd_screen": True,
+                "qr_code": None,
+                "telegram_chat_id": None,
+                "status": None
+            }
+
+        d_type = str(row["device_type"] or "Display Soundbox")
+        d_model = str(row["device_model"] or "Y6B")
+        
+        # Check if the device has an LCD screen (Display Soundbox)
+        has_lcd = (
+            "display" in d_type.lower() or 
+            "lcd" in d_type.lower() or 
+            "screen" in d_type.lower() or
+            "display" in d_model.lower() or
+            "lcd" in d_model.lower()
+        )
+
+        return {
+            "found": True,
+            "device_sn": row["device_sn"],
+            "device_type": d_type,
+            "device_model": d_model,
+            "has_lcd_screen": has_lcd,
+            "qr_code": row["qr_code"],
+            "telegram_chat_id": row["telegram_chat_id"],
+            "status": row["status"]
+        }
 
 
 @router.get("/")
@@ -231,6 +294,7 @@ async def list_devices(
                    d.warranty_start_date,
                    d.warranty_end_date,
                    COALESCE(d.telegram_chat_id, d.chat_id) AS telegram_chat_id,
+                   d.qr_code,
                    COALESCE(d.status::text, CASE WHEN d.merchant_id IS NULL THEN 'IN_STOCK' WHEN d.is_active = FALSE THEN 'Offline' ELSE 'Online' END, 'IN_STOCK') AS status,
                    COALESCE(d.battery, '100%') AS battery,
                    COALESCE(d.signal, 'Good') AS signal,
@@ -597,6 +661,7 @@ class DeviceUpdateSchema(BaseModel):
     telegram_chat_id: Optional[str] = None
     device_type: Optional[str] = None
     device_model: Optional[str] = None
+    qr_code: Optional[str] = None
     status: Optional[str] = None
     merchant_id: Optional[Union[int, str]] = None
     batch_no: Optional[str] = None
@@ -617,20 +682,28 @@ async def update_device(
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
-    Updates device configurations (SN, Telegram Chat ID, Model, Status, or Assigned Store).
-    Requires Admin privileges.
+    Updates device configurations (SN, Telegram Chat ID, QR Code, Model, Status, or Assigned Store).
+    Requires Admin privileges or Store Ownership for assigned devices.
     """
-    if current_user.get("role") != "ADMIN":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators can update device configurations."
-        )
-
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        device = await conn.fetchrow("SELECT id, device_sn FROM devices WHERE id = $1", device_id)
+        device = await conn.fetchrow("SELECT id, device_sn, merchant_id FROM devices WHERE id = $1", device_id)
         if not device:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
+
+        if current_user.get("role") != "ADMIN":
+            owns = None
+            if device.get("merchant_id"):
+                owns = await conn.fetchval("""
+                    SELECT 1 FROM merchants m 
+                    WHERE (m.id::text = $1 OR m.merchant_id::text = $1)
+                      AND (m.user_id = $2 OR (m.user_id IS NULL AND m.owner_phone = $3))
+                """, str(device["merchant_id"]), current_user["id"], current_user.get("phone_number"))
+            if not owns:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Only administrators or store owners can update device configurations."
+                )
 
         # Check if new SN conflicts with existing
         if payload.device_sn and payload.device_sn.strip() != device["device_sn"]:
@@ -653,6 +726,11 @@ async def update_device(
         if payload.telegram_chat_id is not None:
             updates.append(f"telegram_chat_id = ${idx}")
             params.append(payload.telegram_chat_id.strip() if payload.telegram_chat_id.strip() else None)
+            idx += 1
+
+        if payload.qr_code is not None:
+            updates.append(f"qr_code = ${idx}")
+            params.append(payload.qr_code.strip() if payload.qr_code.strip() else None)
             idx += 1
 
         if payload.device_type is not None:

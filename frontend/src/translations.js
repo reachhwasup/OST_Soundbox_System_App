@@ -116,6 +116,15 @@ export const translations = {
     step2Tg: "2. Add @ost_system_soundboxBot to the group.",
     step3Tg: "3. The bot will automatically post the QR code & Verification Code.",
     multiGroupHint: "Tip: You can add multiple Telegram codes separated by commas (e.g. for ABA + Wing groups).",
+    paymentQrCode: "Merchant Payment QR Code (LCD Screen)",
+    paymentQrPlaceholder: "Paste KHQR/Bakong payment string or URL...",
+    paymentQrHint: "💡 For LCD Screen: Scan or upload merchant payment QR (KHQR/Bakong) to display on the soundbox screen.",
+    scanPaymentQrCamera: "Scan Payment QR via Camera",
+    uploadPaymentQr: "Upload Payment QR Image",
+    hasLcdScreen: "🖥️ Display Soundbox (LCD Screen)",
+    hasLcdScreenDesc: "Dynamic QR on LCD screen for customer payment",
+    noLcdScreen: "🏷️ Standard Soundbox (No Screen)",
+    noLcdScreenDesc: "Voice announcements only, printed QR stand",
     
     // Transactions Table
     bank: "Bank",
@@ -501,6 +510,15 @@ export const translations = {
     step2Tg: "២. បន្ថែម @ost_system_soundboxBot ចូលទៅក្នុង Group។",
     step3Tg: "៣. Bot នឹងផ្ញើរូបភាព QR Code និងលេខកូដ Chat ID ដោយស្វ័យប្រវត្តិ។",
     multiGroupHint: "គន្លឹះ៖ អ្នកអាចបញ្ចូលលេខកូដ Telegram ច្រើនដោយប្រើសញ្ញាក្បៀស (ឧ. សម្រាប់គ្រុប ABA + Wing)។",
+    paymentQrCode: "កូដ QR ទូទាត់សម្រាប់បង្ហាញលើអេក្រង់ LCD",
+    paymentQrPlaceholder: "បញ្ចូលកូដ KHQR/Bakong ឬតំណភ្ជាប់...",
+    paymentQrHint: "💡 សម្រាប់ឧបករណ៍មានអេក្រង់៖ ស្កេន ឬផ្ទុកឡើងកូដ QR ទូទាត់ (KHQR/Bakong) ដើម្បីបង្ហាញលើអេក្រង់ Soundbox។",
+    scanPaymentQrCamera: "ស្កេន QR ទូទាត់តាមកាមេរ៉ា",
+    uploadPaymentQr: "បញ្ចូលរូបភាព QR ទូទាត់",
+    hasLcdScreen: "🖥️ ឧបករណ៍មានអេក្រង់ LCD (Display)",
+    hasLcdScreenDesc: "បង្ហាញកូដ QR លើអេក្រង់សម្រាប់អតិថិជនស្កេនទូទាត់",
+    noLcdScreen: "🏷️ ឧបករណ៍គ្មានអេក្រង់ (Standard)",
+    noLcdScreenDesc: "សំឡេងប្រកាសទូទាត់, ប្រើស្លាក QR បោះពុម្ព",
     
     // Transactions Table
     bank: "ធនាគារ",

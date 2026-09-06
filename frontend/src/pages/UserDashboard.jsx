@@ -235,6 +235,8 @@ export default function UserDashboard() {
             deviceSn: d.device_sn || 'Y6B-Soundbox',
             deviceModel: d.device_model || 'Y6B 4G',
             deviceType: d.device_type || (String(d.device_model || '').includes('Display') ? 'Display Soundbox' : 'Standard Soundbox'),
+            hasLcdScreen: (d.device_type === 'Display Soundbox' || String(d.device_model || '').includes('Display') || String(d.device_type || '').includes('Display')),
+            qrCode: d.qr_code || '',
             batteryLevel: (String(d.status || '').toUpperCase() === 'OFFLINE' || String(d.status || '').toUpperCase() === 'INACTIVE') 
               ? null 
               : (d.battery !== undefined && d.battery !== null
@@ -424,16 +426,21 @@ export default function UserDashboard() {
 
   // Device Link Form State (New)
   const [deviceSn, setDeviceSn] = useState('');
+  const [deviceType, setDeviceType] = useState('Display Soundbox');
+  const [paymentQr, setPaymentQr] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
   const [targetStoreIdForNewDevice, setTargetStoreIdForNewDevice] = useState('');
   const [savingDevice, setSavingDevice] = useState(false);
+  const [isLookupLoading, setIsLookupLoading] = useState(false);
   
-  // Field-specific Camera QR Scanner state for Link Modal
+  // Field-specific Camera QR Scanner state for Link Modal ('sn' | 'qr' | 'telegram')
   const [activeCameraField, setActiveCameraField] = useState(null);
   const [scanFeedback, setScanFeedback] = useState({ field: '', message: '', isError: false });
 
   // Device Edit Form State
   const [editDeviceSn, setEditDeviceSn] = useState('');
+  const [editDeviceType, setEditDeviceType] = useState('Display Soundbox');
+  const [editPaymentQr, setEditPaymentQr] = useState('');
   const [editTelegramChatId, setEditTelegramChatId] = useState('');
   const [editDeviceModel, setEditDeviceModel] = useState('Y6B');
   const [editDeviceMerchantId, setEditDeviceMerchantId] = useState('');
@@ -442,9 +449,35 @@ export default function UserDashboard() {
 
   // Refs for hidden file inputs
   const snFileInputRef = useRef(null);
+  const paymentQrFileInputRef = useRef(null);
   const telegramFileInputRef = useRef(null);
   const editSnFileInputRef = useRef(null);
+  const editPaymentQrFileInputRef = useRef(null);
   const editTelegramFileInputRef = useRef(null);
+
+  // Auto-detect whether device has LCD screen by SN lookup
+  const lookupDeviceType = async (sn) => {
+    if (!sn || !sn.trim()) return;
+    try {
+      setIsLookupLoading(true);
+      const res = await api.get(`/api/devices/lookup/${encodeURIComponent(sn.trim())}`);
+      if (res.data && res.data.found) {
+        if (res.data.has_lcd_screen !== undefined) {
+          setDeviceType(res.data.has_lcd_screen ? 'Display Soundbox' : 'Standard Soundbox');
+        }
+        if (res.data.qr_code && !paymentQr) {
+          setPaymentQr(res.data.qr_code);
+        }
+        if (res.data.telegram_chat_id && !telegramChatId) {
+          setTelegramChatId(res.data.telegram_chat_id);
+        }
+      }
+    } catch (e) {
+      console.warn('Device lookup failed', e);
+    } finally {
+      setIsLookupLoading(false);
+    }
+  };
 
   // Fetch all user stores
   const fetchStoresData = async (silent = false) => {
@@ -733,6 +766,12 @@ export default function UserDashboard() {
       return;
     }
 
+    const hasLcd = deviceType === 'Display Soundbox' || String(deviceType).includes('Display');
+    if (hasLcd && !paymentQr.trim()) {
+      setError('Please scan or enter the Merchant Payment QR Code for the LCD screen.');
+      return;
+    }
+
     setSavingDevice(true);
     setError('');
 
@@ -741,7 +780,9 @@ export default function UserDashboard() {
         merchant_id: targetStore.id,
         device_sn: deviceSn.trim(),
         telegram_chat_id: telegramChatId.trim() || null,
-        device_model: 'Y6B'
+        device_type: hasLcd ? 'Display Soundbox' : 'Standard Soundbox',
+        device_model: hasLcd ? 'Display Soundbox' : 'Standard Soundbox',
+        qr_code: hasLcd ? (paymentQr.trim() || null) : null
       });
       const dvcMsg = `Soundbox '${deviceSn.trim()}' linked to '${targetStore.name}'!`;
       showToast({
@@ -751,6 +792,8 @@ export default function UserDashboard() {
         duration: 5000
       });
       setDeviceSn('');
+      setPaymentQr('');
+      setDeviceType('Display Soundbox');
       setTelegramChatId('');
       setTargetStoreIdForNewDevice('');
       setActiveCameraField(null);
@@ -777,6 +820,12 @@ export default function UserDashboard() {
     setEditDeviceSn(device.device_sn || '');
     setEditTelegramChatId(device.telegram_chat_id || '');
     setEditDeviceModel(device.device_model || 'Y6B');
+    const isDisplay = device.device_type === 'Display Soundbox' || 
+                      String(device.device_model || '').includes('Display') || 
+                      String(device.device_type || '').includes('Display') ||
+                      Boolean(device.qr_code || device.qrCode);
+    setEditDeviceType(isDisplay ? 'Display Soundbox' : 'Standard Soundbox');
+    setEditPaymentQr(device.qr_code || device.qrCode || '');
     setEditDeviceMerchantId(String(device.storeId || activeStore?.id || ''));
     setEditActiveCameraField(null);
     setEditScanFeedback({ field: '', message: '', isError: false });
@@ -792,6 +841,12 @@ export default function UserDashboard() {
       return;
     }
 
+    const editHasLcd = editDeviceType === 'Display Soundbox' || String(editDeviceType).includes('Display');
+    if (editHasLcd && !editPaymentQr.trim()) {
+      setError('Please scan or enter the Merchant Payment QR Code for the LCD screen.');
+      return;
+    }
+
     setSavingDevice(true);
     setError('');
 
@@ -799,7 +854,9 @@ export default function UserDashboard() {
       await api.put(`/api/devices/${selectedDevice.id}`, {
         device_sn: editDeviceSn.trim(),
         telegram_chat_id: editTelegramChatId.trim() || null,
-        device_model: editDeviceModel.trim() || 'Y6B',
+        device_type: editHasLcd ? 'Display Soundbox' : 'Standard Soundbox',
+        device_model: editDeviceModel.trim() || (editHasLcd ? 'Display Soundbox' : 'Standard Soundbox'),
+        qr_code: editHasLcd ? (editPaymentQr.trim() || null) : null,
         merchant_id: editDeviceMerchantId ? parseInt(editDeviceMerchantId) : activeStore.id
       });
       const updDvcMsg = `Soundbox '${editDeviceSn.trim()}' updated successfully!`;
@@ -994,6 +1051,10 @@ export default function UserDashboard() {
           if (field === 'sn') {
             setDeviceSn(clean);
             setScanFeedback({ field: 'sn', message: `Scanned SN: ${clean}`, isError: false });
+            lookupDeviceType(clean);
+          } else if (field === 'qr') {
+            setPaymentQr(clean);
+            setScanFeedback({ field: 'qr', message: `Scanned Payment QR`, isError: false });
           } else {
             setTelegramChatId(clean);
             setScanFeedback({ field: 'telegram', message: `Scanned Code: ${clean}`, isError: false });
@@ -1030,6 +1091,9 @@ export default function UserDashboard() {
           if (field === 'sn') {
             setEditDeviceSn(clean);
             setEditScanFeedback({ field: 'sn', message: `Scanned SN: ${clean}`, isError: false });
+          } else if (field === 'qr') {
+            setEditPaymentQr(clean);
+            setEditScanFeedback({ field: 'qr', message: `Scanned Payment QR`, isError: false });
           } else {
             setEditTelegramChatId(clean);
             setEditScanFeedback({ field: 'telegram', message: `Scanned Code: ${clean}`, isError: false });
@@ -2411,12 +2475,22 @@ export default function UserDashboard() {
         <div className="space-y-4">
           {activeCameraField && (
             <FieldQRScanner 
-              targetName={activeCameraField === 'sn' ? 'Device Serial Number (SN)' : 'Telegram Chat ID (Code)'}
+              targetName={
+                activeCameraField === 'sn' 
+                  ? t('deviceSn', 'Device Serial Number (SN)') 
+                  : activeCameraField === 'qr' 
+                  ? t('paymentQrCode', 'Merchant Payment QR Code (LCD Screen)')
+                  : t('telegramChatId', 'Telegram Verification Code (Chat ID)')
+              }
               onScanSuccess={(decodedText) => {
                 const text = decodedText.trim();
                 if (activeCameraField === 'sn') {
                   setDeviceSn(text);
                   setScanFeedback({ field: 'sn', message: `Scanned SN: ${text}`, isError: false });
+                  lookupDeviceType(text);
+                } else if (activeCameraField === 'qr') {
+                  setPaymentQr(text);
+                  setScanFeedback({ field: 'qr', message: `Scanned Payment QR`, isError: false });
                 } else {
                   setTelegramChatId(text);
                   setScanFeedback({ field: 'telegram', message: `Scanned Code: ${text}`, isError: false });
@@ -2437,7 +2511,7 @@ export default function UserDashboard() {
                 <select
                   value={targetStoreIdForNewDevice || activeStore?.id}
                   onChange={(e) => setTargetStoreIdForNewDevice(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white"
+                  className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white cursor-pointer"
                 >
                   {stores.map(s => (
                     <option key={s.merchant_id || s.id} value={s.merchant_id || s.id}>{s.merchant_name || s.name}</option>
@@ -2446,6 +2520,57 @@ export default function UserDashboard() {
               </div>
             )}
 
+            {/* Soundbox Hardware Model / LCD Screen Option */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300">
+                  {t('deviceType', 'Soundbox Type')}
+                </label>
+                {isLookupLoading && (
+                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Auto-detecting...
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDeviceType('Display Soundbox')}
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col gap-1 cursor-pointer ${
+                    deviceType === 'Display Soundbox'
+                      ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-500'
+                      : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                  }`}
+                >
+                  <span className="text-xs font-bold flex items-center gap-1.5">
+                    🖥️ {t('hasLcdScreen', 'Display (LCD Screen)')}
+                  </span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                    {t('hasLcdScreenDesc', 'Dynamic QR on LCD screen for customer payment')}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDeviceType('Standard Soundbox')}
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col gap-1 cursor-pointer ${
+                    deviceType !== 'Display Soundbox'
+                      ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-500'
+                      : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                  }`}
+                >
+                  <span className="text-xs font-bold flex items-center gap-1.5">
+                    🏷️ {t('noLcdScreen', 'Standard (No Screen)')}
+                  </span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                    {t('noLcdScreenDesc', 'Voice announcements only, printed QR stand')}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Field 1: Device SN */}
             <div>
               <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
                 {t('deviceSn', 'Device Serial Number (SN)')} <span className="text-rose-500">*</span>
@@ -2455,7 +2580,13 @@ export default function UserDashboard() {
                 <input
                   type="text"
                   value={deviceSn}
-                  onChange={(e) => setDeviceSn(e.target.value)}
+                  onChange={(e) => {
+                    setDeviceSn(e.target.value);
+                    if (e.target.value.trim().length >= 4) {
+                      lookupDeviceType(e.target.value);
+                    }
+                  }}
+                  onBlur={() => lookupDeviceType(deviceSn)}
                   placeholder={t('deviceSnPlaceholder', 'e.g. Y6B2026081501')}
                   className="w-full pl-3 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   required
@@ -2463,7 +2594,7 @@ export default function UserDashboard() {
                 <button
                   type="button"
                   onClick={() => setActiveCameraField(activeCameraField === 'sn' ? null : 'sn')}
-                  className={`absolute inset-y-0 right-0 pr-3 flex items-center transition ${
+                  className={`absolute inset-y-0 right-0 pr-3 flex items-center transition cursor-pointer ${
                     activeCameraField === 'sn' ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-600'
                   }`}
                   title={t('scanWithCamera', 'Scan with Camera')}
@@ -2500,6 +2631,73 @@ export default function UserDashboard() {
               )}
             </div>
 
+            {/* Field 2 (Conditional): Payment QR Code for Devices with LCD Screen */}
+            {deviceType === 'Display Soundbox' && (
+              <div className="p-3 bg-emerald-50/60 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-900/60 space-y-2 transition-all">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold uppercase text-emerald-900 dark:text-emerald-200">
+                    {t('paymentQrCode', 'Merchant Payment QR Code (LCD Screen)')} <span className="text-rose-500">*</span>
+                  </label>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-300">
+                    🖥️ LCD QR
+                  </span>
+                </div>
+
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={paymentQr}
+                    onChange={(e) => setPaymentQr(e.target.value)}
+                    placeholder={t('paymentQrPlaceholder', 'Paste KHQR/Bakong payment string or URL...')}
+                    className="w-full pl-3 pr-10 py-2.5 bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setActiveCameraField(activeCameraField === 'qr' ? null : 'qr')}
+                    className={`absolute inset-y-0 right-0 pr-3 flex items-center transition cursor-pointer ${
+                      activeCameraField === 'qr' ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-600'
+                    }`}
+                    title={t('scanPaymentQrCamera', 'Scan Payment QR via Camera')}
+                  >
+                    <QrCode className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-emerald-700 dark:text-emerald-400">
+                  {t('paymentQrHint', '💡 For LCD Screen: Scan or upload merchant payment QR (KHQR/Bakong) to display on the soundbox screen.')}
+                </p>
+
+                <div className="flex items-center justify-between pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => paymentQrFileInputRef.current?.click()}
+                    className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1 py-1 transition cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    {t('uploadPaymentQr', 'Upload Payment QR Image')}
+                  </button>
+                  <input
+                    ref={paymentQrFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleScanFile(e, 'qr')}
+                    className="hidden"
+                  />
+                </div>
+
+                {scanFeedback.field === 'qr' && (
+                  <div className={`mt-1 text-xs flex items-center gap-1 ${
+                    scanFeedback.isError ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400 font-medium'
+                  }`}>
+                    {scanFeedback.isError ? <AlertCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                    <span>{scanFeedback.message}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Field 3: Telegram Verification Code */}
             <div>
               <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
                 {t('telegramChatId', 'Telegram Verification Code (Chat ID)')}
@@ -2516,7 +2714,7 @@ export default function UserDashboard() {
                 <button
                   type="button"
                   onClick={() => setActiveCameraField(activeCameraField === 'telegram' ? null : 'telegram')}
-                  className={`absolute inset-y-0 right-0 pr-3 flex items-center transition ${
+                  className={`absolute inset-y-0 right-0 pr-3 flex items-center transition cursor-pointer ${
                     activeCameraField === 'telegram' ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-600'
                   }`}
                   title={t('scanWithCamera', 'Scan with Camera')}
@@ -2592,12 +2790,21 @@ export default function UserDashboard() {
         <div className="space-y-4">
           {editActiveCameraField && (
             <FieldQRScanner 
-              targetName={editActiveCameraField === 'sn' ? t('deviceSn', 'Device Serial Number (SN)') : t('telegramChatId', 'Telegram Chat ID (Code)')}
+              targetName={
+                editActiveCameraField === 'sn' 
+                  ? t('deviceSn', 'Device Serial Number (SN)') 
+                  : editActiveCameraField === 'qr' 
+                  ? t('paymentQrCode', 'Merchant Payment QR Code (LCD Screen)')
+                  : t('telegramChatId', 'Telegram Chat ID (Code)')
+              }
               onScanSuccess={(decodedText) => {
                 const text = decodedText.trim();
                 if (editActiveCameraField === 'sn') {
                   setEditDeviceSn(text);
                   setEditScanFeedback({ field: 'sn', message: `Scanned SN: ${text}`, isError: false });
+                } else if (editActiveCameraField === 'qr') {
+                  setEditPaymentQr(text);
+                  setEditScanFeedback({ field: 'qr', message: `Scanned Payment QR`, isError: false });
                 } else {
                   setEditTelegramChatId(text);
                   setEditScanFeedback({ field: 'telegram', message: `Scanned Code: ${text}`, isError: false });
@@ -2609,6 +2816,49 @@ export default function UserDashboard() {
           )}
 
           <form onSubmit={handleUpdateDevice} className="space-y-4">
+            {/* Soundbox Hardware Model / LCD Screen Option */}
+            <div>
+              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1.5">
+                {t('deviceType', 'Soundbox Type')}
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditDeviceType('Display Soundbox')}
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col gap-1 cursor-pointer ${
+                    editDeviceType === 'Display Soundbox'
+                      ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-500'
+                      : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                  }`}
+                >
+                  <span className="text-xs font-bold flex items-center gap-1.5">
+                    🖥️ {t('hasLcdScreen', 'Display (LCD Screen)')}
+                  </span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                    {t('hasLcdScreenDesc', 'Dynamic QR on LCD screen for customer payment')}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setEditDeviceType('Standard Soundbox')}
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col gap-1 cursor-pointer ${
+                    editDeviceType !== 'Display Soundbox'
+                      ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-500'
+                      : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                  }`}
+                >
+                  <span className="text-xs font-bold flex items-center gap-1.5">
+                    🏷️ {t('noLcdScreen', 'Standard (No Screen)')}
+                  </span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                    {t('noLcdScreenDesc', 'Voice announcements only, printed QR stand')}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Field 1: Device SN */}
             <div>
               <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
                 {t('deviceSn', 'Device Serial Number (SN)')} <span className="text-rose-500">*</span>
@@ -2625,7 +2875,7 @@ export default function UserDashboard() {
                 <button
                   type="button"
                   onClick={() => setEditActiveCameraField(editActiveCameraField === 'sn' ? null : 'sn')}
-                  className={`absolute inset-y-0 right-0 pr-3 flex items-center transition ${
+                  className={`absolute inset-y-0 right-0 pr-3 flex items-center transition cursor-pointer ${
                     editActiveCameraField === 'sn' ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-600'
                   }`}
                   title={t('scanSoundboxQrCamera', 'Scan Soundbox QR via Camera')}
@@ -2661,6 +2911,72 @@ export default function UserDashboard() {
                 </div>
               )}
             </div>
+
+            {/* Field 2 (Conditional): Payment QR Code for Devices with LCD Screen */}
+            {editDeviceType === 'Display Soundbox' && (
+              <div className="p-3 bg-emerald-50/60 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-900/60 space-y-2 transition-all">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold uppercase text-emerald-900 dark:text-emerald-200">
+                    {t('paymentQrCode', 'Merchant Payment QR Code (LCD Screen)')} <span className="text-rose-500">*</span>
+                  </label>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-300">
+                    🖥️ LCD QR
+                  </span>
+                </div>
+
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={editPaymentQr}
+                    onChange={(e) => setEditPaymentQr(e.target.value)}
+                    placeholder={t('paymentQrPlaceholder', 'Paste KHQR/Bakong payment string or URL...')}
+                    className="w-full pl-3 pr-10 py-2.5 bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setEditActiveCameraField(editActiveCameraField === 'qr' ? null : 'qr')}
+                    className={`absolute inset-y-0 right-0 pr-3 flex items-center transition cursor-pointer ${
+                      editActiveCameraField === 'qr' ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-600'
+                    }`}
+                    title={t('scanPaymentQrCamera', 'Scan Payment QR via Camera')}
+                  >
+                    <QrCode className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-emerald-700 dark:text-emerald-400">
+                  {t('paymentQrHint', '💡 For LCD Screen: Scan or upload merchant payment QR (KHQR/Bakong) to display on the soundbox screen.')}
+                </p>
+
+                <div className="flex items-center justify-between pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => editPaymentQrFileInputRef.current?.click()}
+                    className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1 py-1 transition cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    {t('uploadPaymentQr', 'Upload Payment QR Image')}
+                  </button>
+                  <input
+                    ref={editPaymentQrFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleEditScanFile(e, 'qr')}
+                    className="hidden"
+                  />
+                </div>
+
+                {editScanFeedback.field === 'qr' && (
+                  <div className={`mt-1 text-xs flex items-center gap-1 ${
+                    editScanFeedback.isError ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400 font-medium'
+                  }`}>
+                    {editScanFeedback.isError ? <AlertCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                    <span>{editScanFeedback.message}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
