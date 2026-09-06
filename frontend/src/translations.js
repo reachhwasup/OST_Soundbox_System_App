@@ -333,6 +333,7 @@ export const translations = {
     completePairing: "Complete Pairing & Activate Soundbox",
     pairedSuccessfully: "Soundbox paired and activated successfully!",
     waitingForRegistration: "Waiting for Registration",
+    awaitingStoreLink: "Awaiting Store Link",
     confirmSaleAndDeploy: "Confirm Sale",
     // Store & Location Filter Keys
     allProvinces: "All Provinces / Cities",

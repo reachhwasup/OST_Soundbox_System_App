@@ -653,6 +653,7 @@ export default function AdminDashboard() {
       discPct = 0;
     }
     const finalPrice = Math.max(0, basePrice - discAmt);
+    const sn = sellTargetDevice.device_sn || sellTargetDevice.device_id;
 
     try {
       await api.put(`/api/devices/${sellTargetDevice.id}`, {
@@ -672,15 +673,22 @@ export default function AdminDashboard() {
       setIsSellStockOpen(false);
       await fetchAllData();
 
-      // Switch to Manage Devices tab
+      // Switch to Manage Devices tab and focus on this sold unit
+      setDevFilterId(sn || '');
+      setDevFilterType('ALL');
+      setDevFilterStatus('');
+      setDevFilterMerchant('');
+      setDevFilterWarranty('ALL');
+      setDevFilterDate('');
+      setDevPage(1);
       setAdminTab('devices');
 
       showToast({
         type: 'success',
-        title: isKhmer ? 'បានលក់ឧបករណ៍ដោយជោគជ័យ' : 'Device Sold & Deployed',
+        title: isKhmer ? 'បានលក់ឧបករណ៍ដោយជោគជ័យ' : 'Device Sold & Moved to Manage Devices',
         message: isKhmer 
-          ? `ឧបករណ៍ស្ថិតក្នុងស្ថានភាព៖ រង់ចាំការចុះឈ្មោះ (អតិថិជននឹងស្កេនភ្ជាប់តាមហាងរបស់ពួកគាត់)` 
-          : `Device marked as sold. Status: Waiting for Registration (Ready for user to scan & link).`,
+          ? `ឧបករណ៍ ${sn} ត្រូវបានផ្លាស់ទីទៅកាន់ Manage Devices ដោយស្ថិតក្នុងស្ថានភាព៖ រង់ចាំការចុះឈ្មោះ (រង់ចាំអតិថិជនស្កេនភ្ជាប់តាម App)` 
+          : `Device ${sn} moved to Manage Devices with status 'Waiting for Registration'. Waiting for user to link in app.`,
         duration: 5000
       });
     } catch (err) {
@@ -1030,8 +1038,10 @@ export default function AdminDashboard() {
   // Warehouse Stock Devices Filtering Logic
   const filteredStockDevices = useMemo(() => {
     const list = devices.filter(d => {
-      // Must be unassigned (available in warehouse stock)
+      // Must be unassigned and strictly in warehouse stock (not pending/sold or active)
       if (d.merchant_id) return false;
+      const st = String(d.status || '').toUpperCase();
+      if (st === 'PENDING' || st === 'ACTIVE') return false;
 
       if (stockSearchTerm.trim()) {
         const q = stockSearchTerm.toLowerCase().trim();
@@ -3319,8 +3329,8 @@ export default function AdminDashboard() {
                             ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
                             : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
                       }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
-                        <span>{isOnline ? t('online', 'Online') : String(d.status).toUpperCase() === 'PENDING' ? t('waitingForRegistration', 'Pending') : t('offline', 'Offline')}</span>
+                        <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : String(d.status).toUpperCase() === 'PENDING' ? 'bg-purple-500 animate-pulse' : 'bg-slate-400'}`}></span>
+                        <span>{isOnline ? t('online', 'Online') : String(d.status).toUpperCase() === 'PENDING' ? (isKhmer ? '🟣 រង់ចាំការចុះឈ្មោះ' : '🟣 Waiting for Registration') : t('offline', 'Offline')}</span>
                       </span>
                     </div>
 
@@ -3328,7 +3338,11 @@ export default function AdminDashboard() {
                     <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100 dark:border-slate-800">
                       <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 truncate max-w-[180px]">
                         <Store className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        <span className="truncate font-semibold">{d.store_name || d.owner_name || t('unassigned', 'Unassigned')}</span>
+                        <span className="truncate font-semibold">
+                          {String(d.status).toUpperCase() === 'PENDING' && !d.merchant_id
+                            ? (isKhmer ? '⏳ រង់ចាំការភ្ជាប់ហាង' : '⏳ Awaiting Store Link')
+                            : (d.store_name || d.owner_name || t('unassigned', 'Unassigned'))}
+                        </span>
                       </div>
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                         isDisplay
@@ -3413,7 +3427,7 @@ export default function AdminDashboard() {
                 <span>{t('warehouseStock', 'Warehouse Stock')}</span>
               </div>
               <div className="text-xl sm:text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">
-                {devices.filter(d => !d.merchant_id).length}
+                {devices.filter(d => !d.merchant_id && String(d.status || '').toUpperCase() !== 'PENDING' && String(d.status || '').toUpperCase() !== 'ACTIVE').length}
               </div>
               <div className="text-[10px] text-slate-400 mt-0.5">{t('unassignedAndReady', 'Unassigned & Ready')}</div>
             </div>
@@ -3424,7 +3438,7 @@ export default function AdminDashboard() {
                 <span>{t('availableUnits', 'Available Units')}</span>
               </div>
               <div className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
-                {devices.filter(d => !d.merchant_id).length}
+                {devices.filter(d => !d.merchant_id && String(d.status || '').toUpperCase() !== 'PENDING' && String(d.status || '').toUpperCase() !== 'ACTIVE').length}
               </div>
               <div className="text-[10px] text-slate-400 mt-0.5">{t('readyForDeployment', 'Ready for Deployment')}</div>
             </div>

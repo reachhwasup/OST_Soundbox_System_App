@@ -295,7 +295,7 @@ async def list_devices(
                    d.warranty_end_date,
                    COALESCE(d.telegram_chat_id, d.chat_id) AS telegram_chat_id,
                    d.qr_code,
-                   COALESCE(d.status::text, CASE WHEN d.merchant_id IS NULL THEN 'IN_STOCK' WHEN d.is_active = FALSE THEN 'Offline' ELSE 'Online' END, 'IN_STOCK') AS status,
+                   COALESCE(NULLIF(d.status::text, ''), CASE WHEN d.merchant_id IS NULL THEN 'IN_STOCK' WHEN d.is_active = FALSE THEN 'Offline' ELSE 'Online' END, 'IN_STOCK') AS status,
                    COALESCE(d.battery, '100%') AS battery,
                    COALESCE(d.signal, 'Good') AS signal,
                    COALESCE(d.version_4g, 'Y6_LCD_1605_V1.0') AS version_4g,
@@ -821,13 +821,27 @@ async def update_device(
             idx += 1
 
         if payload.status is not None:
-            updates.append(f"status = ${idx}::device_status")
-            params.append(payload.status.strip())
+            st_val = payload.status.strip().upper()
+            col_type = await conn.fetchval("""
+                SELECT udt_name FROM information_schema.columns 
+                WHERE table_name = 'devices' AND column_name = 'status'
+            """)
+            if col_type == 'device_status':
+                try:
+                    await conn.execute(f"ALTER TYPE device_status ADD VALUE IF NOT EXISTS '{st_val}';")
+                except Exception:
+                    pass
+                updates.append(f"status = ${idx}::device_status")
+            else:
+                updates.append(f"status = ${idx}")
+            params.append(st_val)
             idx += 1
-            if payload.status.strip().upper() == 'ACTIVE':
+            if st_val == 'ACTIVE':
                 updates.append("is_active = TRUE")
-            elif payload.status.strip().upper() in ['IN_STOCK', 'MAINTENANCE', 'PENDING', 'RETIRED']:
+            elif st_val in ['IN_STOCK', 'MAINTENANCE', 'PENDING', 'RETIRED']:
                 updates.append("is_active = FALSE")
+            if st_val == 'PENDING':
+                updates.append("merchant_id = NULL")
 
         if payload.merchant_id is not None:
             col_type = await conn.fetchval("""
@@ -854,7 +868,12 @@ async def update_device(
         updates.append("updated_at = CURRENT_TIMESTAMP")
         set_sql = ", ".join(updates)
 
-        await conn.execute(f"UPDATE devices SET {set_sql} WHERE id = $1", *params)
+        try:
+            await conn.execute(f"UPDATE devices SET {set_sql} WHERE id = $1", *params)
+        except Exception as upd_err:
+            logger.warning(f"Device update error with sql '{set_sql}': {upd_err}. Retrying without enum cast...")
+            set_sql_clean = set_sql.replace("::device_status", "")
+            await conn.execute(f"UPDATE devices SET {set_sql_clean} WHERE id = $1", *params)
 
         return {
             "status": "success",
