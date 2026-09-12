@@ -94,13 +94,17 @@ async def init_db():
                     password_hash VARCHAR(255) NOT NULL,
                     role user_role NOT NULL DEFAULT 'USER',
                     status user_status NOT NULL DEFAULT 'ACTIVE',
+                    is_active BOOLEAN DEFAULT TRUE,
                     last_login_at TIMESTAMP WITH TIME ZONE,
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
+                ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+                UPDATE users SET is_active = TRUE WHERE is_active IS NULL;
                 CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone_number);
                 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
                 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+                CREATE INDEX IF NOT EXISTS idx_users_is_active ON users(is_active);
             """)
             logger.info("Step 2 (Users Table) initialized successfully.")
         except Exception as e:

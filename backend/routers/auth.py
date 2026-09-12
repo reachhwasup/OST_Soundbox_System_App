@@ -91,13 +91,22 @@ async def login(payload: LoginSchema):
     pool = await get_db_pool()
     
     async with pool.acquire() as conn:
-        user = await conn.fetchrow(
-            """
-            SELECT id, phone_number, full_name, password_hash, role, status
-            FROM users WHERE phone_number = $1
-            """,
-            clean_phone
-        )
+        try:
+            user = await conn.fetchrow(
+                """
+                SELECT id, phone_number, full_name, password_hash, role, status, COALESCE(is_active, TRUE) AS is_active
+                FROM users WHERE phone_number = $1
+                """,
+                clean_phone
+            )
+        except Exception:
+            user = await conn.fetchrow(
+                """
+                SELECT id, phone_number, full_name, password_hash, role, status
+                FROM users WHERE phone_number = $1
+                """,
+                clean_phone
+            )
 
         if not user or not verify_password(payload.password, user["password_hash"]):
             raise HTTPException(
@@ -105,10 +114,10 @@ async def login(payload: LoginSchema):
                 detail="Incorrect phone number or password."
             )
 
-        if user["status"] == "SUSPENDED":
+        if user.get("is_active") is False or user["status"] == "SUSPENDED":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Your account is suspended. Please contact administrator."
+                detail="Your account has been deactivated or suspended. Please contact administrator."
             )
 
         # Update last login
