@@ -378,26 +378,46 @@ async def register_device(
 
 async def resolve_supplier(conn, supplier_id: Optional[int] = None, supplier_name: Optional[str] = None) -> tuple:
     """Helper to resolve supplier_id and supplier_name against the suppliers table with graceful fallback."""
-    if supplier_id:
-        row = await conn.fetchrow("SELECT id, name FROM suppliers WHERE id = $1", int(supplier_id))
+    try:
+        # Check if suppliers table exists; if not, create it
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS suppliers (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(150) NOT NULL UNIQUE,
+                contact_person VARCHAR(150),
+                phone VARCHAR(50),
+                email VARCHAR(150),
+                address TEXT,
+                notes TEXT,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            INSERT INTO suppliers (name, is_active)
+            VALUES ('Feishu', TRUE), ('Hemi', TRUE)
+            ON CONFLICT (name) DO NOTHING;
+        """)
+
+        if supplier_id:
+            row = await conn.fetchrow("SELECT id, name FROM suppliers WHERE id = $1", int(supplier_id))
+            if row:
+                return row["id"], row["name"]
+        name_clean = (supplier_name or "Feishu").strip()
+        if not name_clean:
+            name_clean = "Feishu"
+        row = await conn.fetchrow("SELECT id, name FROM suppliers WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))", name_clean)
         if row:
             return row["id"], row["name"]
-    name_clean = (supplier_name or "Feishu").strip()
-    if not name_clean:
-        name_clean = "Feishu"
-    row = await conn.fetchrow("SELECT id, name FROM suppliers WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))", name_clean)
-    if row:
-        return row["id"], row["name"]
-    # Fallback to Feishu
-    row = await conn.fetchrow("SELECT id, name FROM suppliers WHERE name = 'Feishu' LIMIT 1")
-    if row:
-        return row["id"], row["name"]
-    # If no suppliers table seed exists yet, auto-create
-    try:
+        # Fallback to Feishu
+        row = await conn.fetchrow("SELECT id, name FROM suppliers WHERE name = 'Feishu' LIMIT 1")
+        if row:
+            return row["id"], row["name"]
+        # If no suppliers table seed exists yet, auto-create
         new_row = await conn.fetchrow("INSERT INTO suppliers (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET is_active = TRUE RETURNING id, name", name_clean)
         return new_row["id"], new_row["name"]
-    except Exception:
-        return 1, "Feishu"
+    except Exception as e:
+        logger.warning(f"Failed to resolve supplier ({e}), falling back to (None, 'Feishu')")
+        return None, "Feishu"
 
 
 @router.get("/lookup/{device_sn}")
@@ -551,17 +571,43 @@ async def list_devices(
             logger.warning(f"list_devices query failed: {e}. Auto-healing schema and retrying...")
             try:
                 await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS suppliers (
+                        id SERIAL PRIMARY KEY,
+                        name VARCHAR(150) NOT NULL UNIQUE,
+                        is_active BOOLEAN DEFAULT TRUE
+                    );
+                    INSERT INTO suppliers (name, is_active) VALUES ('Feishu', TRUE), ('Hemi', TRUE) ON CONFLICT (name) DO NOTHING;
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier_id INT;
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS batch_no VARCHAR(100) DEFAULT 'BATCH-STD';
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_4g VARCHAR(100) DEFAULT 'Y6B_LCD_1605_V1.0';
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_wifi VARCHAR(100) DEFAULT 'esp32c2x_2M_OTA';
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
+                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
+                    CREATE TABLE IF NOT EXISTS sales (
+                        id SERIAL PRIMARY KEY,
+                        device_id INT,
+                        device_sn VARCHAR(100) NOT NULL,
+                        merchant_id INT,
+                        price NUMERIC(10, 2) DEFAULT 29.00,
+                        discount_amount NUMERIC(10, 2) DEFAULT 0.00,
+                        discount_percent NUMERIC(5, 2) DEFAULT 0.00,
+                        final_price NUMERIC(10, 2) DEFAULT 29.00,
+                        warranty_days INT DEFAULT 90,
+                        warranty_start_date TIMESTAMP WITH TIME ZONE,
+                        warranty_end_date TIMESTAMP WITH TIME ZONE
+                    );
                 """)
                 devices = await conn.fetch(query, *params)
             except Exception as e2:
                 logger.error(f"Fallback list_devices query: {e2}")
                 fallback_query = """
-                    SELECT d.id, d.device_sn, d.merchant_id, d.price, d.status, d.created_at,
+                    SELECT d.id, 
+                           COALESCE(d.device_id, d.device_sn, d.id::text) AS device_sn,
+                           d.merchant_id, 
+                           COALESCE(d.status::text, 'IN_STOCK') AS status,
+                           d.created_at,
                            COALESCE(d.device_type, 'Display Soundbox') AS device_type,
+                           COALESCE(d.device_model, 'Y6B') AS device_model,
                            COALESCE(d.battery, '100%') AS battery,
                            COALESCE(d.signal, 'Good') AS signal,
                            COALESCE(m.merchant_name, m.name) AS store_name
@@ -575,13 +621,19 @@ async def list_devices(
         for d in devices:
             try:
                 row = dict(d)
+                created_at = row.get("created_at")
+                w_start = row.get("warranty_start_date")
+                w_end = row.get("warranty_end_date")
+                heartbeat = row.get("last_heartbeat")
+                l_time = row.get("last_time")
+
                 formatted_devices.append({
                     **row,
-                    "created_at": row["created_at"].isoformat() if hasattr(row.get("created_at"), "isoformat") else (str(row.get("created_at")) if row.get("created_at") else None),
-                    "warranty_start_date": row["warranty_start_date"].isoformat() if hasattr(row.get("warranty_start_date"), "isoformat") else (str(row.get("warranty_start_date")) if row.get("warranty_start_date") else None),
-                    "warranty_end_date": row["warranty_end_date"].isoformat() if hasattr(row.get("warranty_end_date"), "isoformat") else (str(row.get("warranty_end_date")) if row.get("warranty_end_date") else None),
-                    "last_heartbeat": row["last_heartbeat"].isoformat() if hasattr(row.get("last_heartbeat"), "isoformat") else (str(row.get("last_heartbeat")) if row.get("last_heartbeat") else None),
-                    "last_time": row["last_time"].strftime("%Y-%m-%d %H:%M:%S") if hasattr(row.get("last_time"), "strftime") else (str(row.get("last_time")) if row.get("last_time") else None)
+                    "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else (str(created_at) if created_at else None),
+                    "warranty_start_date": w_start.isoformat() if hasattr(w_start, "isoformat") else (str(w_start) if w_start else None),
+                    "warranty_end_date": w_end.isoformat() if hasattr(w_end, "isoformat") else (str(w_end) if w_end else None),
+                    "last_heartbeat": heartbeat.isoformat() if hasattr(heartbeat, "isoformat") else (str(heartbeat) if heartbeat else None),
+                    "last_time": l_time.strftime("%Y-%m-%d %H:%M:%S") if hasattr(l_time, "strftime") else (str(l_time) if l_time else None)
                 })
             except Exception:
                 formatted_devices.append(dict(d))
@@ -645,10 +697,16 @@ async def bulk_import_devices(
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier_id INT;
                 """)
-                await conn.execute("""
-                    INSERT INTO devices (device_id, device_sn, notes, price, status, is_active, battery, signal, supplier_id)
-                    VALUES ($1, $1, $2, $3, 'IN_STOCK', FALSE, '100%', 'Good', $4)
-                """, sn, payload.notes, payload.price or 29.00, supp_id)
+                try:
+                    await conn.execute("""
+                        INSERT INTO devices (device_id, device_sn, notes, price, status, is_active, battery, signal, supplier_id)
+                        VALUES ($1, $1, $2, $3, 'IN_STOCK', FALSE, '100%', 'Good', $4)
+                    """, sn, payload.notes, payload.price or 29.00, supp_id)
+                except Exception:
+                    await conn.execute("""
+                        INSERT INTO devices (device_id, device_sn, notes, price, status, is_active, battery, signal)
+                        VALUES ($1, $1, $2, $3, 'IN_STOCK', FALSE, '100%', 'Good')
+                    """, sn, payload.notes, payload.price or 29.00)
             imported_count += 1
 
         return {
@@ -734,14 +792,24 @@ async def intake_single_device(
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
                     ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier_id INT;
                 """)
-                new_id = await conn.fetchval("""
-                    INSERT INTO devices (
-                        device_id, device_sn, device_type, 
-                        merchant_id, notes, price, status, is_active, battery, signal, supplier_id
-                    )
-                    VALUES ($1, $1, $2, $3, $4, $5, $6, $7, '100%', 'Good', $8)
-                    RETURNING id
-                """, sn, payload.device_type or "Display Soundbox", m_id_target, payload.notes, payload.price or 29.00, initial_status, is_active, supp_id)
+                try:
+                    new_id = await conn.fetchval("""
+                        INSERT INTO devices (
+                            device_id, device_sn, device_type, device_model,
+                            merchant_id, batch_no, notes, price, status, is_active, battery, signal, supplier_id
+                        )
+                        VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9, '100%', 'Good', $10)
+                        RETURNING id
+                    """, sn, payload.device_type or "Display Soundbox", payload.device_model or "Y6B", m_id_target, payload.batch_no, payload.notes, payload.price or 29.00, initial_status, is_active, supp_id)
+                except Exception:
+                    new_id = await conn.fetchval("""
+                        INSERT INTO devices (
+                            device_id, device_sn, device_type, 
+                            merchant_id, notes, price, status, is_active, battery, signal
+                        )
+                        VALUES ($1, $1, $2, $3, $4, $5, $6, $7, '100%', 'Good')
+                        RETURNING id
+                    """, sn, payload.device_type or "Display Soundbox", m_id_target, payload.notes, payload.price or 29.00, initial_status, is_active)
             except Exception as final_err:
                 logger.error(f"Device intake permanently failed for SN '{sn}': {final_err}", exc_info=True)
                 raise HTTPException(

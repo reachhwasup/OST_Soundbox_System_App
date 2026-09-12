@@ -166,6 +166,35 @@ async def list_sales(
     """Lists device sales orders with revenue summaries and pagination."""
     pool = await get_db_pool()
     async with pool.acquire() as conn:
+        # Ensure sales table exists
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS sales (
+                id SERIAL PRIMARY KEY,
+                device_id INT,
+                device_sn VARCHAR(100) NOT NULL,
+                merchant_id INT,
+                sold_by_user_id INT,
+                customer_name VARCHAR(150),
+                customer_phone VARCHAR(50),
+                price NUMERIC(10, 2) NOT NULL DEFAULT 29.00,
+                discount_type VARCHAR(20) DEFAULT 'NONE',
+                discount_percent NUMERIC(5, 2) DEFAULT 0.00,
+                discount_amount NUMERIC(10, 2) DEFAULT 0.00,
+                final_price NUMERIC(10, 2) NOT NULL DEFAULT 29.00,
+                currency VARCHAR(10) DEFAULT 'USD',
+                warranty_days INT DEFAULT 90,
+                warranty_start_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                warranty_end_date TIMESTAMP WITH TIME ZONE,
+                payment_method VARCHAR(50) DEFAULT 'CASH',
+                status VARCHAR(50) DEFAULT 'COMPLETED',
+                notes TEXT,
+                quantity INT NOT NULL DEFAULT 1,
+                invoice_reference VARCHAR(100),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+
         where_clauses = ["1=1"]
         params = []
         idx = 1

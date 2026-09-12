@@ -571,3 +571,20 @@ async def get_admin_logs(
             "total_count": len(all_logs),
             "logs": all_logs[:limit]
         }
+
+
+@router.post("/run-migrations")
+async def run_database_migrations(current_user: Dict[str, Any] = Depends(require_admin)):
+    """Triggers database migrations and schema sync on demand (Admin only)."""
+    try:
+        from backend.database import init_db
+        await init_db()
+        return {
+            "status": "success",
+            "message": "Database migrations and schema checks executed successfully."
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database migration failed: {str(e)}"
+        )

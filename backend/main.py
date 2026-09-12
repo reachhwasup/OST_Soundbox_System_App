@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
         try:
             await init_db()
         except Exception as de:
-            logger.warning(f"Database schema initialization warning: {de}")
+            logger.error(f"Database schema initialization warning: {de}", exc_info=True)
 
         db_pool = await get_db_pool()
         logger.info("PostgreSQL database connection pool established successfully.")
