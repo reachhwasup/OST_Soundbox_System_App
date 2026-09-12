@@ -827,7 +827,7 @@ async def return_device_to_stock(
 
         return {
             "status": "success",
-            "message": f"Device '{device['device_sn']}' returned to warehouse stock."
+            "message": f"Device '{device_id['device_sn']}' returned to warehouse stock."
         }
 
 
