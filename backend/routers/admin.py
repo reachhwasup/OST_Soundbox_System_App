@@ -40,10 +40,15 @@ class AdminStatusToggleSchema(BaseModel):
 async def get_system_stats():
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        total_users = await conn.fetchval("SELECT COUNT(*) FROM users")
-        active_users = await conn.fetchval("SELECT COUNT(*) FROM users WHERE status = 'ACTIVE'")
-        suspended_users = await conn.fetchval("SELECT COUNT(*) FROM users WHERE status = 'SUSPENDED'")
-        admin_count = await conn.fetchval("SELECT COUNT(*) FROM users WHERE role = 'ADMIN'")
+        try:
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE")
+        except Exception:
+            pass
+
+        total_users = await conn.fetchval("SELECT COUNT(*) FROM users WHERE COALESCE(is_active, TRUE) = TRUE")
+        active_users = await conn.fetchval("SELECT COUNT(*) FROM users WHERE status = 'ACTIVE' AND COALESCE(is_active, TRUE) = TRUE")
+        suspended_users = await conn.fetchval("SELECT COUNT(*) FROM users WHERE status = 'SUSPENDED' AND COALESCE(is_active, TRUE) = TRUE")
+        admin_count = await conn.fetchval("SELECT COUNT(*) FROM users WHERE role = 'ADMIN' AND COALESCE(is_active, TRUE) = TRUE")
         total_stores = await conn.fetchval("SELECT COUNT(*) FROM merchants")
         total_devices = await conn.fetchval("SELECT COUNT(*) FROM devices")
         total_transactions = await conn.fetchval("SELECT COUNT(*) FROM transactions")
@@ -73,7 +78,7 @@ async def list_users(
     pool = await get_db_pool()
     offset = (page - 1) * limit
     
-    where_clauses = ["1=1"]
+    where_clauses = ["COALESCE(u.is_active, TRUE) = TRUE"]
     params = []
     param_idx = 1
 
@@ -108,6 +113,7 @@ async def list_users(
     query = f"""
         SELECT 
             u.id, u.phone_number, u.full_name, u.role, u.status, 
+            COALESCE(u.is_active, TRUE) AS is_active,
             u.last_login_at, u.created_at, u.updated_at,
             COALESCE(
                 (
@@ -132,6 +138,11 @@ async def list_users(
     params.extend([limit, offset])
 
     async with pool.acquire() as conn:
+        try:
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE")
+        except Exception:
+            pass
+
         total_count = await conn.fetchval(count_query, *params[:-2])
         rows = await conn.fetch(query, *params)
 
@@ -151,6 +162,7 @@ async def list_users(
                 "full_name": r["full_name"],
                 "role": r["role"],
                 "status": r["status"],
+                "is_active": r["is_active"],
                 "last_login_at": r["last_login_at"].isoformat() if r["last_login_at"] else None,
                 "created_at": r["created_at"].isoformat() if r["created_at"] else None,
                 "updated_at": r["updated_at"].isoformat() if r["updated_at"] else None,
@@ -174,18 +186,36 @@ async def create_user(payload: AdminCreateUserSchema):
     clean_phone = normalize_phone_number(payload.phone_number)
     
     async with pool.acquire() as conn:
-        existing = await conn.fetchrow("SELECT id FROM users WHERE phone_number = $1", clean_phone)
+        try:
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE")
+        except Exception:
+            pass
+
+        existing = await conn.fetchrow("SELECT id, is_active FROM users WHERE phone_number = $1", clean_phone)
+        hashed = hash_password(payload.password)
+
         if existing:
+            if existing.get("is_active") is False:
+                # Reactivate previously soft-deleted account
+                await conn.execute("""
+                    UPDATE users 
+                    SET full_name = $1, password_hash = $2, role = $3::user_role, status = $4::user_status, is_active = TRUE, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = $5
+                """, payload.full_name.strip(), hashed, payload.role.upper(), payload.status.upper(), existing["id"])
+                return {
+                    "status": "success",
+                    "message": f"User '{payload.full_name}' reactivated successfully.",
+                    "user_id": existing["id"]
+                }
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="A user with this phone number already exists."
             )
 
-        hashed = hash_password(payload.password)
         new_id = await conn.fetchval(
             """
-            INSERT INTO users (phone_number, full_name, password_hash, role, status)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO users (phone_number, full_name, password_hash, role, status, is_active)
+            VALUES ($1, $2, $3, $4, $5, TRUE)
             RETURNING id
             """,
             clean_phone, payload.full_name.strip(), hashed, payload.role.upper(), payload.status.upper()
@@ -315,7 +345,12 @@ async def delete_user(user_id: int, current_admin: Dict[str, Any] = Depends(requ
 
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        user = await conn.fetchrow("SELECT id, full_name, phone_number FROM users WHERE id = $1", user_id)
+        try:
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE")
+        except Exception:
+            pass
+
+        user = await conn.fetchrow("SELECT id, full_name, phone_number, is_active FROM users WHERE id = $1", user_id)
         if not user:
             # Idempotent deletion: if user already deleted from DB, return success
             return {
@@ -323,13 +358,16 @@ async def delete_user(user_id: int, current_admin: Dict[str, Any] = Depends(requ
                 "message": "User was already removed or does not exist."
             }
 
-        # Safe unlinking of associated stores so foreign key constraints never block deletion
-        await conn.execute("UPDATE merchants SET user_id = NULL WHERE user_id = $1", user_id)
-        await conn.execute("DELETE FROM users WHERE id = $1", user_id)
+        # Soft-delete: Do not delete user from database, set is_active = FALSE and status = 'SUSPENDED'
+        await conn.execute("""
+            UPDATE users 
+            SET is_active = FALSE, status = 'SUSPENDED', updated_at = CURRENT_TIMESTAMP 
+            WHERE id = $1
+        """, user_id)
 
         return {
             "status": "success",
-            "message": f"User '{user['full_name']}' ({user['phone_number']}) deleted successfully."
+            "message": f"User '{user['full_name']}' ({user['phone_number']}) deactivated successfully."
         }
 
 

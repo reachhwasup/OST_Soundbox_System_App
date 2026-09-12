@@ -94,13 +94,17 @@ async def init_db():
                     password_hash VARCHAR(255) NOT NULL,
                     role user_role NOT NULL DEFAULT 'USER',
                     status user_status NOT NULL DEFAULT 'ACTIVE',
+                    is_active BOOLEAN DEFAULT TRUE,
                     last_login_at TIMESTAMP WITH TIME ZONE,
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
+                ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+                UPDATE users SET is_active = TRUE WHERE is_active IS NULL;
                 CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone_number);
                 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
                 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+                CREATE INDEX IF NOT EXISTS idx_users_is_active ON users(is_active);
             """)
             logger.info("Step 2 (Users Table) initialized successfully.")
         except Exception as e:
@@ -110,10 +114,10 @@ async def init_db():
         try:
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS merchants (
-                    merchant_id SERIAL PRIMARY KEY,
-                    merchant_name VARCHAR(150) NOT NULL,
-                    name VARCHAR(150),
-                    id INT,
+                    id SERIAL PRIMARY KEY,
+                    merchant_id VARCHAR(100),
+                    merchant_name VARCHAR(255),
+                    name VARCHAR(255),
                     place VARCHAR(150),
                     location VARCHAR(255),
                     telegram_chat_id VARCHAR(100),
@@ -127,10 +131,11 @@ async def init_db():
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
+
+                ALTER TABLE merchants ADD COLUMN IF NOT EXISTS id SERIAL;
                 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS merchant_id VARCHAR(100);
                 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS merchant_name VARCHAR(255);
                 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS name VARCHAR(255);
-                ALTER TABLE merchants ADD COLUMN IF NOT EXISTS id INT;
                 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS user_id INT REFERENCES users(id) ON DELETE SET NULL;
                 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS owner_phone VARCHAR(50);
                 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS province VARCHAR(100);
@@ -139,8 +144,22 @@ async def init_db():
                 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS village VARCHAR(100);
                 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS street VARCHAR(150);
                 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(100);
-                ALTER TABLE merchants ALTER COLUMN merchant_id DROP NOT NULL;
-                ALTER TABLE merchants ALTER COLUMN merchant_name DROP NOT NULL;
+
+                DO $$ BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints tc
+                        JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
+                        WHERE tc.table_name = 'merchants' AND tc.constraint_type = 'PRIMARY KEY' AND kcu.column_name = 'merchant_id'
+                    ) THEN
+                        ALTER TABLE merchants ALTER COLUMN merchant_id DROP NOT NULL;
+                    END IF;
+                EXCEPTION WHEN OTHERS THEN null;
+                END $$;
+
+                DO $$ BEGIN
+                    ALTER TABLE merchants ALTER COLUMN merchant_name DROP NOT NULL;
+                EXCEPTION WHEN OTHERS THEN null;
+                END $$;
 
                 -- Auto-sync columns so merchant_id and merchant_name are always populated
                 UPDATE merchants SET
@@ -190,9 +209,10 @@ async def init_db():
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS devices (
                     id SERIAL PRIMARY KEY,
-                    merchant_id INT REFERENCES merchants(id) ON DELETE SET NULL,
+                    merchant_id VARCHAR(100),
                     device_sn VARCHAR(100),
                     device_model VARCHAR(50) DEFAULT 'Y6B',
+                    device_type VARCHAR(50) DEFAULT 'Display Soundbox',
                     telegram_chat_id VARCHAR(100),
                     status device_status DEFAULT 'ACTIVE',
                     last_heartbeat TIMESTAMP WITH TIME ZONE,
@@ -265,10 +285,10 @@ async def init_db():
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS sales (
                     id SERIAL PRIMARY KEY,
-                    device_id INT REFERENCES devices(id) ON DELETE SET NULL,
+                    device_id INT,
                     device_sn VARCHAR(100) NOT NULL,
-                    merchant_id INT REFERENCES merchants(id) ON DELETE SET NULL,
-                    sold_by_user_id INT REFERENCES users(id) ON DELETE SET NULL,
+                    merchant_id INT,
+                    sold_by_user_id INT,
                     customer_name VARCHAR(150),
                     customer_phone VARCHAR(50),
                     price NUMERIC(10, 2) NOT NULL DEFAULT 29.00,
@@ -354,7 +374,7 @@ async def init_db():
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS transactions (
                     id BIGSERIAL PRIMARY KEY,
-                    device_id INT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+                    device_id INT,
                     bank_name VARCHAR(50) NOT NULL,
                     bank_tx_id VARCHAR(150) NOT NULL,
                     amount NUMERIC(12, 2) NOT NULL,
