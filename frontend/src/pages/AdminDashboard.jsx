@@ -80,7 +80,6 @@ import {
   Calendar,
   ShoppingBag,
   QrCode,
-  Banknote,
   Camera,
   Upload,
   User,
@@ -4502,14 +4501,12 @@ export default function AdminDashboard() {
                           )}
                           <div className="mt-1 flex justify-end">
                             {sale.payment_method === 'QR_SCAN' ? (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                                <QrCode className="w-2.5 h-2.5" />
-                                <span>{t('paymentQrScan', 'QR Scan')}</span>
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                {t('paymentQrScan', 'QR Scan')}
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                <Banknote className="w-2.5 h-2.5" />
-                                <span>{t('paymentCash', 'Cash')}</span>
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                {t('paymentCash', 'Cash')}
                               </span>
                             )}
                           </div>
@@ -6992,9 +6989,8 @@ export default function AdminDashboard() {
             {/* Payment Method Selection: Cash or QR Scan */}
             <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                  <Banknote className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>{t('paymentMethod', 'Payment Method')}</span>
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  {t('paymentMethod', 'Payment Method')}
                 </span>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                   sellPaymentMethod === 'QR_SCAN'
@@ -7010,58 +7006,37 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setSellPaymentMethod('CASH')}
-                  className={`p-3 rounded-xl border text-left transition cursor-pointer flex items-center gap-2.5 ${
+                  className={`p-3 rounded-xl border text-left transition cursor-pointer ${
                     sellPaymentMethod === 'CASH'
                       ? 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-500 text-emerald-950 dark:text-emerald-100 shadow-2xs ring-1 ring-emerald-500'
                       : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
                   }`}
                 >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                    sellPaymentMethod === 'CASH'
-                      ? 'bg-emerald-500 text-white shadow-xs'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
-                  }`}>
-                    <Banknote className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold">{t('paymentCash', 'Cash')}</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">{t('paymentMethodCashDesc', 'Direct cash')}</div>
-                  </div>
+                  <div className="text-xs font-bold">{t('paymentCash', 'Cash')}</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">{t('paymentMethodCashDesc', 'Direct cash payment')}</div>
                 </button>
 
                 {/* QR Scan Option */}
                 <button
                   type="button"
                   onClick={() => setSellPaymentMethod('QR_SCAN')}
-                  className={`p-3 rounded-xl border text-left transition cursor-pointer flex items-center gap-2.5 ${
+                  className={`p-3 rounded-xl border text-left transition cursor-pointer ${
                     sellPaymentMethod === 'QR_SCAN'
                       ? 'bg-indigo-50/90 dark:bg-indigo-950/40 border-indigo-500 text-indigo-950 dark:text-indigo-100 shadow-2xs ring-1 ring-indigo-500'
                       : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
                   }`}
                 >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                    sellPaymentMethod === 'QR_SCAN'
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
-                  }`}>
-                    <QrCode className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold">{t('paymentQrScan', 'QR Scan')}</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">{t('paymentMethodQrDesc', 'Bakong / KHQR')}</div>
-                  </div>
+                  <div className="text-xs font-bold">{t('paymentQrScan', 'QR Scan')}</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">{t('paymentMethodQrDesc', 'Bakong / KHQR payment')}</div>
                 </button>
               </div>
 
               {/* Informative banner when QR Scan is chosen */}
               {sellPaymentMethod === 'QR_SCAN' && (
-                <div className="p-2.5 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-lg border border-indigo-200 dark:border-indigo-900/60 flex items-center gap-2 text-indigo-800 dark:text-indigo-200 text-[11px]">
-                  <QrCode className="w-4 h-4 shrink-0 text-indigo-500" />
-                  <span>
-                    {isKhmer 
-                      ? 'អតិថិជនស្កេនទូទាត់ប្រាក់តាមរយៈ KHQR/Bakong។ អ្នកអាចបញ្ចូលលេខកូដវិក្កយបត្រ ឬលេខយោងនៅប្រអប់ខាងក្រោម។' 
-                      : 'Customer pays via Bakong / KHQR scan. You can record the transaction slip or invoice reference below.'}
-                  </span>
+                <div className="p-2.5 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-lg border border-indigo-200 dark:border-indigo-900/60 text-indigo-800 dark:text-indigo-200 text-[11px]">
+                  {isKhmer 
+                    ? 'អតិថិជនស្កេនទូទាត់ប្រាក់តាមរយៈ KHQR/Bakong។ អ្នកអាចបញ្ចូលលេខកូដវិក្កយបត្រ ឬលេខយោងនៅប្រអប់ខាងក្រោម។' 
+                    : 'Customer pays via Bakong / KHQR scan. You can record the transaction slip or invoice reference below.'}
                 </div>
               )}
             </div>
