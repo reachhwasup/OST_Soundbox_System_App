@@ -182,6 +182,8 @@ export default function AdminDashboard() {
   const [stockTypeFilter, setStockTypeFilter] = useState('ALL');
   const [stockSupplierFilter, setStockSupplierFilter] = useState('ALL');
   const [stockPriceFilter, setStockPriceFilter] = useState('ALL');
+  const [stockMinPrice, setStockMinPrice] = useState('');
+  const [stockMaxPrice, setStockMaxPrice] = useState('');
   const [stockDateFilter, setStockDateFilter] = useState('');
   const [stockSortBy, setStockSortBy] = useState('NEWEST'); // 'NEWEST' | 'OLDEST' | 'SN_ASC' | 'SN_DESC' | 'PRICE_DESC' | 'PRICE_ASC'
   const [stockPage, setStockPage] = useState(1);
@@ -292,17 +294,45 @@ export default function AdminDashboard() {
   // Mobile & Tablet Collapsible Filter Toggles
   const [isStockFiltersExpanded, setIsStockFiltersExpanded] = useState(false);
   const [isDevFiltersExpanded, setIsDevFiltersExpanded] = useState(false);
+  const [isStoreFiltersExpanded, setIsStoreFiltersExpanded] = useState(false);
+  const [isSalesFiltersExpanded, setIsSalesFiltersExpanded] = useState(false);
+
+  const activeSalesFilterCount = useMemo(() => {
+    let count = 0;
+    if (salesStatusFilter && salesStatusFilter !== 'ALL') count++;
+    if (salesPaymentMethodFilter && salesPaymentMethodFilter !== 'ALL') count++;
+    if (salesSupplierFilter && salesSupplierFilter !== 'ALL') count++;
+    if (salesSortBy && salesSortBy !== 'newest') count++;
+    return count;
+  }, [salesStatusFilter, salesPaymentMethodFilter, salesSupplierFilter, salesSortBy]);
+
+  const activeStoreFilterCount = useMemo(() => {
+    let count = 0;
+    if (storeProvinceFilter) count++;
+    if (storeDistrictFilter) count++;
+    if (storeCommuneFilter) count++;
+    if (storeOwnerFilter && storeOwnerFilter !== 'ALL') count++;
+    if (storeDateFilter && storeDateFilter.trim()) count++;
+    if (storeSortBy && storeSortBy !== 'NEWEST') count++;
+    return count;
+  }, [storeProvinceFilter, storeDistrictFilter, storeCommuneFilter, storeOwnerFilter, storeDateFilter, storeSortBy]);
 
   const activeStockFilterCount = useMemo(() => {
     let count = 0;
     if (stockSearchTerm.trim()) count++;
     if (stockTypeFilter && stockTypeFilter !== 'ALL') count++;
     if (stockSupplierFilter && stockSupplierFilter !== 'ALL') count++;
-    if (stockPriceFilter && stockPriceFilter !== 'ALL') count++;
+    if (stockPriceFilter && stockPriceFilter !== 'ALL') {
+      if (stockPriceFilter === 'CUSTOM') {
+        if (stockMinPrice || stockMaxPrice) count++;
+      } else {
+        count++;
+      }
+    }
     if (stockDateFilter.trim()) count++;
     if (stockSortBy !== 'NEWEST') count++;
     return count;
-  }, [stockSearchTerm, stockTypeFilter, stockSupplierFilter, stockPriceFilter, stockDateFilter, stockSortBy]);
+  }, [stockSearchTerm, stockTypeFilter, stockSupplierFilter, stockPriceFilter, stockMinPrice, stockMaxPrice, stockDateFilter, stockSortBy]);
 
   const activeDevFilterCount = useMemo(() => {
     let count = 0;
@@ -980,9 +1010,20 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     setStockPage(1);
-  }, [stockSearchTerm, stockTypeFilter, stockSupplierFilter, stockPriceFilter, stockDateFilter, stockSortBy]);
+  }, [stockSearchTerm, stockTypeFilter, stockSupplierFilter, stockPriceFilter, stockMinPrice, stockMaxPrice, stockDateFilter, stockSortBy]);
 
-  // Available Provinces for Stores Filter
+  // Dynamic Available Prices in Warehouse Stock
+  const availableStockPrices = useMemo(() => {
+    const set = new Set();
+    devices.forEach(d => {
+      const p = d.price !== undefined && d.price !== null && d.price !== '' ? Number(d.price) : 29;
+      if (!isNaN(p)) {
+        set.add(p);
+      }
+    });
+    return Array.from(set).sort((a, b) => a - b);
+  }, [devices]);
+
   // Available Provinces for Stores Filter
   const availableProvinces = useMemo(() => {
     const set = new Set();
@@ -1224,8 +1265,27 @@ export default function AdminDashboard() {
       }
 
       if (stockPriceFilter !== 'ALL') {
-        if (Math.round(Number(d.price || 29)) !== Math.round(Number(stockPriceFilter))) {
-          return false;
+        const itemPrice = Number(d.price !== undefined && d.price !== null && d.price !== '' ? d.price : 29);
+        if (stockPriceFilter === 'UNDER_30') {
+          if (itemPrice >= 30) return false;
+        } else if (stockPriceFilter === '30_50') {
+          if (itemPrice < 30 || itemPrice > 50) return false;
+        } else if (stockPriceFilter === '50_100') {
+          if (itemPrice < 50 || itemPrice > 100) return false;
+        } else if (stockPriceFilter === 'OVER_100') {
+          if (itemPrice <= 100) return false;
+        } else if (stockPriceFilter === 'CUSTOM') {
+          const min = stockMinPrice !== '' ? Number(stockMinPrice) : null;
+          const max = stockMaxPrice !== '' ? Number(stockMaxPrice) : null;
+          if (min !== null && !isNaN(min) && itemPrice < min) return false;
+          if (max !== null && !isNaN(max) && itemPrice > max) return false;
+        } else if (stockPriceFilter.startsWith('EXACT_')) {
+          const exactVal = Number(stockPriceFilter.replace('EXACT_', ''));
+          if (Math.abs(itemPrice - exactVal) > 0.009) return false;
+        } else if (!isNaN(Number(stockPriceFilter))) {
+          if (Math.round(itemPrice) !== Math.round(Number(stockPriceFilter))) {
+            return false;
+          }
         }
       }
 
@@ -1259,7 +1319,7 @@ export default function AdminDashboard() {
       // Default: NEWEST
       return (new Date(b.created_at || 0) - new Date(a.created_at || 0)) || (b.id - a.id);
     });
-  }, [devices, stockSearchTerm, stockTypeFilter, stockSupplierFilter, stockPriceFilter, stockDateFilter, stockSortBy]);
+  }, [devices, stockSearchTerm, stockTypeFilter, stockSupplierFilter, stockPriceFilter, stockMinPrice, stockMaxPrice, stockDateFilter, stockSortBy]);
 
   // Reset Stock Filters
   const handleResetStockFilters = () => {
@@ -1267,6 +1327,8 @@ export default function AdminDashboard() {
     setStockTypeFilter('ALL');
     setStockSupplierFilter('ALL');
     setStockPriceFilter('ALL');
+    setStockMinPrice('');
+    setStockMaxPrice('');
     setStockDateFilter('');
     setStockSortBy('NEWEST');
     setStockPage(1);
@@ -1602,8 +1664,8 @@ export default function AdminDashboard() {
     }
 
     return (
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3.5 bg-slate-50/75 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 select-none">
-        <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-3 px-3.5 sm:px-5 py-3 sm:py-3.5 bg-slate-50/75 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 select-none">
+        <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 text-center sm:text-left">
           <span>{isKhmer ? 'បង្ហាញ' : 'Showing'}</span>
           <strong className="text-slate-900 dark:text-white font-bold">{startItem}-{endItem}</strong>
           <span>{isKhmer ? 'នៃសរុប' : 'of'}</span>
@@ -1611,7 +1673,7 @@ export default function AdminDashboard() {
           <span>{isKhmer ? 'ជួរ' : 'records'}</span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+        <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2 sm:gap-3">
           {/* Rows per page */}
           <div className="flex items-center gap-1.5">
             <span className="text-slate-400 text-[11px] hidden sm:inline">{isKhmer ? 'ជួរក្នុងមួយទំព័រ' : 'Rows'}:</span>
@@ -1621,7 +1683,7 @@ export default function AdminDashboard() {
                 onPageSizeChange(Number(e.target.value));
                 onPageChange(1);
               }}
-              className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+              className="px-2 py-1 sm:px-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
             >
               <option value={10}>10 / page</option>
               <option value={20}>20 / page</option>
@@ -1631,7 +1693,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Page Numeration Buttons */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 flex-wrap justify-center">
             <button
               type="button"
               disabled={currentPage <= 1}
@@ -2114,21 +2176,7 @@ export default function AdminDashboard() {
       {/* Top Banner Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-              {t('admin', 'Admin Portal')}
-            </span>
-            <span className="text-[11px] sm:text-xs text-slate-400">
-              {adminTab === 'users' ? t('userAccountsRoles', 'User Accounts & Roles') :
-               adminTab === 'stores' ? t('storeMerchantBranches', 'Store & Merchant Branches') :
-               adminTab === 'devices' ? t('deployedSoundboxFleet', 'Deployed Soundbox Fleet & Telemetry') :
-               adminTab === 'inventory' ? t('warehouseStockBreadcrumb', 'Warehouse Stock & Inventory') :
-               adminTab === 'sales' || adminTab === 'sales_history' ? t('salesHistoryBreadcrumb', 'Device Sales & Order Ledger') :
-               adminTab === 'user_activity' || adminTab === 'user_logs' || adminTab === 'logs' ? t('userActivityTitle', 'User Activity') :
-               t('adminActivityTitle', 'Admin Activity')}
-            </span>
-          </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
             {adminTab === 'users' ? t('userMerchantAccounts', 'User & Merchant Accounts') :
              adminTab === 'stores' ? t('storesMerchantLocations', 'Stores & Merchant Locations') :
              adminTab === 'devices' ? t('manageDevicesTitle', 'Manage Devices (Deployed Soundboxes)') :
@@ -2168,7 +2216,7 @@ export default function AdminDashboard() {
             <div className="text-[10px] sm:text-xs font-semibold text-purple-600 uppercase tracking-wider">{t('admin', 'Admins')}</div>
             <div className="text-xl sm:text-2xl font-bold text-purple-600 mt-1">{stats.admin_count}</div>
           </div>
-          <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+          <div className="col-span-2 sm:col-span-1 bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
             <div className="text-[10px] sm:text-xs font-semibold text-blue-600 uppercase tracking-wider">{t('totalStores', 'Stores Total')}</div>
             <div className="text-xl sm:text-2xl font-bold text-blue-600 mt-1">{stats.total_stores}</div>
           </div>
@@ -2318,7 +2366,7 @@ export default function AdminDashboard() {
                   </div>
 
                   {/* Mobile Actions Bar */}
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-1.5">
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-end gap-1.5">
                     {u.id !== currentAdmin?.id && (
                       <button
                         type="button"
@@ -2364,7 +2412,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Mobile User Pagination */}
-          <div className="md:hidden">
+          <div className="md:hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs">
             {renderPaginationNumeration({
               currentPage: userPage,
               totalPages: totalUserPages,
@@ -2569,82 +2617,110 @@ export default function AdminDashboard() {
         <div className="space-y-4">
 
           {/* Top Stores KPI Summary Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-2xs space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{t('totalStores', 'Total Stores')}</span>
-                <div className="p-1.5 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 rounded-lg">
-                  <Store className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+            <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 p-2.5 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">{t('totalStores', 'Total Stores')}</span>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
                 {stores.length}
               </div>
-              <span className="text-[11px] text-slate-400">Registered merchant locations</span>
+              <span className="text-[10px] sm:text-[11px] text-slate-400 block truncate">Registered merchant locations</span>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-2xs space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{t('activeStoresWithDevice', 'Stores with Soundbox')}</span>
-                <div className="p-1.5 bg-blue-50 dark:bg-blue-950/60 text-blue-600 rounded-lg">
-                  <Smartphone className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-blue-600 dark:text-blue-400 font-mono tracking-tight">
+            <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 p-2.5 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">{t('activeStoresWithDevice', 'With Soundbox')}</span>
+              <div className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400 font-mono tracking-tight">
                 {stores.filter(s => (s.device_count || 0) > 0).length}
               </div>
-              <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">Equipped with speaker</span>
+              <span className="text-[10px] sm:text-[11px] text-blue-600 dark:text-blue-400 font-medium block truncate">Equipped speaker</span>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-2xs space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{t('unlinkedStoresCount', 'Unlinked Stores')}</span>
-                <div className="p-1.5 bg-amber-50 dark:bg-amber-950/60 text-amber-600 rounded-lg">
-                  <AlertTriangle className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-amber-600 dark:text-amber-400 font-mono tracking-tight">
+            <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 p-2.5 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">{t('unlinkedStoresCount', 'Unlinked')}</span>
+              <div className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400 font-mono tracking-tight">
                 {stores.filter(s => !s.device_count || s.device_count === 0).length}
               </div>
-              <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">Ready for device pairing</span>
+              <span className="text-[10px] sm:text-[11px] text-amber-600 dark:text-amber-400 font-medium block truncate">Ready for pairing</span>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-2xs space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{t('activeProvincesCount', 'Provinces Covered')}</span>
-                <div className="p-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 rounded-lg">
-                  <MapPin className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-tight">
+            <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 p-2.5 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">{t('activeProvincesCount', 'Provinces')}</span>
+              <div className="text-xl sm:text-2xl font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-tight">
                 {availableProvinces.length}
               </div>
-              <span className="text-[11px] text-slate-400">Nationwide cities & provinces</span>
+              <span className="text-[10px] sm:text-[11px] text-slate-400 block truncate">Nationwide covered</span>
             </div>
           </div>
 
           {/* Stores Search & Filter Toolbar */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-3.5">
-            {/* Filter Grid Row 1: Search, Province, District, Commune */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-3">
-              
-              {/* 1. Store Search Input */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('searchStorePlaceholder', 'Search store, owner, phone...')}
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder={t('searchStorePlaceholder', 'Search store, owner, phone...')}
-                    value={storeSearch}
-                    onChange={(e) => setStoreSearch(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
-                  />
-                </div>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-3.5 sm:p-5 space-y-3">
+            {/* Top Row: Primary Search + Mobile/Tablet Filter Toggle + Actions */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  placeholder={t('searchStorePlaceholder', 'Search store, owner, phone...')}
+                  value={storeSearch}
+                  onChange={(e) => { setStoreSearch(e.target.value); setStorePage(1); }}
+                  className="w-full px-4 py-2.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
+                />
+                {storeSearch && (
+                  <button
+                    type="button"
+                    onClick={() => { setStoreSearch(''); setStorePage(1); }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer font-bold text-sm"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
 
-              {/* 2. Province / City */}
+              {/* Action Buttons & Filter Toggle */}
+              <div className="flex items-center gap-2">
+                {/* Mobile/Tablet Filter Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsStoreFiltersExpanded(!isStoreFiltersExpanded)}
+                  className={`lg:hidden flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl text-xs font-semibold border transition flex items-center justify-center gap-2 cursor-pointer touch-manipulation ${
+                    isStoreFiltersExpanded || activeStoreFilterCount > 0
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                      : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  <span>Filters</span>
+                  {activeStoreFilterCount > 0 && (
+                    <span className="px-1.5 py-0.2 bg-emerald-600 text-white text-[10px] font-bold rounded-full">
+                      {activeStoreFilterCount}
+                    </span>
+                  )}
+                </button>
+
+                {(storeSearch || storeProvinceFilter || storeDistrictFilter || storeCommuneFilter || storeOwnerFilter !== 'ALL' || storeDateFilter || storeSortBy !== 'NEWEST') && (
+                  <button
+                    type="button"
+                    onClick={handleResetStoreFilters}
+                    className="px-3 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1 shrink-0 touch-manipulation"
+                    title="Clear Filters"
+                  >
+                    <span>{t('reset', 'Reset')}</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleExportStoresCSV}
+                  className="hidden sm:flex px-3.5 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer items-center gap-1.5 shadow-2xs shrink-0 touch-manipulation"
+                  title="Export Filtered Stores to CSV"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{t('exportCsv', 'Export')}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Secondary Filter Grid: Always visible on desktop (lg:grid), collapsible on mobile & tablet */}
+            <div className={`${isStoreFiltersExpanded ? 'grid' : 'hidden lg:grid'} grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/80`}>
+              
+              {/* 1. Province / City */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('provinceCity', 'Province / City')}
@@ -2655,6 +2731,7 @@ export default function AdminDashboard() {
                     setStoreProvinceFilter(e.target.value);
                     setStoreDistrictFilter('');
                     setStoreCommuneFilter('');
+                    setStorePage(1);
                   }}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
                 >
@@ -2665,7 +2742,7 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-              {/* 3. District / Khan */}
+              {/* 2. District / Khan */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('districtKhan', 'District / Khan')}
@@ -2675,6 +2752,7 @@ export default function AdminDashboard() {
                   onChange={(e) => {
                     setStoreDistrictFilter(e.target.value);
                     setStoreCommuneFilter('');
+                    setStorePage(1);
                   }}
                   disabled={availableDistricts.length === 0}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer disabled:opacity-50"
@@ -2686,14 +2764,17 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-              {/* 4. Commune / Sangkat */}
+              {/* 3. Commune / Sangkat */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('communeSangkat', 'Commune / Sangkat')}
                 </label>
                 <select
                   value={storeCommuneFilter}
-                  onChange={(e) => setStoreCommuneFilter(e.target.value)}
+                  onChange={(e) => {
+                    setStoreCommuneFilter(e.target.value);
+                    setStorePage(1);
+                  }}
                   disabled={availableCommunes.length === 0}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer disabled:opacity-50"
                 >
@@ -2704,19 +2785,17 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-            </div>
-
-            {/* Filter Grid Row 2: Merchant Owner, Registration Date, Sort By */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 gap-3 pt-1">
-
-              {/* 5. Merchant / Owner */}
+              {/* 4. Merchant / Owner */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('merchantOwner', 'Merchant / Owner')}
                 </label>
                 <select
                   value={storeOwnerFilter}
-                  onChange={(e) => setStoreOwnerFilter(e.target.value)}
+                  onChange={(e) => {
+                    setStoreOwnerFilter(e.target.value);
+                    setStorePage(1);
+                  }}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
                 >
                   <option value="ALL">{t('allOwners', 'All Merchant Owners')}</option>
@@ -2726,7 +2805,7 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-              {/* 6. Registration Date */}
+              {/* 5. Registration Date */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('storeRegDate', 'Registration Date')}
@@ -2734,19 +2813,25 @@ export default function AdminDashboard() {
                 <input
                   type="date"
                   value={storeDateFilter}
-                  onChange={(e) => setStoreDateFilter(e.target.value)}
+                  onChange={(e) => {
+                    setStoreDateFilter(e.target.value);
+                    setStorePage(1);
+                  }}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
                 />
               </div>
 
-              {/* 7. Sort By Selector */}
+              {/* 6. Sort By Selector */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('sortBy', 'Sort By')}
                 </label>
                 <select
                   value={storeSortBy}
-                  onChange={(e) => setStoreSortBy(e.target.value)}
+                  onChange={(e) => {
+                    setStoreSortBy(e.target.value);
+                    setStorePage(1);
+                  }}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer font-medium"
                 >
                   <option value="NEWEST">{t('sortNewest', 'Newest Registered')}</option>
@@ -2757,33 +2842,10 @@ export default function AdminDashboard() {
               </div>
 
             </div>
-
-            {/* Bottom Row: Action Buttons */}
-            <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-              {(storeSearch || storeProvinceFilter || storeDistrictFilter || storeCommuneFilter || storeOwnerFilter !== 'ALL' || storeDateFilter || storeSortBy !== 'NEWEST') && (
-                <button
-                  type="button"
-                  onClick={handleResetStoreFilters}
-                  className="px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
-                  title="Clear Filters"
-                >
-                  <span>{t('reset', 'Reset Filters')}</span>
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={handleExportStoresCSV}
-                className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer"
-                title="Export Filtered Stores to CSV"
-              >
-                <span>{t('exportCsv', 'Export CSV')}</span>
-              </button>
-            </div>
           </div>
           
-          {/* Mobile Store Cards (< md) */}
-          <div className="md:hidden space-y-3">
+          {/* Mobile & Tablet Store Cards (< lg) */}
+          <div className="lg:hidden grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {paginatedStores.length > 0 ? (
               paginatedStores.map((s) => (
                 <div 
@@ -2792,15 +2854,15 @@ export default function AdminDashboard() {
                     setSelectedStoreForDetails(s);
                     setIsStoreDetailsOpen(true);
                   }}
-                  className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200 dark:border-slate-800 p-4 space-y-3 cursor-pointer"
+                  className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200 dark:border-slate-800 p-4 space-y-3 cursor-pointer hover:border-emerald-500/50 transition"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold shrink-0">
                         <Store className="w-5 h-5" />
                       </div>
-                      <div>
-                        <div className="font-bold text-slate-900 dark:text-white text-base">
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-900 dark:text-white text-base truncate">
                           {s.merchant_name || s.name}
                         </div>
                         <div className="text-xs text-slate-400">
@@ -2808,7 +2870,7 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                     </div>
-                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
+                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0 ${
                       s.device_count > 0 
                         ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' 
                         : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
@@ -2820,7 +2882,7 @@ export default function AdminDashboard() {
                   <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl text-xs space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-slate-400">{t('owner', 'Owner')}:</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{s.owner_name || '—'}</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[170px]">{s.owner_name || '—'}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-slate-400">{t('phoneNumber', 'Phone')}:</span>
@@ -2828,12 +2890,12 @@ export default function AdminDashboard() {
                     </div>
                     <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
                       <span className="text-slate-400">{t('location', 'Location')}:</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{s.province || s.location || '—'}</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[170px]">{s.province || s.location || '—'}</span>
                     </div>
                     <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
                       <span className="text-slate-400">{t('telegramChatId', 'Telegram ID')}:</span>
                       {s.telegram_chat_id ? (
-                        <span className="font-mono font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                        <span className="font-mono font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1 truncate max-w-[170px]">
                           <span>{s.telegram_chat_id.startsWith('@') ? s.telegram_chat_id : `@${s.telegram_chat_id}`}</span>
                         </span>
                       ) : (
@@ -2856,14 +2918,14 @@ export default function AdminDashboard() {
                 </div>
               ))
             ) : (
-              <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 text-center text-slate-400 text-sm border border-slate-200 dark:border-slate-800">
+              <div className="col-span-full bg-white dark:bg-slate-900 rounded-2xl p-6 text-center text-slate-400 text-sm border border-slate-200 dark:border-slate-800">
                 No stores found matching your search.
               </div>
             )}
           </div>
 
-          {/* Mobile Store Pagination */}
-          <div className="md:hidden">
+          {/* Mobile & Tablet Store Pagination (< lg) */}
+          <div className="lg:hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs">
             {renderPaginationNumeration({
               currentPage: storePage,
               totalPages: totalStorePages,
@@ -2876,8 +2938,8 @@ export default function AdminDashboard() {
             })}
           </div>
 
-          {/* Desktop Store Table (>= md) */}
-          <div className="hidden md:block mt-6 mb-4 bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-6">
+          {/* Desktop Store Table (>= lg) */}
+          <div className="hidden lg:block mt-6 mb-4 bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-6">
             <div className="flex items-center justify-between mb-2">
               <div>
                 <h3 className="text-base font-semibold text-slate-900 dark:text-white">{t('storeManagement', 'Stores & Locations')}</h3>
@@ -3049,38 +3111,38 @@ export default function AdminDashboard() {
         <div className="space-y-4">
 
           {/* 0. Deployed Devices KPI Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="text-[10px] sm:text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
-                <CheckCircle className="w-3.5 h-3.5" />
-                <span>{t('deployedSoundboxes', 'Deployed Soundboxes')}</span>
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <div className="bg-white dark:bg-slate-900 p-2.5 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+              <div className="text-[9px] sm:text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1 truncate">
+                <CheckCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                <span className="truncate">{t('deployedSoundboxes', 'Deployed')}</span>
               </div>
-              <div className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
+              <div className="text-lg sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-0.5 sm:mt-1">
                 {devices.filter(d => d.merchant_id || String(d.status).toUpperCase() === 'PENDING').length}
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">{t('activeInMerchantStores', 'Active in Merchant Stores')}</div>
+              <div className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate">{t('activeInMerchantStores', 'Active in Merchant Stores')}</div>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="text-[10px] sm:text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Radio className="w-3.5 h-3.5" />
-                <span>{t('onlineConnected', 'Online & Connected')}</span>
+            <div className="bg-white dark:bg-slate-900 p-2.5 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+              <div className="text-[9px] sm:text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1 truncate">
+                <Radio className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                <span className="truncate">{t('onlineConnected', 'Online')}</span>
               </div>
-              <div className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+              <div className="text-lg sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 sm:mt-1">
                 {devices.filter(d => d.merchant_id && (String(d.status).toUpperCase() === 'ONLINE' || String(d.status).toUpperCase() === 'ACTIVE')).length}
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">{t('liveTelemetryAvailable', 'Live Telemetry Available')}</div>
+              <div className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate">{t('liveTelemetryAvailable', 'Live Telemetry')}</div>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="text-[10px] sm:text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Volume2 className="w-3.5 h-3.5" />
-                <span>{t('offlineUnits', 'Offline Units')}</span>
+            <div className="bg-white dark:bg-slate-900 p-2.5 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+              <div className="text-[9px] sm:text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1 truncate">
+                <Volume2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                <span className="truncate">{t('offlineUnits', 'Offline')}</span>
               </div>
-              <div className="text-xl sm:text-2xl font-bold text-slate-700 dark:text-slate-300 mt-1">
+              <div className="text-lg sm:text-2xl font-bold text-slate-700 dark:text-slate-300 mt-0.5 sm:mt-1">
                 {devices.filter(d => d.merchant_id && String(d.status).toUpperCase() === 'OFFLINE').length}
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">{t('disconnectedStandby', 'Disconnected / Standby')}</div>
+              <div className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate">{t('disconnectedStandby', 'Standby')}</div>
             </div>
           </div>
           
@@ -3134,7 +3196,7 @@ export default function AdminDashboard() {
                     className="px-3 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1 shrink-0 touch-manipulation"
                     title="Reset Filters"
                   >
-                    <span className="hidden sm:inline">{t('reset', 'Reset')}</span>
+                    <span>{t('reset', 'Reset')}</span>
                   </button>
                 )}
 
@@ -3231,39 +3293,15 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* 2. Action Toolbar & Batch Operations */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Batch Remote Command */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (devSelectedIds.length === 0) {
-                    showToast({ type: 'error', title: 'Selection Needed', message: 'Please select at least one device from the table.' });
-                    return;
-                  }
-                  setIsBatchCommandOpen(true);
-                }}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-2 transition cursor-pointer"
-              >
-                <span>{t('batchSendCommands', 'Batch Send Commands')}</span>
-                {devSelectedIds.length > 0 && (
-                  <span className="px-1.5 py-0.5 bg-emerald-800 text-[10px] font-bold rounded-full">
-                    {devSelectedIds.length}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setIsColumnsModalOpen(true)}
-                className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
-              >
-                <span>{t('columns', 'Columns')}</span>
-              </button>
-            </div>
+          {/* 2. Action Toolbar */}
+          <div className="hidden lg:flex items-center justify-end gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setIsColumnsModalOpen(true)}
+              className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            >
+              <span>{t('columns', 'Columns')}</span>
+            </button>
           </div>
 
           {/* 3. Cloud Speaker Data Table (Desktop >= lg) */}
@@ -3661,7 +3699,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Mobile & Tablet Device Pagination (< lg) */}
-          <div className="lg:hidden">
+          <div className="lg:hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs">
             {renderPaginationNumeration({
               currentPage: devPage,
               totalPages: totalDevPages,
@@ -3686,33 +3724,30 @@ export default function AdminDashboard() {
           {/* 0. Warehouse Stock KPI Summary Cards */}
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
             <div className="bg-white dark:bg-slate-900 p-2.5 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="text-[9px] sm:text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1 truncate">
-                <Warehouse className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                <span className="truncate">{t('warehouseStock', 'Warehouse Stock')}</span>
+              <div className="text-[9px] sm:text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider truncate">
+                {t('warehouseStock', 'Warehouse Stock')}
               </div>
-              <div className="text-lg sm:text-2xl font-bold text-amber-600 dark:text-amber-400 mt-0.5 sm:mt-1">
+              <div className="text-lg sm:text-2xl font-bold text-amber-600 dark:text-amber-400 mt-0.5 sm:mt-1 font-mono">
                 {devices.filter(d => !d.merchant_id && String(d.status || '').toUpperCase() !== 'PENDING' && String(d.status || '').toUpperCase() !== 'ACTIVE').length}
               </div>
               <div className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate">{t('unassignedAndReady', 'Unassigned & Ready')}</div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 p-2.5 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="text-[9px] sm:text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1 truncate">
-                <Boxes className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                <span className="truncate">{t('availableUnits', 'Available Units')}</span>
+              <div className="text-[9px] sm:text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider truncate">
+                {t('availableUnits', 'Available Units')}
               </div>
-              <div className="text-lg sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-0.5 sm:mt-1">
+              <div className="text-lg sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-0.5 sm:mt-1 font-mono">
                 {devices.filter(d => !d.merchant_id && String(d.status || '').toUpperCase() !== 'PENDING' && String(d.status || '').toUpperCase() !== 'ACTIVE').length}
               </div>
               <div className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate">{t('readyForDeployment', 'Ready for Deployment')}</div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 p-2.5 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="text-[9px] sm:text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1 truncate">
-                <Volume2 className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">{t('totalFleetUnits', 'Total Fleet Units')}</span>
+              <div className="text-[9px] sm:text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider truncate">
+                {t('totalFleetUnits', 'Total Fleet Units')}
               </div>
-              <div className="text-lg sm:text-2xl font-bold text-blue-600 dark:text-blue-400 mt-0.5 sm:mt-1">
+              <div className="text-lg sm:text-2xl font-bold text-blue-600 dark:text-blue-400 mt-0.5 sm:mt-1 font-mono">
                 {devices.length}
               </div>
               <div className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate">{t('allSoundboxes', 'All Soundboxes')}</div>
@@ -3851,20 +3886,81 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-              {/* Price Tier */}
+              {/* Price Filter */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('priceTier', 'Price Tier')}
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    {t('priceTier', isKhmer ? 'កម្រិតតម្លៃ' : 'Price')}
+                  </label>
+                  {stockPriceFilter === 'CUSTOM' && (
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Custom</span>
+                  )}
+                </div>
                 <select
                   value={stockPriceFilter}
                   onChange={(e) => setStockPriceFilter(e.target.value)}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
                 >
-                  <option value="ALL">{t('allPrices', 'All Price Tiers')}</option>
-                  <option value="29">$29.00 (Standard Audio)</option>
-                  <option value="39">$39.00 (Display Screen)</option>
+                  <option value="ALL">{t('allPrices', isKhmer ? 'គ្រប់កម្រិតតម្លៃ (All Prices)' : 'All Price Tiers')}</option>
+                  <optgroup label={isKhmer ? 'ចន្លោះតម្លៃ (Ranges)' : 'Price Ranges'}>
+                    <option value="UNDER_30">&lt; $30.00</option>
+                    <option value="30_50">$30.00 – $50.00</option>
+                    <option value="50_100">$50.00 – $100.00</option>
+                    <option value="OVER_100">&gt; $100.00</option>
+                  </optgroup>
+                  {availableStockPrices.length > 0 && (
+                    <optgroup label={isKhmer ? 'តម្លៃក្នុងស្តុក (In Stock)' : 'Exact In Stock'}>
+                      {availableStockPrices.map((p) => (
+                        <option key={p} value={`EXACT_${p}`}>
+                          ${Number(p).toFixed(2)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  <optgroup label={isKhmer ? 'កំណត់ដោយខ្លួនឯង (Custom)' : 'Custom Range'}>
+                    <option value="CUSTOM">{isKhmer ? 'ចន្លោះជាក់លាក់ (Min - Max)...' : 'Custom Range (Min - Max)...'}</option>
+                  </optgroup>
                 </select>
+
+                {stockPriceFilter === 'CUSTOM' && (
+                  <div className="flex items-center gap-1.5 mt-2 animate-fadeIn">
+                    <div className="relative flex-1">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        placeholder="Min"
+                        value={stockMinPrice}
+                        onChange={(e) => setStockMinPrice(e.target.value)}
+                        className="w-full pl-5 pr-1.5 py-1 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                      />
+                    </div>
+                    <span className="text-xs text-slate-400 font-medium">-</span>
+                    <div className="relative flex-1">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        placeholder="Max"
+                        value={stockMaxPrice}
+                        onChange={(e) => setStockMaxPrice(e.target.value)}
+                        className="w-full pl-5 pr-1.5 py-1 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                      />
+                    </div>
+                    {(stockMinPrice || stockMaxPrice) && (
+                      <button
+                        type="button"
+                        onClick={() => { setStockMinPrice(''); setStockMaxPrice(''); }}
+                        className="text-[10px] text-slate-400 hover:text-rose-500 px-1 font-bold cursor-pointer"
+                        title="Clear Min/Max"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Registration Date */}
@@ -4178,77 +4274,57 @@ export default function AdminDashboard() {
       {(adminTab === 'sales' || adminTab === 'sales_history') && (
         <div className="space-y-4 sm:space-y-5">
           {/* Top Sales KPI Banner */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
             {/* KPI 1: Gross Sales Revenue */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  {t('totalRevenue', 'Total Revenue')}
-                </span>
-                <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-                  <DollarSign className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 p-2.5 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">
+                {t('totalRevenue', 'Total Revenue')}
+              </span>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
                 ${Number(salesTotalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">
                 {isKhmer ? 'ចំណូលលក់ឧបករណ៍សរុប' : 'Total gross device revenue'}
               </p>
             </div>
 
             {/* KPI 2: Total Recorded Sales Orders */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  {t('salesOrders', 'Sales Orders')}
-                </span>
-                <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
-                  <ShoppingBag className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 p-2.5 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">
+                {t('salesOrders', 'Sales Orders')}
+              </span>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
                 {salesTotalCount}
               </div>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">
                 {isKhmer ? 'ចំនួនការលក់ដែលបានកត់ត្រា' : 'Total units sold & registered'}
               </p>
             </div>
 
             {/* KPI 3: Average Order Value */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  {t('avgOrderValue', 'Avg Order Value')}
-                </span>
-                <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
-                  <Tag className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 p-2.5 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">
+                {t('avgOrderValue', 'Avg Order Value')}
+              </span>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
                 ${salesList.length > 0 ? (salesTotalRevenue / salesList.length).toFixed(2) : '0.00'}
               </div>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">
                 {isKhmer ? 'តម្លៃលក់ជាមធ្យមក្នុងមួយគ្រឿង' : 'Average realized price per unit'}
               </p>
             </div>
 
             {/* KPI 4: Completed vs Pending Setup */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Order Statuses
-                </span>
-                <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
-                  <CheckCircle2 className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 p-2.5 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">
+                Order Statuses
+              </span>
+              <div className="text-base sm:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 <span className="text-emerald-600 dark:text-emerald-400">{salesList.filter(s => (s.status || 'COMPLETED') === 'COMPLETED').length} Done</span>
                 <span className="text-slate-300 dark:text-slate-700">/</span>
                 <span className="text-amber-600 dark:text-amber-400">{salesList.filter(s => s.status === 'PENDING').length} Pending</span>
               </div>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">
                 Active deployed vs pending setup
               </p>
             </div>
@@ -4277,12 +4353,47 @@ export default function AdminDashboard() {
                 )}
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              {/* Action Buttons & Filter Toggle */}
+              <div className="flex items-center gap-2">
+                {/* Mobile/Tablet Filter Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setIsSalesFiltersExpanded(!isSalesFiltersExpanded)}
+                  className={`lg:hidden flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl text-xs font-semibold border transition flex items-center justify-center gap-2 cursor-pointer touch-manipulation ${
+                    isSalesFiltersExpanded || activeSalesFilterCount > 0
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                      : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  <span>Filters</span>
+                  {activeSalesFilterCount > 0 && (
+                    <span className="px-1.5 py-0.2 bg-emerald-600 text-white text-[10px] font-bold rounded-full">
+                      {activeSalesFilterCount}
+                    </span>
+                  )}
+                </button>
+
+                {(activeSalesFilterCount > 0 || salesSearchTerm) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSalesSearchTerm('');
+                      setSalesStatusFilter('ALL');
+                      setSalesPaymentMethodFilter('ALL');
+                      setSalesSupplierFilter('ALL');
+                      setSalesSortBy('newest');
+                    }}
+                    className="px-3 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1 shrink-0 touch-manipulation"
+                    title="Reset Filters"
+                  >
+                    <span>{t('reset', 'Reset')}</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={handleExportSalesCSV}
-                  className="hidden sm:flex px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 transition items-center gap-1.5 shadow-2xs cursor-pointer touch-manipulation"
+                  className="hidden sm:flex px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 transition items-center gap-1.5 shadow-2xs cursor-pointer touch-manipulation shrink-0"
                   title="Export Sales to CSV"
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -4293,7 +4404,7 @@ export default function AdminDashboard() {
                   type="button"
                   onClick={() => fetchSales(salesSearchTerm)}
                   disabled={salesLoading}
-                  className="p-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 transition flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                  className="p-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 transition flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50 shrink-0"
                   title="Refresh Sales"
                 >
                   <RefreshCw className={`w-4 h-4 ${salesLoading ? 'animate-spin text-emerald-500' : ''}`} />
@@ -4301,8 +4412,8 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Filter Dropdowns Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1 border-t border-slate-100 dark:border-slate-800/80">
+            {/* Filter Dropdowns Grid: Collapsible on mobile/tablet, always visible on lg */}
+            <div className={`${isSalesFiltersExpanded ? 'grid' : 'hidden lg:grid'} grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800/80`}>
               {/* Filter 1: Status */}
               <div>
                 <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
@@ -4391,144 +4502,26 @@ export default function AdminDashboard() {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs min-w-[960px]">
-                  <thead className="bg-slate-50/80 dark:bg-slate-800/70 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200 dark:border-slate-800">
-                    <tr>
-                      <th className="px-4 py-3">Order / Date</th>
-                      <th className="px-4 py-3">Invoice Ref</th>
-                      <th className="px-4 py-3">Soundbox / SN</th>
-                      <th className="px-4 py-3">Store / Customer</th>
-                      <th className="px-4 py-3">Sold By</th>
-                      <th className="px-4 py-3 text-center">Qty</th>
-                      <th className="px-4 py-3 text-right">Price & Discount</th>
-                      <th className="px-4 py-3">Warranty</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300">
-                    {paginatedSales.map((sale) => (
-                      <tr key={sale.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-850/60 transition">
-                        {/* Order & Date */}
-                        <td className="px-4 py-3.5 align-top whitespace-nowrap">
+              <>
+                {/* Mobile & Tablet Sales Cards (< lg) */}
+                <div className="lg:hidden p-3.5 sm:p-4 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {paginatedSales.map((sale) => (
+                    <div 
+                      key={sale.id}
+                      className="bg-slate-50/70 dark:bg-slate-800/40 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 space-y-3"
+                    >
+                      {/* Top Header: Order ID + Status */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
                           <div className="font-mono font-bold text-slate-900 dark:text-white text-xs">
                             #ORD-{String(sale.id).padStart(4, '0')}
                           </div>
-                          <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
-                            <span>{sale.created_at ? new Date(sale.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
+                          <div className="text-[11px] text-slate-400 mt-0.5">
+                            {sale.created_at ? new Date(sale.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                           </div>
-                        </td>
+                        </div>
 
-                        {/* Invoice Ref */}
-                        <td className="px-4 py-3.5 align-top whitespace-nowrap">
-                          {sale.invoice_reference ? (
-                            <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
-                              {sale.invoice_reference}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400 font-mono text-xs">—</span>
-                          )}
-                        </td>
-
-                        {/* Soundbox & SN */}
-                        <td className="px-4 py-3.5 align-top">
-                          <div className="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-xs flex items-center gap-1.5">
-                            <span>{sale.device_sn}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                            {sale.device_type && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                                {sale.device_type}
-                              </span>
-                            )}
-                            {sale.supplier_name && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
-                                {sale.supplier_name}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Store / Customer */}
-                        <td className="px-4 py-3.5 align-top">
-                          {sale.store_name ? (
-                            <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
-                              <span>{sale.store_name}</span>
-                            </div>
-                          ) : sale.customer_name ? (
-                            <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
-                              <span>{sale.customer_name}</span>
-                            </div>
-                          ) : (
-                            <div className="text-slate-400 italic">Direct Sale</div>
-                          )}
-                          {(sale.customer_phone || sale.merchant_phone) && (
-                            <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
-                              <span>{sale.customer_phone || sale.merchant_phone}</span>
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Sold By */}
-                        <td className="px-4 py-3.5 align-top whitespace-nowrap">
-                          <div className="text-slate-800 dark:text-slate-200 font-semibold text-xs">
-                            {sale.sold_by_name || 'Admin'}
-                          </div>
-                          {sale.sold_by_phone && (
-                            <div className="text-[10px] text-slate-400">
-                              {sale.sold_by_phone}
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Quantity */}
-                        <td className="px-4 py-3.5 align-top text-center whitespace-nowrap">
-                          <span className="inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-md font-mono font-bold text-xs bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
-                            {sale.quantity || 1}
-                          </span>
-                        </td>
-
-                        {/* Price & Discount */}
-                        <td className="px-4 py-3.5 align-top text-right whitespace-nowrap">
-                          <div className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
-                            ${Number(sale.final_price ?? sale.price ?? 0).toFixed(2)}
-                          </div>
-                          {(sale.discount_percent > 0 || sale.discount_amount > 0) && (
-                            <div className="text-[10px] text-rose-500 dark:text-rose-400 line-through mt-0.5">
-                              ${Number(sale.price || 0).toFixed(2)}
-                              <span className="ml-1 text-[9px] no-underline font-semibold bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-300 px-1 py-0.2 rounded">
-                                {sale.discount_type === 'percent' ? `-${sale.discount_percent}%` : `-$${Number(sale.discount_amount).toFixed(2)}`}
-                              </span>
-                            </div>
-                          )}
-                          <div className="mt-1 flex justify-end">
-                            {sale.payment_method === 'QR_SCAN' ? (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                                {t('paymentQrScan', 'QR Scan')}
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                {t('paymentCash', 'Cash')}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Warranty */}
-                        <td className="px-4 py-3.5 align-top whitespace-nowrap">
-                          <div className="text-slate-800 dark:text-slate-200 font-semibold text-xs flex items-center gap-1">
-                            <span>{sale.warranty_days ? `${sale.warranty_days} days` : 'No warranty'}</span>
-                          </div>
-                          {sale.warranty_end_date && (
-                            <div className="text-[10px] text-slate-400 mt-0.5">
-                              Exp: {new Date(sale.warranty_end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                             sale.status === 'COMPLETED'
                               ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
@@ -4538,32 +4531,284 @@ export default function AdminDashboard() {
                           }`}>
                             {sale.status || 'COMPLETED'}
                           </span>
-                          {sale.notes && (
-                            <div className="text-[10px] text-slate-400 mt-1 max-w-[140px] truncate" title={sale.notes}>
-                              {sale.notes}
-                            </div>
-                          )}
-                        </td>
+                        </div>
+                      </div>
 
-                        {/* Actions */}
-                        <td className="px-4 py-3.5 align-top text-right whitespace-nowrap">
+                      {/* Device SN + Tags */}
+                      <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-xs block truncate">
+                              {sale.device_sn}
+                            </span>
+                            {sale.invoice_reference && (
+                              <span className="text-[10px] font-mono text-slate-400">
+                                Ref: {sale.invoice_reference}
+                              </span>
+                            )}
+                          </div>
                           <button
                             type="button"
                             onClick={() => {
                               navigator.clipboard.writeText(sale.device_sn);
                               showToast({ type: 'success', title: 'Copied', message: `Copied SN ${sale.device_sn} to clipboard.` });
                             }}
-                            className="px-2 py-1 text-[11px] font-semibold text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg transition cursor-pointer"
-                            title="Copy Serial Number"
+                            className="px-2 py-1 text-[11px] font-semibold text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg transition shrink-0 cursor-pointer"
                           >
                             <span>{isKhmer ? 'ចម្លង' : 'Copy'}</span>
                           </button>
-                        </td>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {sale.device_type && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                              {sale.device_type}
+                            </span>
+                          )}
+                          {sale.supplier_name && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                              {sale.supplier_name}
+                            </span>
+                          )}
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                            Qty: {sale.quantity || 1}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Store / Customer Info */}
+                      <div className="text-xs space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">{t('customerStore', 'Store / Buyer')}:</span>
+                          <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[200px]">
+                            {sale.store_name || sale.customer_name || 'Direct Sale'}
+                          </span>
+                        </div>
+                        {(sale.customer_phone || sale.merchant_phone) && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">{t('phoneNumber', 'Phone')}:</span>
+                            <span className="font-mono text-slate-700 dark:text-slate-300">
+                              {sale.customer_phone || sale.merchant_phone}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Sold By:</span>
+                          <span className="text-slate-700 dark:text-slate-300 font-medium">
+                            {sale.sold_by_name || 'Admin'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Bottom Row: Price & Payment Method */}
+                      <div className="pt-2.5 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          {sale.payment_method === 'QR_SCAN' ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                              {t('paymentQrScan', 'QR Scan')}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                              {t('paymentCash', 'Cash')}
+                            </span>
+                          )}
+                          {sale.warranty_days && (
+                            <span className="text-[10px] text-slate-400">
+                              {sale.warranty_days}d war.
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="text-right">
+                          <div className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
+                            ${Number(sale.final_price ?? sale.price ?? 0).toFixed(2)}
+                          </div>
+                          {(sale.discount_percent > 0 || sale.discount_amount > 0) && (
+                            <div className="text-[10px] text-rose-500 dark:text-rose-400 line-through">
+                              ${Number(sale.price || 0).toFixed(2)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop Sales Orders Table (>= lg) */}
+                <div className="hidden lg:block overflow-x-auto">
+                  <table className="w-full text-left text-xs min-w-[960px]">
+                    <thead className="bg-slate-50/80 dark:bg-slate-800/70 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200 dark:border-slate-800">
+                      <tr>
+                        <th className="px-4 py-3">Order / Date</th>
+                        <th className="px-4 py-3">Invoice Ref</th>
+                        <th className="px-4 py-3">Soundbox / SN</th>
+                        <th className="px-4 py-3">Store / Customer</th>
+                        <th className="px-4 py-3">Sold By</th>
+                        <th className="px-4 py-3 text-center">Qty</th>
+                        <th className="px-4 py-3 text-right">Price & Discount</th>
+                        <th className="px-4 py-3">Warranty</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3 text-right">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300">
+                      {paginatedSales.map((sale) => (
+                        <tr key={sale.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-850/60 transition">
+                          {/* Order & Date */}
+                          <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                            <div className="font-mono font-bold text-slate-900 dark:text-white text-xs">
+                              #ORD-{String(sale.id).padStart(4, '0')}
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
+                              <span>{sale.created_at ? new Date(sale.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
+                            </div>
+                          </td>
+
+                          {/* Invoice Ref */}
+                          <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                            {sale.invoice_reference ? (
+                              <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
+                                {sale.invoice_reference}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 font-mono text-xs">—</span>
+                            )}
+                          </td>
+
+                          {/* Soundbox & SN */}
+                          <td className="px-4 py-3.5 align-top">
+                            <div className="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-xs flex items-center gap-1.5">
+                              <span>{sale.device_sn}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              {sale.device_type && (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                  {sale.device_type}
+                                </span>
+                              )}
+                              {sale.supplier_name && (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                                  {sale.supplier_name}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Store / Customer */}
+                          <td className="px-4 py-3.5 align-top">
+                            {sale.store_name ? (
+                              <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                <span>{sale.store_name}</span>
+                              </div>
+                            ) : sale.customer_name ? (
+                              <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                <span>{sale.customer_name}</span>
+                              </div>
+                            ) : (
+                              <div className="text-slate-400 italic">Direct Sale</div>
+                            )}
+                            {(sale.customer_phone || sale.merchant_phone) && (
+                              <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
+                                <span>{sale.customer_phone || sale.merchant_phone}</span>
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Sold By */}
+                          <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                            <div className="text-slate-800 dark:text-slate-200 font-semibold text-xs">
+                              {sale.sold_by_name || 'Admin'}
+                            </div>
+                            {sale.sold_by_phone && (
+                              <div className="text-[10px] text-slate-400">
+                                {sale.sold_by_phone}
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Quantity */}
+                          <td className="px-4 py-3.5 align-top text-center whitespace-nowrap">
+                            <span className="inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-md font-mono font-bold text-xs bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
+                              {sale.quantity || 1}
+                            </span>
+                          </td>
+
+                          {/* Price & Discount */}
+                          <td className="px-4 py-3.5 align-top text-right whitespace-nowrap">
+                            <div className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
+                              ${Number(sale.final_price ?? sale.price ?? 0).toFixed(2)}
+                            </div>
+                            {(sale.discount_percent > 0 || sale.discount_amount > 0) && (
+                              <div className="text-[10px] text-rose-500 dark:text-rose-400 line-through mt-0.5">
+                                ${Number(sale.price || 0).toFixed(2)}
+                                <span className="ml-1 text-[9px] no-underline font-semibold bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-300 px-1 py-0.2 rounded">
+                                  {sale.discount_type === 'percent' ? `-${sale.discount_percent}%` : `-$${Number(sale.discount_amount).toFixed(2)}`}
+                                </span>
+                              </div>
+                            )}
+                            <div className="mt-1 flex justify-end">
+                              {sale.payment_method === 'QR_SCAN' ? (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                  {t('paymentQrScan', 'QR Scan')}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                  {t('paymentCash', 'Cash')}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Warranty */}
+                          <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                            <div className="text-slate-800 dark:text-slate-200 font-semibold text-xs flex items-center gap-1">
+                              <span>{sale.warranty_days ? `${sale.warranty_days} days` : 'No warranty'}</span>
+                            </div>
+                            {sale.warranty_end_date && (
+                              <div className="text-[10px] text-slate-400 mt-0.5">
+                                Exp: {new Date(sale.warranty_end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Status */}
+                          <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                              sale.status === 'COMPLETED'
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                : sale.status === 'PENDING'
+                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                                : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                            }`}>
+                              {sale.status || 'COMPLETED'}
+                            </span>
+                            {sale.notes && (
+                              <div className="text-[10px] text-slate-400 mt-1 max-w-[140px] truncate" title={sale.notes}>
+                                {sale.notes}
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Actions */}
+                          <td className="px-4 py-3.5 align-top text-right whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(sale.device_sn);
+                                showToast({ type: 'success', title: 'Copied', message: `Copied SN ${sale.device_sn} to clipboard.` });
+                              }}
+                              className="px-2 py-1 text-[11px] font-semibold text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg transition cursor-pointer"
+                              title="Copy Serial Number"
+                            >
+                              <span>{isKhmer ? 'ចម្លង' : 'Copy'}</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
 
             {/* Pagination Controls */}
@@ -4589,72 +4834,48 @@ export default function AdminDashboard() {
         <div className="space-y-4">
           
           {/* Top User Activity KPI Banner */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total User Actions</span>
-                <div className="p-1.5 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 rounded-lg">
-                  <Activity className="w-4 h-4" />
-                </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+            <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 p-2.5 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">Total User Actions</span>
+              <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
+                {userActivities.length}
               </div>
-              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
-                {userActivities.length} <span className="text-xs font-normal text-slate-400">actions</span>
-              </div>
-              <span className="text-[11px] text-slate-400">Merchant operations & events</span>
+              <span className="text-[10px] sm:text-[11px] text-slate-400 block truncate">Merchant operations & events</span>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Store Registrations</span>
-                <div className="p-1.5 bg-blue-50 dark:bg-blue-950/60 text-blue-600 rounded-lg">
-                  <Store className="w-4 h-4" />
-                </div>
+            <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 p-2.5 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">Store Registrations</span>
+              <div className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400 font-mono tracking-tight">
+                {stores.length}
               </div>
-              <div className="text-2xl font-black text-blue-600 dark:text-blue-400 font-mono tracking-tight">
-                {stores.length} <span className="text-xs font-normal text-slate-400">stores</span>
-              </div>
-              <span className="text-[11px] text-slate-400">Branches created by merchants</span>
+              <span className="text-[10px] sm:text-[11px] text-slate-400 block truncate">Branches created by merchants</span>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Soundbox Linkings</span>
-                <div className="p-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 rounded-lg">
-                  <Smartphone className="w-4 h-4" />
-                </div>
+            <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 p-2.5 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">Soundbox Linkings</span>
+              <div className="text-xl sm:text-2xl font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-tight">
+                {devices.filter(d => d.merchant_id).length}
               </div>
-              <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-tight">
-                {devices.filter(d => d.merchant_id).length} <span className="text-xs font-normal text-slate-400">devices</span>
-              </div>
-              <span className="text-[11px] text-indigo-500 font-medium flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>QR scanned & assigned</span>
-              </span>
+              <span className="text-[10px] sm:text-[11px] text-indigo-500 font-medium block truncate">QR scanned & assigned</span>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Active Merchants</span>
-                <div className="p-1.5 bg-amber-50 dark:bg-amber-950/60 text-amber-600 rounded-lg">
-                  <Users className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+            <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 p-2.5 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">Active Merchants</span>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
                 {users.filter(u => String(u.role).toUpperCase() === 'MERCHANT' || String(u.role).toUpperCase() === 'USER').length}
               </div>
-              <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">Active merchant accounts</span>
+              <span className="text-[10px] sm:text-[11px] text-amber-600 dark:text-amber-400 font-medium block truncate">Active merchant accounts</span>
             </div>
           </div>
 
           {/* User Activity Card */}
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-4 sm:p-6 space-y-4">
             
             {/* Header Toolbar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-emerald-600" />
-                  <span>{isKhmer ? 'កំណត់ត្រាសកម្មភាពអ្នកប្រើប្រាស់' : 'User & Merchant Activity Log'}</span>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  {isKhmer ? 'កំណត់ត្រាសកម្មភាពអ្នកប្រើប្រាស់' : 'User & Merchant Activity Log'}
                 </h3>
                 <p className="text-xs text-slate-400">
                   {t('userActivitySubtitle', 'Audit trail of merchant & user operations, store registrations, soundbox claims, and login events.')}
@@ -4674,38 +4895,51 @@ export default function AdminDashboard() {
             </div>
 
             {/* Filter Toolbar */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
               {/* Search */}
-              <div className="relative">
+              <div className="relative flex-1">
                 <input
                   type="text"
                   value={userActivitySearch}
-                  onChange={(e) => setUserActivitySearch(e.target.value)}
+                  onChange={(e) => { setUserActivitySearch(e.target.value); setUserActPage(1); }}
                   placeholder="Search user, store, phone, SN, action..."
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
+                {userActivitySearch && (
+                  <button
+                    type="button"
+                    onClick={() => { setUserActivitySearch(''); setUserActPage(1); }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer font-bold text-sm"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
 
-              {/* Action Category Filter */}
-              <select
-                value={userActivityCategoryFilter}
-                onChange={(e) => setUserActivityCategoryFilter(e.target.value)}
-                className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-              >
-                <option value="ALL">All Activity Categories</option>
-                <option value="STORE_REGISTER">Store Registrations</option>
-                <option value="DEVICE_LINK">Soundbox Links & Claims</option>
-                <option value="TELEGRAM_PAIR">Telegram Bot Pairings</option>
-                <option value="USER_LOGIN">User Logins & Auth</option>
-              </select>
+              <div className="flex items-center gap-2">
+                {/* Action Category Filter */}
+                <select
+                  value={userActivityCategoryFilter}
+                  onChange={(e) => { setUserActivityCategoryFilter(e.target.value); setUserActPage(1); }}
+                  className="flex-1 sm:flex-initial px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                >
+                  <option value="ALL">All Activity Categories</option>
+                  <option value="STORE_REGISTER">Store Registrations</option>
+                  <option value="DEVICE_LINK">Soundbox Links & Claims</option>
+                  <option value="TELEGRAM_PAIR">Telegram Bot Pairings</option>
+                  <option value="USER_LOGIN">User Logins & Auth</option>
+                </select>
 
-              <button
-                type="button"
-                onClick={() => { setUserActivitySearch(''); setUserActivityCategoryFilter('ALL'); }}
-                className="px-3.5 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <span>Reset Filters</span>
-              </button>
+                {(userActivitySearch || userActivityCategoryFilter !== 'ALL') && (
+                  <button
+                    type="button"
+                    onClick={() => { setUserActivitySearch(''); setUserActivityCategoryFilter('ALL'); setUserActPage(1); }}
+                    className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+                  >
+                    <span>Reset</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* User Activities Table */}
@@ -4727,7 +4961,6 @@ export default function AdminDashboard() {
               if (filteredList.length === 0) {
                 return (
                   <div className="text-center py-14 text-slate-500 space-y-2">
-                    <Activity className="w-10 h-10 text-slate-300 mx-auto" />
                     <p className="text-sm font-bold text-slate-800 dark:text-slate-200">No user activity matches criteria</p>
                     <p className="text-xs text-slate-400">Try adjusting search term or category filters.</p>
                   </div>
@@ -4739,8 +4972,103 @@ export default function AdminDashboard() {
               const paginatedUserActs = filteredList.slice(startUserActIdx, startUserActIdx + userActPageSize);
 
               return (
-                <div className="mt-6 mb-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900">
-                  <div className="overflow-x-auto">
+                <div className="mt-4 mb-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 shadow-2xs">
+                  {/* Batch Selection Banner on Mobile/Tablet */}
+                  {userActSelectedIds.length > 0 && (
+                    <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border-b border-emerald-100 dark:border-emerald-900/60 flex items-center justify-between gap-2 text-xs">
+                      <span className="font-semibold text-emerald-800 dark:text-emerald-300">
+                        {userActSelectedIds.length} item{userActSelectedIds.length > 1 ? 's' : ''} selected
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setUserActSelectedIds([])}
+                        className="text-xs text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 font-medium underline cursor-pointer"
+                      >
+                        Clear Selection
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Mobile & Tablet Activity Cards (< lg) */}
+                  <div className="lg:hidden p-3.5 sm:p-4 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {paginatedUserActs.map((act) => {
+                      const isSelected = userActSelectedIds.includes(act.id);
+                      return (
+                        <div 
+                          key={act.id}
+                          className={`rounded-2xl border p-3.5 sm:p-4 space-y-2.5 transition ${
+                            isSelected 
+                              ? 'bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800' 
+                              : 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800'
+                          }`}
+                        >
+                          {/* Top Row: Checkbox + Category + Status */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => toggleUserActSelection(act.id)}
+                                className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                              >
+                                {isSelected ? (
+                                  <CheckSquare className="w-4 h-4 text-emerald-600" />
+                                ) : (
+                                  <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                                )}
+                              </button>
+                              <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                act.category === 'STORE_REGISTER'
+                                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60'
+                                  : act.category === 'DEVICE_LINK'
+                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60'
+                                  : act.category === 'TELEGRAM_PAIR'
+                                  ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60'
+                                  : 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60'
+                              }`}>
+                                {act.action_label}
+                              </span>
+                            </div>
+                            <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                              {act.status}
+                            </span>
+                          </div>
+
+                          {/* User Info & Target */}
+                          <div className="text-xs space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-slate-900 dark:text-white truncate">
+                                {act.user_name || 'Merchant'}
+                              </span>
+                              {act.user_phone && (
+                                <span className="text-[11px] font-mono text-slate-400 shrink-0">
+                                  {act.user_phone}
+                                </span>
+                              )}
+                            </div>
+                            <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
+                              {act.target_name}
+                            </div>
+                            {act.details && (
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 p-2 rounded-lg border border-slate-200/60 dark:border-slate-800 break-words">
+                                {act.details}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Bottom Row: Platform/IP + Timestamp */}
+                          <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                            <span>{act.platform} · {act.ip_address}</span>
+                            <span>
+                              {new Date(act.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Desktop Table (>= lg) */}
+                  <div className="hidden lg:block overflow-x-auto">
                     <table className="w-full text-left border-collapse min-w-[850px]">
                       <thead>
                         <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -4855,69 +5183,48 @@ export default function AdminDashboard() {
         <div className="space-y-4">
           
           {/* Top Admin Activity KPI Banner */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Admin Actions</span>
-                <div className="p-1.5 bg-rose-50 dark:bg-rose-950/60 text-rose-600 rounded-lg">
-                  <ShieldAlert className="w-4 h-4" />
-                </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+            <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 p-2.5 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">Total Admin Actions</span>
+              <div className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400 font-mono tracking-tight">
+                {adminActivities.length}
               </div>
-              <div className="text-2xl font-black text-rose-600 dark:text-rose-400 font-mono tracking-tight">
-                {adminActivities.length} <span className="text-xs font-normal text-slate-400">actions</span>
-              </div>
-              <span className="text-[11px] text-slate-400">Administrative & hardware events</span>
+              <span className="text-[10px] sm:text-[11px] text-slate-400 block truncate">Administrative & hardware events</span>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Stock & Deployments</span>
-                <div className="p-1.5 bg-amber-50 dark:bg-amber-950/60 text-amber-600 rounded-lg">
-                  <Warehouse className="w-4 h-4" />
-                </div>
+            <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 p-2.5 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">Stock & Deployments</span>
+              <div className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400 font-mono tracking-tight">
+                {devices.length}
               </div>
-              <div className="text-2xl font-black text-amber-600 dark:text-amber-400 font-mono tracking-tight">
-                {devices.length} <span className="text-xs font-normal text-slate-400">units</span>
-              </div>
-              <span className="text-[11px] text-amber-600 font-medium">Warehouse inventory managed</span>
+              <span className="text-[10px] sm:text-[11px] text-amber-600 font-medium block truncate">Warehouse inventory managed</span>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Remote Commands</span>
-                <div className="p-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 rounded-lg">
-                  <Send className="w-4 h-4" />
-                </div>
+            <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 p-2.5 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">Remote Commands</span>
+              <div className="text-xl sm:text-2xl font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-tight">
+                {logs.filter(l => l.log_category === 'SECURITY').length}
               </div>
-              <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-tight">
-                {logs.filter(l => l.log_category === 'SECURITY').length} <span className="text-xs font-normal text-slate-400">commands</span>
-              </div>
-              <span className="text-[11px] text-slate-400">Voice tests, volume & reboots</span>
+              <span className="text-[10px] sm:text-[11px] text-slate-400 block truncate">Voice tests, volume & reboots</span>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Users Provisioned</span>
-                <div className="p-1.5 bg-blue-50 dark:bg-blue-950/60 text-blue-600 rounded-lg">
-                  <Users className="w-4 h-4" />
-                </div>
+            <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 p-2.5 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">Users Provisioned</span>
+              <div className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400 font-mono tracking-tight">
+                {users.length}
               </div>
-              <div className="text-2xl font-black text-blue-600 dark:text-blue-400 font-mono tracking-tight">
-                {users.length} <span className="text-xs font-normal text-slate-400">accounts</span>
-              </div>
-              <span className="text-[11px] text-blue-500 font-medium">Role access provisioned</span>
+              <span className="text-[10px] sm:text-[11px] text-blue-500 font-medium block truncate">Role access provisioned</span>
             </div>
           </div>
 
           {/* Admin Activity Card */}
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-4 sm:p-6 space-y-4">
             
             {/* Header Toolbar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <ShieldAlert className="w-5 h-5 text-rose-600" />
-                  <span>{isKhmer ? 'កំណត់ត្រាសកម្មភាពអ្នកគ្រប់គ្រង' : 'Admin & System Operation Audit Log'}</span>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  {isKhmer ? 'កំណត់ត្រាសកម្មភាពអ្នកគ្រប់គ្រង' : 'Admin & System Operation Audit Log'}
                 </h3>
                 <p className="text-xs text-slate-400">
                   {t('adminActivitySubtitle', 'Audit trail of system administrative actions, stock intakes, sales deployments, and remote commands.')}
@@ -4937,40 +5244,53 @@ export default function AdminDashboard() {
             </div>
 
             {/* Filter Toolbar */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
               {/* Search */}
-              <div className="relative">
+              <div className="relative flex-1">
                 <input
                   type="text"
                   value={adminActivitySearch}
-                  onChange={(e) => setAdminActivitySearch(e.target.value)}
+                  onChange={(e) => { setAdminActivitySearch(e.target.value); setAdminActPage(1); }}
                   placeholder="Search operator, device SN, action..."
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500"
                 />
+                {adminActivitySearch && (
+                  <button
+                    type="button"
+                    onClick={() => { setAdminActivitySearch(''); setAdminActPage(1); }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer font-bold text-sm"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
 
-              {/* Event Category Filter */}
-              <select
-                value={adminActivityCategoryFilter}
-                onChange={(e) => setAdminActivityCategoryFilter(e.target.value)}
-                className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 cursor-pointer"
-              >
-                <option value="ALL">All Administrative Actions</option>
-                <option value="STOCK_INTAKE">Stock Intakes</option>
-                <option value="SALE_DEPLOY">Sales & Warranty Deployments</option>
-                <option value="VOICE_BROADCAST">Voice Broadcasts</option>
-                <option value="SET_VOLUME">Volume Adjustments</option>
-                <option value="REBOOT">Device Reboots</option>
-                <option value="USER_MANAGEMENT">User Provisioning</option>
-              </select>
+              <div className="flex items-center gap-2">
+                {/* Event Category Filter */}
+                <select
+                  value={adminActivityCategoryFilter}
+                  onChange={(e) => { setAdminActivityCategoryFilter(e.target.value); setAdminActPage(1); }}
+                  className="flex-1 sm:flex-initial px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 cursor-pointer"
+                >
+                  <option value="ALL">All Administrative Actions</option>
+                  <option value="STOCK_INTAKE">Stock Intakes</option>
+                  <option value="SALE_DEPLOY">Sales & Warranty Deployments</option>
+                  <option value="VOICE_BROADCAST">Voice Broadcasts</option>
+                  <option value="SET_VOLUME">Volume Adjustments</option>
+                  <option value="REBOOT">Device Reboots</option>
+                  <option value="USER_MANAGEMENT">User Provisioning</option>
+                </select>
 
-              <button
-                type="button"
-                onClick={() => { setAdminActivitySearch(''); setAdminActivityCategoryFilter('ALL'); }}
-                className="px-3.5 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <span>Reset Filters</span>
-              </button>
+                {(adminActivitySearch || adminActivityCategoryFilter !== 'ALL') && (
+                  <button
+                    type="button"
+                    onClick={() => { setAdminActivitySearch(''); setAdminActivityCategoryFilter('ALL'); setAdminActPage(1); }}
+                    className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+                  >
+                    <span>Reset</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Admin Activities Table */}
@@ -4991,7 +5311,6 @@ export default function AdminDashboard() {
               if (filteredList.length === 0) {
                 return (
                   <div className="text-center py-14 text-slate-500 space-y-2">
-                    <ShieldAlert className="w-10 h-10 text-slate-300 mx-auto" />
                     <p className="text-sm font-bold text-slate-800 dark:text-slate-200">No admin activities match criteria</p>
                     <p className="text-xs text-slate-400">All administrative operations logged securely.</p>
                   </div>
@@ -5003,8 +5322,100 @@ export default function AdminDashboard() {
               const paginatedAdminActs = filteredList.slice(startAdminActIdx, startAdminActIdx + adminActPageSize);
 
               return (
-                <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900">
-                  <div className="overflow-x-auto">
+                <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 shadow-2xs">
+                  {/* Batch Selection Banner on Mobile/Tablet */}
+                  {adminActSelectedIds.length > 0 && (
+                    <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border-b border-rose-100 dark:border-rose-900/60 flex items-center justify-between gap-2 text-xs">
+                      <span className="font-semibold text-rose-800 dark:text-rose-300">
+                        {adminActSelectedIds.length} item{adminActSelectedIds.length > 1 ? 's' : ''} selected
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setAdminActSelectedIds([])}
+                        className="text-xs text-rose-700 hover:text-rose-900 dark:text-rose-400 font-medium underline cursor-pointer"
+                      >
+                        Clear Selection
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Mobile & Tablet Activity Cards (< lg) */}
+                  <div className="lg:hidden p-3.5 sm:p-4 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {paginatedAdminActs.map((act) => {
+                      const isSelected = adminActSelectedIds.includes(act.id);
+                      return (
+                        <div 
+                          key={act.id}
+                          className={`rounded-2xl border p-3.5 sm:p-4 space-y-2.5 transition ${
+                            isSelected 
+                              ? 'bg-rose-50/50 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800' 
+                              : 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800'
+                          }`}
+                        >
+                          {/* Top Row: Checkbox + Category + Status */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => toggleAdminActSelection(act.id)}
+                                className="text-slate-400 hover:text-rose-600 transition cursor-pointer"
+                              >
+                                {isSelected ? (
+                                  <CheckSquare className="w-4 h-4 text-rose-600" />
+                                ) : (
+                                  <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                                )}
+                              </button>
+                              <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                act.category === 'STOCK_INTAKE'
+                                  ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60'
+                                  : act.category === 'SALE_DEPLOY'
+                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60'
+                                  : act.category === 'VOICE_BROADCAST' || act.category === 'SET_VOLUME'
+                                  ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60'
+                                  : 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/60'
+                              }`}>
+                                {act.action_label}
+                              </span>
+                            </div>
+                            <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                              {act.status}
+                            </span>
+                          </div>
+
+                          {/* Operator & Target */}
+                          <div className="text-xs space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-slate-900 dark:text-white truncate">
+                                {act.operator}
+                              </span>
+                              <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                                SuperAdmin
+                              </span>
+                            </div>
+                            <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
+                              {act.target_name}
+                            </div>
+                            {act.details && (
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 p-2 rounded-lg border border-slate-200/60 dark:border-slate-800 break-words">
+                                {act.details}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Bottom Row: Timestamp */}
+                          <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-end text-[10px] text-slate-400 font-mono">
+                            <span>
+                              {new Date(act.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Desktop Table (>= lg) */}
+                  <div className="hidden lg:block overflow-x-auto">
                     <table className="w-full text-left border-collapse min-w-[850px]">
                       <thead>
                         <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
