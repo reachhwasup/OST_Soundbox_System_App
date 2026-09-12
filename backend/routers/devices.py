@@ -791,7 +791,17 @@ async def intake_single_device(
                     )
                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                     RETURNING product_id
-                """, sn, payload.device_model or "Y6B" payload.price or 29.00, payload.sell_price or 29.00,payload.mini_stk or 1, payload.warran_months or 0, is_active, supp_id)
+                """, 
+                sn, 
+                payload.device_model or "Y6B", 
+                payload.unit, 
+                float(payload.price or 29.00), 
+                float(payload.sell_price or 29.00), 
+                int(payload.mini_stk or 1), 
+                int(payload.warran_months or 0), 
+                is_active, 
+                supp_id)
+                    
             except Exception as final_err:
                 logger.error(f"Product intake permanently failed for SN '{sn}': {final_err}", exc_info=True)
                 raise HTTPException(
