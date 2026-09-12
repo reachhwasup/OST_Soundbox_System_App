@@ -721,12 +721,17 @@ class DeviceIntakeSchema(BaseModel):
     device_sn: str
     device_type: str = "Soundbox"
     device_model: str = "Y6B"
+    unit: str[str] = None
+    mini_stk: str[str] = None
+    warran_months: Optional[str] = "0"
     batch_no: Optional[str] = None
     notes: Optional[str] = None
     merchant_id: Optional[Union[int, str]] = None
     price: Optional[float] = 29.00
+    sell_price: Optional[float] = 29.00
     supplier_id: Optional[int] = None
     supplier: Optional[str] = "Feishu"
+
 
 
 @router.post("/intake", status_code=status.HTTP_201_CREATED)
@@ -801,6 +806,7 @@ async def intake_single_device(
         }
 
 
+
 @router.post("/{device_id}/return-to-stock")
 async def return_device_to_stock(
     device_id: int,
@@ -815,7 +821,7 @@ async def return_device_to_stock(
 
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        existing = await conn.fetchrow("SELECT product_id FROM products WHERE item_code = $1", device_id)
+        existing = await conn.fetchrow("SELECT product_id FROM products WHERE item_code = $1 AND is_active = true", device_id)
         if not existing:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
 
