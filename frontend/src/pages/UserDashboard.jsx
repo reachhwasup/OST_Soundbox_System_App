@@ -2670,15 +2670,6 @@ export default function UserDashboard() {
                           </div>
                         </div>
 
-                        {/* Compact Type Select */}
-                        <select
-                          value={item.deviceType}
-                          onChange={(e) => setDevicesToLink(prev => prev.map(d => d.id === item.id ? { ...d, deviceType: e.target.value } : d))}
-                          className="px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1.5 focus:ring-emerald-500 cursor-pointer shrink-0"
-                        >
-                          <option value="Display Soundbox">🖥️ Display</option>
-                          <option value="Standard Soundbox">🏷️ Standard</option>
-                        </select>
 
                         {devicesToLink.length > 1 && (
                           <button
