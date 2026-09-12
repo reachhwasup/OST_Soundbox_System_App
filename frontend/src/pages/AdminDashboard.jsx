@@ -358,7 +358,7 @@ export default function AdminDashboard() {
   const [sellWarrantyStartDate, setSellWarrantyStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [sellQuantity, setSellQuantity] = useState(1);
   const [sellInvoiceRef, setSellInvoiceRef] = useState('');
-  const [sellPaymentMethod, setSellPaymentMethod] = useState('CASH'); // 'CASH' or 'QR_SCAN'
+  const [sellPaymentMethod, setSellPaymentMethod] = useState('QR_SCAN'); // Default: QR Code else Cash
   const [sellSubmitting, setSellSubmitting] = useState(false);
 
   // Form states for Create User
@@ -778,7 +778,7 @@ export default function AdminDashboard() {
     setSellWarrantyStartDate(new Date().toISOString().split('T')[0]);
     setSellQuantity(1);
     setSellInvoiceRef('');
-    setSellPaymentMethod('CASH');
+    setSellPaymentMethod('QR_SCAN');
     setIsSellStockOpen(true);
   };
   const openSellModal = openSellStockModal;
@@ -6986,7 +6986,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Payment Method Selection: Cash or QR Scan */}
+            {/* Payment Method Checkbox Selection: QR Code by default else Cash */}
             <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
@@ -6997,48 +6997,51 @@ export default function AdminDashboard() {
                     ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300'
                     : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                 }`}>
-                  {sellPaymentMethod === 'QR_SCAN' ? t('paymentQrScan', 'QR Scan') : t('paymentCash', 'Cash')}
+                  {sellPaymentMethod === 'QR_SCAN' ? t('paymentQrScan', 'QR Code') : t('paymentCash', 'Cash')}
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-2.5">
-                {/* Cash Option */}
-                <button
-                  type="button"
-                  onClick={() => setSellPaymentMethod('CASH')}
-                  className={`p-3 rounded-xl border text-left transition cursor-pointer ${
-                    sellPaymentMethod === 'CASH'
-                      ? 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-500 text-emerald-950 dark:text-emerald-100 shadow-2xs ring-1 ring-emerald-500'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
-                  }`}
-                >
-                  <div className="text-xs font-bold">{t('paymentCash', 'Cash')}</div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">{t('paymentMethodCashDesc', 'Direct cash payment')}</div>
-                </button>
-
-                {/* QR Scan Option */}
-                <button
-                  type="button"
-                  onClick={() => setSellPaymentMethod('QR_SCAN')}
-                  className={`p-3 rounded-xl border text-left transition cursor-pointer ${
+                {/* QR Code Checkbox (Default) */}
+                <label
+                  className={`flex items-center gap-3 p-3 rounded-xl border transition cursor-pointer select-none ${
                     sellPaymentMethod === 'QR_SCAN'
-                      ? 'bg-indigo-50/90 dark:bg-indigo-950/40 border-indigo-500 text-indigo-950 dark:text-indigo-100 shadow-2xs ring-1 ring-indigo-500'
+                      ? 'bg-indigo-50/80 dark:bg-indigo-950/40 border-indigo-500 text-indigo-950 dark:text-indigo-100 shadow-2xs ring-1 ring-indigo-500'
                       : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
                   }`}
                 >
-                  <div className="text-xs font-bold">{t('paymentQrScan', 'QR Scan')}</div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">{t('paymentMethodQrDesc', 'Bakong / KHQR payment')}</div>
-                </button>
-              </div>
+                  <input
+                    type="checkbox"
+                    checked={sellPaymentMethod === 'QR_SCAN'}
+                    onChange={(e) => setSellPaymentMethod(e.target.checked ? 'QR_SCAN' : 'CASH')}
+                    className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-bold">{t('paymentQrScan', 'QR Code')}</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">Bakong / KHQR</div>
+                  </div>
+                </label>
 
-              {/* Informative banner when QR Scan is chosen */}
-              {sellPaymentMethod === 'QR_SCAN' && (
-                <div className="p-2.5 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-lg border border-indigo-200 dark:border-indigo-900/60 text-indigo-800 dark:text-indigo-200 text-[11px]">
-                  {isKhmer 
-                    ? 'អតិថិជនស្កេនទូទាត់ប្រាក់តាមរយៈ KHQR/Bakong។ អ្នកអាចបញ្ចូលលេខកូដវិក្កយបត្រ ឬលេខយោងនៅប្រអប់ខាងក្រោម។' 
-                    : 'Customer pays via Bakong / KHQR scan. You can record the transaction slip or invoice reference below.'}
-                </div>
-              )}
+                {/* Cash Checkbox */}
+                <label
+                  className={`flex items-center gap-3 p-3 rounded-xl border transition cursor-pointer select-none ${
+                    sellPaymentMethod === 'CASH'
+                      ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-500 text-emerald-950 dark:text-emerald-100 shadow-2xs ring-1 ring-emerald-500'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={sellPaymentMethod === 'CASH'}
+                    onChange={(e) => setSellPaymentMethod(e.target.checked ? 'CASH' : 'QR_SCAN')}
+                    className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-bold">{t('paymentCash', 'Cash')}</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">{t('paymentMethodCashDesc', 'Direct cash')}</div>
+                  </div>
+                </label>
+              </div>
             </div>
 
             {/* Quantity & Invoice Reference Configuration */}
