@@ -721,8 +721,8 @@ class DeviceIntakeSchema(BaseModel):
     device_sn: str
     device_type: str = "Soundbox"
     device_model: str = "Y6B"
-    unit: str[str] = None
-    mini_stk: str[str] = None
+    unit: str
+    mini_stk: str[str] = "1"
     warran_months: Optional[str] = "0"
     batch_no: Optional[str] = None
     notes: Optional[str] = None
@@ -768,9 +768,9 @@ async def intake_single_device(
                     item_code, item_name, unit, cost_price, selling_price, 
                     min_stock_level, warranty_months, is_active, supplier_id
                 )
-                VALUES ($1, $2, 'pcs', $3, $3, 5, 12, $4, $5)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                 RETURNING product_id
-            """, sn, payload.device_model or "Y6B", payload.price or 29.00, is_active, supp_id)
+            """, sn, payload.device_model or "Y6B", payload.price or 29.00, payload.sell_price or 29.00,payload.mini_stk or 1, payload.warran_months or 0, is_active, supp_id)
         except Exception as insert_err:
             logger.warning(f"Product intake failed: {insert_err}. Attempting schema auto-heal and fallback...")
             try:
@@ -789,9 +789,9 @@ async def intake_single_device(
                     INSERT INTO products (
                         item_code, item_name, unit, cost_price, selling_price, is_active, supplier_id
                     )
-                    VALUES ($1, $2, 'pcs', $3, $3, $4, $5)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                     RETURNING product_id
-                """, sn, payload.device_model or "Y6B", payload.price or 29.00, is_active, supp_id)
+                """, sn, payload.device_model or "Y6B" payload.price or 29.00, payload.sell_price or 29.00,payload.mini_stk or 1, payload.warran_months or 0, is_active, supp_id)
             except Exception as final_err:
                 logger.error(f"Product intake permanently failed for SN '{sn}': {final_err}", exc_info=True)
                 raise HTTPException(
