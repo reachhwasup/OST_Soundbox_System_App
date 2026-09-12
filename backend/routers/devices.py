@@ -722,7 +722,7 @@ class DeviceIntakeSchema(BaseModel):
     device_type: str = "Soundbox"
     device_model: str = "Y6B"
     unit: str
-    mini_stk: str[str] = "1"
+    mini_stk: Optional[str] = "1"
     warran_months: Optional[str] = "0"
     batch_no: Optional[str] = None
     notes: Optional[str] = None
