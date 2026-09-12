@@ -721,7 +721,7 @@ class DeviceIntakeSchema(BaseModel):
     device_sn: str
     device_type: str = "Soundbox"
     device_model: str = "Y6B"
-    unit: str
+    unit: Optional[str] = "1"
     mini_stk: Optional[str] = "1"
     warran_months: Optional[str] = "0"
     batch_no: Optional[str] = None
@@ -770,7 +770,17 @@ async def intake_single_device(
                 )
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                 RETURNING product_id
-            """, sn, payload.device_model or "Y6B", payload.price or 29.00, payload.sell_price or 29.00,payload.mini_stk or 1, payload.warran_months or 0, is_active, supp_id)
+           """, 
+            sn, 
+            payload.device_model or "Y6B", 
+            payload.unit or "1", 
+            float(payload.price or 29.00), 
+            float(payload.sell_price or 29.00), 
+            int(payload.mini_stk or 1), 
+            int(payload.warran_months or 0), 
+            is_active, 
+            supp_id)
+                
         except Exception as insert_err:
             logger.warning(f"Product intake failed: {insert_err}. Attempting schema auto-heal and fallback...")
             try:
@@ -794,7 +804,7 @@ async def intake_single_device(
                 """, 
                 sn, 
                 payload.device_model or "Y6B", 
-                payload.unit, 
+                payload.unit or "1", 
                 float(payload.price or 29.00), 
                 float(payload.sell_price or 29.00), 
                 int(payload.mini_stk or 1), 
