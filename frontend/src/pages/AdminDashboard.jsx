@@ -7028,14 +7028,13 @@ export default function AdminDashboard() {
           setSupplierFormPhone('');
           setSupplierFormEmail('');
         }}
-        title={`🏢 ${t('manageSuppliers', 'Manage Suppliers')}`}
+        title={t('manageSuppliers', 'Manage Suppliers')}
       >
         <div className="space-y-5">
           {/* Add / Edit Supplier Form */}
           <form onSubmit={handleSaveSupplier} className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                <Building className="w-3.5 h-3.5 text-indigo-500" />
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
                 <span>{editingSupplierId ? t('editSupplier', 'Edit Supplier') : t('addSupplier', 'Add New Supplier')}</span>
               </h4>
               {editingSupplierId && (
@@ -7140,9 +7139,6 @@ export default function AdminDashboard() {
               {suppliersList.map((supp) => (
                 <div key={supp.id} className="p-3.5 bg-white dark:bg-slate-900 flex items-center justify-between gap-3 hover:bg-slate-50/80 dark:hover:bg-slate-850 transition">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-base">
-                      {supp.name.toLowerCase() === 'hemi' ? '🏭' : '🏢'}
-                    </div>
                     <div>
                       <div className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-2">
                         <span>{supp.name}</span>
