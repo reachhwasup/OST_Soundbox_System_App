@@ -747,80 +747,57 @@ async def intake_single_device(
 
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        existing = await conn.fetchrow("SELECT id FROM devices WHERE device_sn = $1", sn)
+        # ឆែកមើលថាតើមាន SN នេះក្នុង products (item_code) រួចហើយឬនៅ
+        existing = await conn.fetchrow("SELECT product_id FROM products WHERE item_code = $1", sn)
         if existing:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Device SN '{sn}' is already registered in the system.")
 
         supp_id, supp_name = await resolve_supplier(conn, payload.supplier_id, payload.supplier)
 
-        initial_status = 'ACTIVE' if payload.merchant_id else 'IN_STOCK'
         is_active = True if payload.merchant_id else False
 
-        # Safely resolve merchant_id type matching devices table schema
-        m_id_target = None
-        if payload.merchant_id is not None:
-            col_type = await conn.fetchval("""
-                SELECT data_type FROM information_schema.columns 
-                WHERE table_name = 'devices' AND column_name = 'merchant_id'
-            """)
-            if col_type in ('integer', 'bigint', 'smallint'):
-                try:
-                    m_id_target = int(payload.merchant_id)
-                except Exception:
-                    m_id_target = None
-            else:
-                m_id_target = str(payload.merchant_id)
-
         try:
+            # Insert ចូលទៅ products
             new_id = await conn.fetchval("""
-                INSERT INTO devices (
-                    device_id, device_sn, device_type, device_model, 
-                    merchant_id, batch_no, notes, price, status, is_active, battery, signal, supplier_id
+                INSERT INTO products (
+                    item_code, item_name, unit, cost_price, selling_price, 
+                    min_stock_level, warranty_months, is_active, supplier_id
                 )
-                VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9, '100%', 'Good', $10)
-                RETURNING id
-            """, sn, payload.device_type or "Display Soundbox", payload.device_model or "Y6B", m_id_target, payload.batch_no, payload.notes, payload.price or 29.00, initial_status, is_active, supp_id)
+                VALUES ($1, $2, 'pcs', $3, $3, 5, 12, $4, $5)
+                RETURNING product_id
+            """, sn, payload.device_model or "Y6B", payload.price or 29.00, is_active, supp_id)
         except Exception as insert_err:
-            logger.warning(f"Standard device intake failed: {insert_err}. Attempting schema auto-heal and fallback...")
+            logger.warning(f"Product intake failed: {insert_err}. Attempting schema auto-heal and fallback...")
             try:
-                # Auto-heal missing columns if running against an older database schema
+                # Auto-heal សម្រាប់ Table products ករណីខ្វះ Column
                 await conn.execute("""
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_model VARCHAR(100) DEFAULT 'Y6B';
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS batch_no VARCHAR(100) DEFAULT 'BATCH-SINGLE';
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_type VARCHAR(100) DEFAULT 'Display Soundbox';
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier_id INT;
+                    ALTER TABLE products ADD COLUMN IF NOT EXISTS item_code VARCHAR(100);
+                    ALTER TABLE products ADD COLUMN IF NOT EXISTS item_name VARCHAR(150);
+                    ALTER TABLE products ADD COLUMN IF NOT EXISTS unit VARCHAR(30) DEFAULT 'pcs';
+                    ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price NUMERIC(12, 2);
+                    ALTER TABLE products ADD COLUMN IF NOT EXISTS selling_price NUMERIC(12, 2);
+                    ALTER TABLE products ADD COLUMN IF NOT EXISTS min_stock_level INT DEFAULT 5;
+                    ALTER TABLE products ADD COLUMN IF NOT EXISTS warranty_months INT DEFAULT 12;
+                    ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_id INT;
                 """)
-                try:
-                    new_id = await conn.fetchval("""
-                        INSERT INTO devices (
-                            device_id, device_sn, device_type, device_model,
-                            merchant_id, batch_no, notes, price, status, is_active, battery, signal, supplier_id
-                        )
-                        VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9, '100%', 'Good', $10)
-                        RETURNING id
-                    """, sn, payload.device_type or "Display Soundbox", payload.device_model or "Y6B", m_id_target, payload.batch_no, payload.notes, payload.price or 29.00, initial_status, is_active, supp_id)
-                except Exception:
-                    new_id = await conn.fetchval("""
-                        INSERT INTO devices (
-                            device_id, device_sn, device_type, 
-                            merchant_id, notes, price, status, is_active, battery, signal
-                        )
-                        VALUES ($1, $1, $2, $3, $4, $5, $6, $7, '100%', 'Good')
-                        RETURNING id
-                    """, sn, payload.device_type or "Display Soundbox", m_id_target, payload.notes, payload.price or 29.00, initial_status, is_active)
+                new_id = await conn.fetchval("""
+                    INSERT INTO products (
+                        item_code, item_name, unit, cost_price, selling_price, is_active, supplier_id
+                    )
+                    VALUES ($1, $2, 'pcs', $3, $3, $4, $5)
+                    RETURNING product_id
+                """, sn, payload.device_model or "Y6B", payload.price or 29.00, is_active, supp_id)
             except Exception as final_err:
-                logger.error(f"Device intake permanently failed for SN '{sn}': {final_err}", exc_info=True)
+                logger.error(f"Product intake permanently failed for SN '{sn}': {final_err}", exc_info=True)
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Failed to intake device: {str(final_err)}"
+                    detail=f"Failed to intake product: {str(final_err)}"
                 )
 
         return {
             "status": "success",
             "message": f"Soundbox '{sn}' registered successfully into stock.",
-            "device_id": new_id
+            "product_id": new_id
         }
 
 
@@ -838,8 +815,8 @@ async def return_device_to_stock(
 
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        device = await conn.fetchrow("SELECT id, device_sn FROM devices WHERE id = $1", device_id)
-        if not device:
+        existing = await conn.fetchrow("SELECT product_id FROM products WHERE item_code = $1", device_id)
+        if not existing:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
 
         await conn.execute("""
