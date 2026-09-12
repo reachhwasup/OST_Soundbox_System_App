@@ -753,7 +753,7 @@ async def intake_single_device(
     pool = await get_db_pool()
     async with pool.acquire() as conn:
         # ឆែកមើលថាតើមាន SN នេះក្នុង products (item_code) រួចហើយឬនៅ
-        existing = await conn.fetchrow("SELECT product_id FROM products WHERE item_code = $1", sn)
+        existing = await conn.fetchrow("SELECT product_id FROM products WHERE item_code = $1 and is_active = true", sn)
         if existing:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Device SN '{sn}' is already registered in the system.")
 
