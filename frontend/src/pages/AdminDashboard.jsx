@@ -80,6 +80,7 @@ import {
   Calendar,
   ShoppingBag,
   QrCode,
+  Banknote,
   Camera,
   Upload,
   User,
@@ -245,6 +246,7 @@ export default function AdminDashboard() {
   const [salesGoToPage, setSalesGoToPage] = useState('');
   const [salesStatusFilter, setSalesStatusFilter] = useState('ALL');
   const [salesSupplierFilter, setSalesSupplierFilter] = useState('ALL');
+  const [salesPaymentMethodFilter, setSalesPaymentMethodFilter] = useState('ALL');
   const [salesSortBy, setSalesSortBy] = useState('newest');
 
   const [isDeviceDetailOpen, setIsDeviceDetailOpen] = useState(false);
@@ -357,6 +359,7 @@ export default function AdminDashboard() {
   const [sellWarrantyStartDate, setSellWarrantyStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [sellQuantity, setSellQuantity] = useState(1);
   const [sellInvoiceRef, setSellInvoiceRef] = useState('');
+  const [sellPaymentMethod, setSellPaymentMethod] = useState('CASH'); // 'CASH' or 'QR_SCAN'
   const [sellSubmitting, setSellSubmitting] = useState(false);
 
   // Form states for Create User
@@ -776,6 +779,7 @@ export default function AdminDashboard() {
     setSellWarrantyStartDate(new Date().toISOString().split('T')[0]);
     setSellQuantity(1);
     setSellInvoiceRef('');
+    setSellPaymentMethod('CASH');
     setIsSellStockOpen(true);
   };
   const openSellModal = openSellStockModal;
@@ -814,8 +818,8 @@ export default function AdminDashboard() {
         quantity: Number(sellQuantity) || 1,
         invoice_reference: sellInvoiceRef.trim() || null,
         target_status: 'PENDING',
-        payment_method: 'CASH',
-        notes: `Sold via Admin Dashboard`
+        payment_method: sellPaymentMethod,
+        notes: `Sold via Admin Dashboard (${sellPaymentMethod === 'QR_SCAN' ? 'QR Scan / KHQR' : 'Cash'})`
       });
 
       setIsSellStockOpen(false);
@@ -1521,6 +1525,9 @@ export default function AdminDashboard() {
     if (salesSupplierFilter !== 'ALL') {
       result = result.filter(s => s.supplier_name === salesSupplierFilter);
     }
+    if (salesPaymentMethodFilter !== 'ALL') {
+      result = result.filter(s => (s.payment_method || 'CASH').toUpperCase() === salesPaymentMethodFilter);
+    }
     if (salesSearchTerm.trim()) {
       const q = salesSearchTerm.toLowerCase().trim();
       result = result.filter(s => 
@@ -1547,7 +1554,7 @@ export default function AdminDashboard() {
       result.sort((a, b) => Number(a.final_price ?? a.price ?? 0) - Number(b.final_price ?? b.price ?? 0));
     }
     return result;
-  }, [salesList, salesStatusFilter, salesSupplierFilter, salesSearchTerm, salesSortBy]);
+  }, [salesList, salesStatusFilter, salesSupplierFilter, salesPaymentMethodFilter, salesSearchTerm, salesSortBy]);
 
   const totalSalesPages = Math.max(1, Math.ceil(filteredSalesList.length / salesPageSize));
   const paginatedSales = useMemo(() => {
@@ -4293,7 +4300,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Filter Dropdowns Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 border-t border-slate-100 dark:border-slate-800/80">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1 border-t border-slate-100 dark:border-slate-800/80">
               {/* Filter 1: Status */}
               <div>
                 <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
@@ -4310,7 +4317,23 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-              {/* Filter 2: Supplier */}
+              {/* Filter 2: Payment Method */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                  {t('paymentMethodFilter', 'Payment Method')}
+                </label>
+                <select
+                  value={salesPaymentMethodFilter}
+                  onChange={(e) => setSalesPaymentMethodFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                >
+                  <option value="ALL">{t('allPaymentMethods', 'All Payment Methods')} ({salesList.length})</option>
+                  <option value="CASH">{t('paymentCash', 'Cash')} ({salesList.filter(s => (s.payment_method || 'CASH').toUpperCase() === 'CASH').length})</option>
+                  <option value="QR_SCAN">{t('paymentQrScan', 'QR Scan')} ({salesList.filter(s => (s.payment_method || '').toUpperCase() === 'QR_SCAN').length})</option>
+                </select>
+              </div>
+
+              {/* Filter 3: Supplier */}
               <div>
                 <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
                   Supplier
@@ -4329,7 +4352,7 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-              {/* Filter 3: Sort Order */}
+              {/* Filter 4: Sort Order */}
               <div>
                 <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
                   Sort By
@@ -4477,6 +4500,19 @@ export default function AdminDashboard() {
                               </span>
                             </div>
                           )}
+                          <div className="mt-1 flex justify-end">
+                            {sale.payment_method === 'QR_SCAN' ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                <QrCode className="w-2.5 h-2.5" />
+                                <span>{t('paymentQrScan', 'QR Scan')}</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                <Banknote className="w-2.5 h-2.5" />
+                                <span>{t('paymentCash', 'Cash')}</span>
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Warranty */}
@@ -6951,6 +6987,83 @@ export default function AdminDashboard() {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Payment Method Selection: Cash or QR Scan */}
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <Banknote className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>{t('paymentMethod', 'Payment Method')}</span>
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  sellPaymentMethod === 'QR_SCAN'
+                    ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300'
+                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                }`}>
+                  {sellPaymentMethod === 'QR_SCAN' ? t('paymentQrScan', 'QR Scan') : t('paymentCash', 'Cash')}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                {/* Cash Option */}
+                <button
+                  type="button"
+                  onClick={() => setSellPaymentMethod('CASH')}
+                  className={`p-3 rounded-xl border text-left transition cursor-pointer flex items-center gap-2.5 ${
+                    sellPaymentMethod === 'CASH'
+                      ? 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-500 text-emerald-950 dark:text-emerald-100 shadow-2xs ring-1 ring-emerald-500'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                    sellPaymentMethod === 'CASH'
+                      ? 'bg-emerald-500 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                  }`}>
+                    <Banknote className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold">{t('paymentCash', 'Cash')}</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">{t('paymentMethodCashDesc', 'Direct cash')}</div>
+                  </div>
+                </button>
+
+                {/* QR Scan Option */}
+                <button
+                  type="button"
+                  onClick={() => setSellPaymentMethod('QR_SCAN')}
+                  className={`p-3 rounded-xl border text-left transition cursor-pointer flex items-center gap-2.5 ${
+                    sellPaymentMethod === 'QR_SCAN'
+                      ? 'bg-indigo-50/90 dark:bg-indigo-950/40 border-indigo-500 text-indigo-950 dark:text-indigo-100 shadow-2xs ring-1 ring-indigo-500'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                    sellPaymentMethod === 'QR_SCAN'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                  }`}>
+                    <QrCode className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold">{t('paymentQrScan', 'QR Scan')}</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">{t('paymentMethodQrDesc', 'Bakong / KHQR')}</div>
+                  </div>
+                </button>
+              </div>
+
+              {/* Informative banner when QR Scan is chosen */}
+              {sellPaymentMethod === 'QR_SCAN' && (
+                <div className="p-2.5 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-lg border border-indigo-200 dark:border-indigo-900/60 flex items-center gap-2 text-indigo-800 dark:text-indigo-200 text-[11px]">
+                  <QrCode className="w-4 h-4 shrink-0 text-indigo-500" />
+                  <span>
+                    {isKhmer 
+                      ? 'អតិថិជនស្កេនទូទាត់ប្រាក់តាមរយៈ KHQR/Bakong។ អ្នកអាចបញ្ចូលលេខកូដវិក្កយបត្រ ឬលេខយោងនៅប្រអប់ខាងក្រោម។' 
+                      : 'Customer pays via Bakong / KHQR scan. You can record the transaction slip or invoice reference below.'}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Quantity & Invoice Reference Configuration */}

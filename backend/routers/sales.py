@@ -87,6 +87,18 @@ async def create_device_sale(
 
         sold_by_id = current_user.get("id")
 
+        # Auto-heal sales table columns if needed
+        try:
+            await conn.execute("ALTER TABLE sales ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50) DEFAULT 'CASH';")
+            await conn.execute("ALTER TABLE sales ADD COLUMN IF NOT EXISTS invoice_reference VARCHAR(100);")
+            await conn.execute("ALTER TABLE sales ADD COLUMN IF NOT EXISTS quantity INT NOT NULL DEFAULT 1;")
+        except Exception:
+            pass
+
+        norm_pm = (payload.payment_method or "CASH").strip().upper()
+        if norm_pm not in ("CASH", "QR_SCAN", "QR"):
+            norm_pm = "CASH"
+
         # 4. Insert into sales table
         sale_row = await conn.fetchrow("""
             INSERT INTO sales (
@@ -114,7 +126,7 @@ async def create_device_sale(
             payload.warranty_days,
             start_dt,
             end_dt,
-            payload.payment_method,
+            norm_pm,
             payload.notes,
             payload.quantity,
             payload.invoice_reference
@@ -159,6 +171,7 @@ async def create_device_sale(
 @router.get("/", response_model=Dict[str, Any])
 async def list_sales(
     search: Optional[str] = Query(None, description="Search device SN, customer, or merchant"),
+    payment_method: Optional[str] = Query(None, description="Filter by payment method, e.g. CASH or QR_SCAN"),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
     current_user: Dict[str, Any] = Depends(get_current_user)
@@ -195,6 +208,14 @@ async def list_sales(
             );
         """)
 
+        # Auto-heal sales table columns if needed
+        try:
+            await conn.execute("ALTER TABLE sales ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50) DEFAULT 'CASH';")
+            await conn.execute("ALTER TABLE sales ADD COLUMN IF NOT EXISTS invoice_reference VARCHAR(100);")
+            await conn.execute("ALTER TABLE sales ADD COLUMN IF NOT EXISTS quantity INT NOT NULL DEFAULT 1;")
+        except Exception:
+            pass
+
         where_clauses = ["1=1"]
         params = []
         idx = 1
@@ -206,9 +227,15 @@ async def list_sales(
                  s.customer_name ILIKE ${idx} OR 
                  s.customer_phone ILIKE ${idx} OR 
                  s.invoice_reference ILIKE ${idx} OR
+                 s.payment_method ILIKE ${idx} OR
                  COALESCE(m.merchant_name, m.name) ILIKE ${idx})
             """)
             params.append(s_clean)
+            idx += 1
+
+        if payment_method and payment_method.strip().upper() != "ALL":
+            where_clauses.append(f"s.payment_method = ${idx}")
+            params.append(payment_method.strip().upper())
             idx += 1
 
         where_sql = " AND ".join(where_clauses)
