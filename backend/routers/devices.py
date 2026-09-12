@@ -488,7 +488,7 @@ async def lookup_device_by_sn(
 
 @router.get("/")
 async def list_devices(
-    search: Optional[str] = Query(None, description="Search serial number, model, telegram chat ID, or store name"),
+    search: Optional[str] = Query(None, description="Search item code, item name, or supplier name"),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     pool = await get_db_pool()
@@ -497,19 +497,12 @@ async def list_devices(
         params = []
         param_idx = 1
 
-        if current_user["role"] != "ADMIN":
-            where_clauses.append(f"(m.user_id = ${param_idx} OR (m.user_id IS NULL AND m.owner_phone = ${param_idx + 1}))")
-            params.extend([current_user["id"], current_user["phone_number"]])
-            param_idx += 2
-
         if search and search.strip():
             s = f"%{search.strip()}%"
             where_clauses.append(f"""(
-                d.device_sn ILIKE ${param_idx}
-                OR d.telegram_chat_id ILIKE ${param_idx}
-                OR d.device_model ILIKE ${param_idx}
-                OR m.name ILIKE ${param_idx}
-                OR m.owner_phone ILIKE ${param_idx}
+                p.item_code ILIKE ${param_idx}
+                OR p.item_name ILIKE ${param_idx}
+                OR s.name ILIKE ${param_idx}
             )""")
             params.append(s)
             param_idx += 1
@@ -517,126 +510,65 @@ async def list_devices(
         where_sql = " AND ".join(where_clauses)
 
         query = f"""
-            SELECT d.id, 
-                   COALESCE(d.device_id, d.device_sn, d.id::text) AS device_id,
-                   COALESCE(d.device_sn, d.device_id, d.id::text) AS device_sn,
-                   COALESCE(d.device_type, 'Display Soundbox') AS device_type,
-                   COALESCE(d.device_model, d.device_name, 'Display Soundbox') AS device_model,
-                   d.merchant_id,
-                   d.batch_no,
-                   d.notes,
-                   COALESCE(d.price, 29.00) AS price,
-                   COALESCE(latest_sale.discount_amount, 0.00) AS discount_amount,
-                   COALESCE(latest_sale.discount_percent, 0.00) AS discount_percent,
-                   COALESCE(latest_sale.final_price, d.price, 29.00) AS final_price,
-                   COALESCE(latest_sale.warranty_days, 90) AS warranty_days,
-                   latest_sale.warranty_start_date,
-                   latest_sale.warranty_end_date,
-                   d.telegram_chat_id,
-                   d.qr_code,
-                   d.supplier_id,
+            SELECT p.product_id AS id, 
+                   p.item_code AS device_id,
+                   p.item_code AS device_sn,
+                   'Soundbox' AS device_type,
+                   p.item_name AS device_model,
+                   NULL AS merchant_id,
+                   NULL AS batch_no,
+                   NULL AS notes,
+                   COALESCE(p.selling_price, 29.00) AS price,
+                   0.00 AS discount_amount,
+                   0.00 AS discount_percent,
+                   COALESCE(p.selling_price, 29.00) AS final_price,
+                   COALESCE(p.warranty_months, 12) AS warranty_days,
+                   NULL AS warranty_start_date,
+                   NULL AS warranty_end_date,
+                   NULL AS telegram_chat_id,
+                   NULL AS qr_code,
+                   p.supplier_id,
                    COALESCE(s.name, 'Feishu') AS supplier,
-                   COALESCE(NULLIF(d.status::text, ''), CASE WHEN d.merchant_id IS NULL THEN 'IN_STOCK' WHEN d.is_active = FALSE THEN 'Offline' ELSE 'Online' END, 'IN_STOCK') AS status,
-                   COALESCE(d.battery, '100%') AS battery,
-                   COALESCE(d.signal, 'Good') AS signal,
-                   COALESCE(d.version_4g, 'Y6_LCD_1605_V1.0') AS version_4g,
-                   COALESCE(d.version_wifi, 'esp32c2x_2M_OTA') AS version_wifi,
-                   COALESCE(d.last_online, d.last_heartbeat, d.updated_at, d.created_at) AS last_time,
-                   COALESCE(d.last_heartbeat, d.last_online) AS last_heartbeat,
-                   d.created_at,
-                   COALESCE(m.merchant_name, m.name) AS store_name,
-                   COALESCE(u.full_name, m.merchant_name, m.name) AS merchant_name,
-                   COALESCE(m.owner_phone, u.phone_number) AS owner_phone,
-                   COALESCE(u.phone_number, m.owner_phone) AS user_phone,
-                   COALESCE(u.full_name, m.merchant_name, m.name) AS owner_name
-            FROM devices d
-            LEFT JOIN suppliers s ON d.supplier_id = s.id
-            LEFT JOIN LATERAL (
-                SELECT s_order.id, s_order.price, s_order.discount_amount, s_order.discount_percent, s_order.final_price,
-                       s_order.warranty_days, s_order.warranty_start_date, s_order.warranty_end_date
-                FROM sales s_order
-                WHERE s_order.device_id = d.id OR s_order.device_sn = d.device_sn
-                ORDER BY s_order.id DESC
-                LIMIT 1
-            ) latest_sale ON true
-            LEFT JOIN merchants m ON (d.merchant_id::text = m.merchant_id::text OR d.merchant_id::text = m.id::text)
-            LEFT JOIN users u ON m.user_id = u.id OR (m.user_id IS NULL AND m.owner_phone = u.phone_number)
+                   CASE WHEN p.is_active = TRUE THEN 'Online' ELSE 'IN_STOCK' END AS status,
+                   '100%' AS battery,
+                   'Good' AS signal,
+                   'Y6_LCD_1605_V1.0' AS version_4g,
+                   'esp32c2x_2M_OTA' AS version_wifi,
+                   p.created_at AS last_time,
+                   p.created_at AS last_heartbeat,
+                   p.created_at,
+                   NULL AS store_name,
+                   NULL AS merchant_name,
+                   NULL AS owner_phone,
+                   NULL AS user_phone,
+                   NULL AS owner_name
+            FROM products p
+            LEFT JOIN suppliers s ON p.supplier_id = s.id
             WHERE {where_sql}
-            ORDER BY d.id DESC
+            ORDER BY p.product_id DESC
         """
 
         try:
-            devices = await conn.fetch(query, *params)
+            products = await conn.fetch(query, *params)
         except Exception as e:
-            logger.warning(f"list_devices query failed: {e}. Auto-healing schema and retrying...")
-            try:
-                await conn.execute("""
-                    CREATE TABLE IF NOT EXISTS suppliers (
-                        id SERIAL PRIMARY KEY,
-                        name VARCHAR(150) NOT NULL UNIQUE,
-                        is_active BOOLEAN DEFAULT TRUE
-                    );
-                    INSERT INTO suppliers (name, is_active) VALUES ('Feishu', TRUE), ('Hemi', TRUE) ON CONFLICT (name) DO NOTHING;
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier_id INT;
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS batch_no VARCHAR(100) DEFAULT 'BATCH-STD';
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_4g VARCHAR(100) DEFAULT 'Y6B_LCD_1605_V1.0';
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_wifi VARCHAR(100) DEFAULT 'esp32c2x_2M_OTA';
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
-                    CREATE TABLE IF NOT EXISTS sales (
-                        id SERIAL PRIMARY KEY,
-                        device_id INT,
-                        device_sn VARCHAR(100) NOT NULL,
-                        merchant_id INT,
-                        price NUMERIC(10, 2) DEFAULT 29.00,
-                        discount_amount NUMERIC(10, 2) DEFAULT 0.00,
-                        discount_percent NUMERIC(5, 2) DEFAULT 0.00,
-                        final_price NUMERIC(10, 2) DEFAULT 29.00,
-                        warranty_days INT DEFAULT 90,
-                        warranty_start_date TIMESTAMP WITH TIME ZONE,
-                        warranty_end_date TIMESTAMP WITH TIME ZONE
-                    );
-                """)
-                devices = await conn.fetch(query, *params)
-            except Exception as e2:
-                logger.error(f"Fallback list_devices query: {e2}")
-                fallback_query = """
-                    SELECT d.id, 
-                           COALESCE(d.device_id, d.device_sn, d.id::text) AS device_sn,
-                           d.merchant_id, 
-                           COALESCE(d.status::text, 'IN_STOCK') AS status,
-                           d.created_at,
-                           COALESCE(d.device_type, 'Display Soundbox') AS device_type,
-                           COALESCE(d.device_model, 'Y6B') AS device_model,
-                           COALESCE(d.battery, '100%') AS battery,
-                           COALESCE(d.signal, 'Good') AS signal,
-                           COALESCE(m.merchant_name, m.name) AS store_name
-                    FROM devices d
-                    LEFT JOIN merchants m ON (d.merchant_id::text = m.merchant_id::text OR d.merchant_id::text = m.id::text)
-                    ORDER BY d.id DESC
-                """
-                devices = await conn.fetch(fallback_query)
+            logger.warning(f"list_devices query on products failed: {e}. Returning empty list.")
+            products = []
 
         formatted_devices = []
-        for d in devices:
+        for p in products:
             try:
-                row = dict(d)
+                row = dict(p)
                 created_at = row.get("created_at")
-                w_start = row.get("warranty_start_date")
-                w_end = row.get("warranty_end_date")
-                heartbeat = row.get("last_heartbeat")
                 l_time = row.get("last_time")
 
                 formatted_devices.append({
                     **row,
                     "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else (str(created_at) if created_at else None),
-                    "warranty_start_date": w_start.isoformat() if hasattr(w_start, "isoformat") else (str(w_start) if w_start else None),
-                    "warranty_end_date": w_end.isoformat() if hasattr(w_end, "isoformat") else (str(w_end) if w_end else None),
-                    "last_heartbeat": heartbeat.isoformat() if hasattr(heartbeat, "isoformat") else (str(heartbeat) if heartbeat else None),
+                    "last_heartbeat": created_at.isoformat() if hasattr(created_at, "isoformat") else (str(created_at) if created_at else None),
                     "last_time": l_time.strftime("%Y-%m-%d %H:%M:%S") if hasattr(l_time, "strftime") else (str(l_time) if l_time else None)
                 })
             except Exception:
-                formatted_devices.append(dict(d))
+                formatted_devices.append(dict(p))
 
         return {
             "status": "success",
