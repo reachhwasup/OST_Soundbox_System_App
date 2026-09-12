@@ -232,3 +232,53 @@ CREATE TABLE IF NOT EXISTS security_alerts (
 
 CREATE INDEX IF NOT EXISTS idx_security_alerts_merchant ON security_alerts(merchant_id);
 CREATE INDEX IF NOT EXISTS idx_security_alerts_created_at ON security_alerts(created_at DESC);
+
+
+-- 9. Inventory, Branches & Stock Transactions Module
+DO $$ BEGIN
+    CREATE TYPE stock_action AS ENUM ('IN', 'OUT', 'REJECT');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+CREATE TABLE IF NOT EXISTS branches (
+    branch_id SERIAL PRIMARY KEY,
+    branch_code VARCHAR(50) NOT NULL UNIQUE,
+    branch_name VARCHAR(150) NOT NULL,
+    location TEXT,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS products (
+    product_id SERIAL PRIMARY KEY,
+    item_code VARCHAR(50) NOT NULL UNIQUE,
+    item_name VARCHAR(150) NOT NULL,
+    unit VARCHAR(30) NOT NULL,
+    cost_price NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    selling_price NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    min_stock_level INTEGER DEFAULT 5,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    warranty_months INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS stock_transactions (
+    transaction_id SERIAL PRIMARY KEY,
+    branch_id INTEGER REFERENCES branches(branch_id) ON DELETE RESTRICT,
+    product_id INTEGER REFERENCES products(product_id) ON DELETE RESTRICT,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    action_type stock_action NOT NULL,
+    unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    reference_no VARCHAR(100),
+    remarks TEXT,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    discount_percent NUMERIC(5, 2) DEFAULT 0.00,
+    discount_amount NUMERIC(12, 2) DEFAULT 0.00,
+    serial_number VARCHAR(100),
+    warranty_expired_date DATE
+);
+
+CREATE INDEX IF NOT EXISTS idx_stock_trans_action ON stock_transactions(action_type);
+CREATE INDEX IF NOT EXISTS idx_stock_trans_branch ON stock_transactions(branch_id);
+CREATE INDEX IF NOT EXISTS idx_stock_trans_date ON stock_transactions(created_at);
+CREATE INDEX IF NOT EXISTS idx_stock_trans_product ON stock_transactions(product_id);
+CREATE INDEX IF NOT EXISTS idx_stock_trans_serial ON stock_transactions(serial_number);

@@ -355,6 +355,8 @@ export default function AdminDashboard() {
   const [sellDiscountAmount, setSellDiscountAmount] = useState(0);
   const [sellWarrantyDays, setSellWarrantyDays] = useState(90);
   const [sellWarrantyStartDate, setSellWarrantyStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [sellQuantity, setSellQuantity] = useState(1);
+  const [sellInvoiceRef, setSellInvoiceRef] = useState('');
   const [sellSubmitting, setSellSubmitting] = useState(false);
 
   // Form states for Create User
@@ -772,6 +774,8 @@ export default function AdminDashboard() {
     setSellDiscountAmount(0);
     setSellWarrantyDays(90);
     setSellWarrantyStartDate(new Date().toISOString().split('T')[0]);
+    setSellQuantity(1);
+    setSellInvoiceRef('');
     setIsSellStockOpen(true);
   };
   const openSellModal = openSellStockModal;
@@ -807,6 +811,8 @@ export default function AdminDashboard() {
         final_price: finalPrice,
         warranty_days: Number(sellWarrantyDays) || 90,
         warranty_start_date: sellWarrantyStartDate ? new Date(sellWarrantyStartDate).toISOString() : new Date().toISOString(),
+        quantity: Number(sellQuantity) || 1,
+        invoice_reference: sellInvoiceRef.trim() || null,
         target_status: 'PENDING',
         payment_method: 'CASH',
         notes: `Sold via Admin Dashboard`
@@ -1297,9 +1303,10 @@ export default function AdminDashboard() {
       showToast({ type: 'warning', title: 'No Data', message: 'No sales records to export.' });
       return;
     }
-    const headers = ['Order ID', 'Sale Date', 'Device SN', 'Device Type', 'Supplier', 'Customer / Store', 'Customer Phone', 'Sold By', 'Base Price ($)', 'Discount Type', 'Discount', 'Final Price ($)', 'Warranty (Days)', 'Warranty Expiry', 'Status', 'Notes'];
+    const headers = ['Order ID', 'Invoice Ref', 'Sale Date', 'Device SN', 'Device Type', 'Supplier', 'Customer / Store', 'Customer Phone', 'Sold By', 'Quantity', 'Base Price ($)', 'Discount Type', 'Discount', 'Final Price ($)', 'Warranty (Days)', 'Warranty Expiry', 'Status', 'Notes'];
     const rows = filteredSalesList.map(s => [
       `"#ORD-${String(s.id).padStart(4, '0')}"`,
+      `"${s.invoice_reference || ''}"`,
       `"${s.created_at ? new Date(s.created_at).toISOString().slice(0, 10) : ''}"`,
       `"${s.device_sn || ''}"`,
       `"${s.device_type || 'Soundbox'}"`,
@@ -1307,6 +1314,7 @@ export default function AdminDashboard() {
       `"${(s.store_name || s.customer_name || 'Direct Sale').replace(/"/g, '""')}"`,
       `"${s.customer_phone || s.merchant_phone || ''}"`,
       `"${s.sold_by_name || 'Admin'}"`,
+      s.quantity || 1,
       Number(s.price || 0).toFixed(2),
       `"${s.discount_type || 'NONE'}"`,
       s.discount_type === 'percent' ? `${s.discount_percent}%` : `$${Number(s.discount_amount || 0).toFixed(2)}`,
@@ -1517,6 +1525,7 @@ export default function AdminDashboard() {
       const q = salesSearchTerm.toLowerCase().trim();
       result = result.filter(s => 
         (s.device_sn && s.device_sn.toLowerCase().includes(q)) ||
+        (s.invoice_reference && s.invoice_reference.toLowerCase().includes(q)) ||
         (s.customer_name && s.customer_name.toLowerCase().includes(q)) ||
         (s.customer_phone && s.customer_phone.includes(q)) ||
         (s.store_name && s.store_name.toLowerCase().includes(q)) ||
@@ -2167,13 +2176,12 @@ export default function AdminDashboard() {
             
             {/* Search */}
             <div className="relative flex-1">
-              <Search className="w-4 h-4 text-slate-400 absolute inset-y-0 left-3 my-auto pointer-events-none" />
               <input
                 type="text"
                 placeholder={t('searchPlaceholder', 'Search by name, phone number, store or location...')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-base sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-base sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
 
@@ -2215,7 +2223,6 @@ export default function AdminDashboard() {
                   className="px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 rounded-xl transition flex items-center gap-1 cursor-pointer"
                   title="Clear Filters"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
                   {t('close', 'Clear')}
                 </button>
               )}
@@ -2226,7 +2233,6 @@ export default function AdminDashboard() {
                   onClick={() => setIsAddUserOpen(true)}
                   className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold rounded-xl transition flex items-center justify-center gap-1.5 shadow-2xs whitespace-nowrap cursor-pointer"
                 >
-                  <Plus className="w-4 h-4" />
                   {t('addNewUser', 'Add User')}
                 </button>
               )}
@@ -2250,7 +2256,6 @@ export default function AdminDashboard() {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
-                        <Phone className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                         <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">
                           {u.phone_number}
                         </span>
@@ -2290,7 +2295,6 @@ export default function AdminDashboard() {
                   {/* Store & Activity */}
                   <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl text-xs space-y-1">
                     <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-                      <Store className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                       {u.store_count > 0 ? (
                         <span>
                           {u.store?.name} 
@@ -2319,7 +2323,6 @@ export default function AdminDashboard() {
                             : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
                         }`}
                       >
-                        {u.status === 'ACTIVE' ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
                         <span>{u.status === 'ACTIVE' ? 'Suspend' : 'Activate'}</span>
                       </button>
                     )}
@@ -2330,7 +2333,6 @@ export default function AdminDashboard() {
                       className="px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-xs font-semibold flex items-center gap-1"
                       title="Reset Password"
                     >
-                      <Key className="w-3.5 h-3.5" />
                       <span>Password</span>
                     </button>
 
@@ -2341,7 +2343,6 @@ export default function AdminDashboard() {
                         className="px-2.5 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/30 text-rose-600 text-xs font-semibold flex items-center gap-1"
                         title="Delete User"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
                         <span>{t('delete', 'Delete')}</span>
                       </button>
                     )}
@@ -2426,7 +2427,6 @@ export default function AdminDashboard() {
                         {/* Emphasized User Phone Number */}
                         <td className="py-3.5">
                           <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
-                            <Phone className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                             <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">
                               {u.phone_number}
                             </span>
@@ -2471,7 +2471,6 @@ export default function AdminDashboard() {
                         {u.store_count > 0 ? (
                           <div className="space-y-0.5">
                             <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                              <Store className="w-3.5 h-3.5 text-emerald-600" />
                               <span>{u.store?.name}</span>
                               {u.store_count > 1 && (
                                 <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
@@ -2505,7 +2504,6 @@ export default function AdminDashboard() {
                               }`}
                               title={u.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
                             >
-                              {u.status === 'ACTIVE' ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
                               <span>{u.status === 'ACTIVE' ? 'Suspend' : 'Activate'}</span>
                             </button>
                           )}
@@ -2516,7 +2514,6 @@ export default function AdminDashboard() {
                             className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
                             title="Reset Password"
                           >
-                            <Key className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                             <span>Password</span>
                           </button>
 
@@ -2527,7 +2524,6 @@ export default function AdminDashboard() {
                               className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
                               title="Delete User"
                             >
-                              <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
                               <span>{t('delete', 'Delete')}</span>
                             </button>
                           )}
@@ -2632,13 +2628,12 @@ export default function AdminDashboard() {
                   {t('searchStorePlaceholder', 'Search store, owner, phone...')}
                 </label>
                 <div className="relative">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
                     placeholder={t('searchStorePlaceholder', 'Search store, owner, phone...')}
                     value={storeSearch}
                     onChange={(e) => setStoreSearch(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
                   />
                 </div>
               </div>
@@ -2748,10 +2743,10 @@ export default function AdminDashboard() {
                   onChange={(e) => setStoreSortBy(e.target.value)}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer font-medium"
                 >
-                  <option value="NEWEST">✨ {t('sortNewest', 'Newest Registered')}</option>
-                  <option value="OLDEST">⏳ {t('sortOldest', 'Oldest Registered')}</option>
-                  <option value="NAME_ASC">🔤 {t('sortNameAsc', 'Store Name (A → Z)')}</option>
-                  <option value="NAME_DESC">🔤 {t('sortNameDesc', 'Store Name (Z → A)')}</option>
+                  <option value="NEWEST">{t('sortNewest', 'Newest Registered')}</option>
+                  <option value="OLDEST">{t('sortOldest', 'Oldest Registered')}</option>
+                  <option value="NAME_ASC">{t('sortNameAsc', 'Store Name (A → Z)')}</option>
+                  <option value="NAME_DESC">{t('sortNameDesc', 'Store Name (Z → A)')}</option>
                 </select>
               </div>
 
@@ -2766,7 +2761,6 @@ export default function AdminDashboard() {
                   className="px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
                   title="Clear Filters"
                 >
-                  <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
                   <span>{t('reset', 'Reset Filters')}</span>
                 </button>
               )}
@@ -2777,7 +2771,6 @@ export default function AdminDashboard() {
                 className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer"
                 title="Export Filtered Stores to CSV"
               >
-                <Download className="w-3.5 h-3.5" />
                 <span>{t('exportCsv', 'Export CSV')}</span>
               </button>
             </div>
@@ -2835,7 +2828,6 @@ export default function AdminDashboard() {
                       <span className="text-slate-400">{t('telegramChatId', 'Telegram ID')}:</span>
                       {s.telegram_chat_id ? (
                         <span className="font-mono font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                          <Send className="w-3 h-3 text-blue-500" />
                           <span>{s.telegram_chat_id.startsWith('@') ? s.telegram_chat_id : `@${s.telegram_chat_id}`}</span>
                         </span>
                       ) : (
@@ -2853,7 +2845,6 @@ export default function AdminDashboard() {
                     }}
                     className="w-full py-2 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-indigo-100 dark:border-indigo-900/40"
                   >
-                    <Info className="w-3.5 h-3.5" />
                     <span>{t('viewDetails', 'View Full Location Details')}</span>
                   </button>
                 </div>
@@ -2946,17 +2937,12 @@ export default function AdminDashboard() {
                         
                         {/* Store Name */}
                         <td className="py-4 sm:py-4.5 px-5">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold shrink-0">
-                              <Store className="w-4 h-4" />
+                          <div>
+                            <div className="font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">
+                              {s.merchant_name || s.name}
                             </div>
-                            <div>
-                              <div className="font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">
-                                {s.merchant_name || s.name}
-                              </div>
-                              <div className="text-[11px] text-slate-400">
-                                ID: #{s.merchant_id || s.id}
-                              </div>
+                            <div className="text-[11px] text-slate-400">
+                              ID: #{s.merchant_id || s.id}
                             </div>
                           </div>
                         </td>
@@ -2968,7 +2954,6 @@ export default function AdminDashboard() {
                               {s.owner_name || '—'}
                             </div>
                             <div className="inline-flex items-center gap-1 font-mono text-[11px] text-slate-500 dark:text-slate-400">
-                              <Phone className="w-3 h-3 text-indigo-500" />
                               <span>{s.owner_phone}</span>
                             </div>
                           </div>
@@ -2978,12 +2963,10 @@ export default function AdminDashboard() {
                         <td className="py-3.5">
                           <div className="space-y-0.5">
                             <div className="inline-flex items-center gap-1.5 font-semibold text-slate-900 dark:text-slate-100 text-xs sm:text-sm">
-                              <Building className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                               <span>{s.province || s.location || '—'}</span>
                             </div>
                             {s.district && (
-                              <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                                <Navigation className="w-3 h-3 text-emerald-500 shrink-0" />
+                              <div className="text-[11px] text-slate-400">
                                 <span>{s.district}</span>
                               </div>
                             )}
@@ -2994,7 +2977,6 @@ export default function AdminDashboard() {
                         <td className="py-3.5 px-5">
                           {s.telegram_chat_id ? (
                             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 whitespace-nowrap">
-                              <Send className="w-3 h-3 text-blue-500 shrink-0" />
                               <span>{s.telegram_chat_id.startsWith('@') ? s.telegram_chat_id : `@${s.telegram_chat_id}`}</span>
                             </div>
                           ) : (
@@ -3024,7 +3006,6 @@ export default function AdminDashboard() {
                             }}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 text-xs font-semibold transition border border-slate-200/80 dark:border-slate-700"
                           >
-                            <Info className="w-3.5 h-3.5" />
                             <span>{t('viewDetails', 'View Details')}</span>
                           </button>
                         </td>
@@ -3103,13 +3084,12 @@ export default function AdminDashboard() {
             {/* Top Row: Primary Search + Mobile/Tablet Filter Toggle */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
               <div className="relative flex-1">
-                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   value={devFilterId}
                   onChange={(e) => { setDevFilterId(e.target.value); setDevPage(1); }}
                   placeholder={t('pleaseEnterDeviceId', 'Search by Device SN / ID...')}
-                  className="w-full pl-10 pr-4 py-2.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
+                  className="w-full px-4 py-2.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
                 />
                 {devFilterId && (
                   <button
@@ -3133,14 +3113,12 @@ export default function AdminDashboard() {
                       : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                   }`}
                 >
-                  <SlidersHorizontal className="w-3.5 h-3.5" />
                   <span>Filters</span>
                   {activeDevFilterCount > 0 && (
                     <span className="px-1.5 py-0.2 bg-emerald-600 text-white text-[10px] font-bold rounded-full">
                       {activeDevFilterCount}
                     </span>
                   )}
-                  {isDevFiltersExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                 </button>
 
                 {activeDevFilterCount > 0 && (
@@ -3150,7 +3128,6 @@ export default function AdminDashboard() {
                     className="px-3 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1 shrink-0 touch-manipulation"
                     title="Reset Filters"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">{t('reset', 'Reset')}</span>
                   </button>
                 )}
@@ -3161,7 +3138,6 @@ export default function AdminDashboard() {
                   className="px-3.5 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs shrink-0 touch-manipulation"
                   title="Export CSV"
                 >
-                  <Download className="w-3.5 h-3.5 text-slate-400" />
                   <span className="hidden sm:inline">{t('exportCsv', 'Export')}</span>
                 </button>
               </div>
@@ -3180,8 +3156,8 @@ export default function AdminDashboard() {
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
                 >
                   <option value="ALL">{t('allTypes', 'All Device Types')}</option>
-                  <option value="Display">{t('displayScreenQr', '🖥️ Display (Screen QR)')}</option>
-                  <option value="Standard">{t('standardPrintedQr', '🏷️ Standard (Printed QR)')}</option>
+                  <option value="Display">{t('displayScreenQr', 'Display (Screen QR)')}</option>
+                  <option value="Standard">{t('standardPrintedQr', 'Standard (Printed QR)')}</option>
                 </select>
               </div>
 
@@ -3196,9 +3172,9 @@ export default function AdminDashboard() {
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
                 >
                   <option value="">{t('allStatuses', 'All Statuses')}</option>
-                  <option value="Online">🟢 {t('online', 'Online')}</option>
-                  <option value="PENDING">🟣 {t('waitingForRegistration', 'Waiting for Registration')}</option>
-                  <option value="Offline">⚪ {t('offline', 'Offline')}</option>
+                  <option value="Online">{t('online', 'Online')}</option>
+                  <option value="PENDING">{t('waitingForRegistration', 'Waiting for Registration')}</option>
+                  <option value="Offline">{t('offline', 'Offline')}</option>
                 </select>
               </div>
 
@@ -3227,9 +3203,9 @@ export default function AdminDashboard() {
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
                 >
                   <option value="ALL">{t('allWarranty', 'All Warranty')}</option>
-                  <option value="ACTIVE">{t('activeCoverage', '🟢 Active Coverage')}</option>
-                  <option value="EXPIRING_SOON">{t('expiringSoon', '🟡 Expiring Soon (≤15d)')}</option>
-                  <option value="EXPIRED">{t('expired', '🔴 Expired')}</option>
+                  <option value="ACTIVE">{t('activeCoverage', 'Active Coverage')}</option>
+                  <option value="EXPIRING_SOON">{t('expiringSoon', 'Expiring Soon (≤15d)')}</option>
+                  <option value="EXPIRED">{t('expired', 'Expired')}</option>
                 </select>
               </div>
 
@@ -3263,7 +3239,6 @@ export default function AdminDashboard() {
                 }}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-2 transition cursor-pointer"
               >
-                <Radio className="w-4 h-4" />
                 <span>{t('batchSendCommands', 'Batch Send Commands')}</span>
                 {devSelectedIds.length > 0 && (
                   <span className="px-1.5 py-0.5 bg-emerald-800 text-[10px] font-bold rounded-full">
@@ -3279,7 +3254,6 @@ export default function AdminDashboard() {
                 onClick={() => setIsColumnsModalOpen(true)}
                 className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
               >
-                <Columns className="w-3.5 h-3.5 text-slate-400" />
                 <span>{t('columns', 'Columns')}</span>
               </button>
             </div>
@@ -3364,8 +3338,8 @@ export default function AdminDashboard() {
                                   : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
                               }`}>
                                 {(d.device_type === 'Display Soundbox' || String(d.device_type || '').toLowerCase().includes('display') || String(d.device_type || '').toLowerCase().includes('screen'))
-                                  ? '🖥️ Display (Screen QR)'
-                                  : '🏷️ Standard (Printed QR)'}
+                                  ? 'Display (Screen QR)'
+                                  : 'Standard (Printed QR)'}
                               </span>
                             </td>
                           )}
@@ -3378,7 +3352,7 @@ export default function AdminDashboard() {
                                   ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                                   : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
                               }`}>
-                                {(d.supplier || 'Feishu').toLowerCase() === 'hemi' ? '🏭 Hemi' : '🏢 Feishu'}
+                                {(d.supplier || 'Feishu').toLowerCase() === 'hemi' ? 'Hemi' : 'Feishu'}
                               </span>
                             </td>
                           )}
@@ -3393,12 +3367,10 @@ export default function AdminDashboard() {
                                 </div>
                               ) : String(d.status).toUpperCase() === 'PENDING' ? (
                                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-2.5 py-1 rounded-md border border-purple-200/60 dark:border-purple-800/40 whitespace-nowrap">
-                                  <Clock className="w-3 h-3 text-purple-500 animate-pulse" />
                                   <span>{t('awaitingStoreLink', 'Awaiting Store Link')}</span>
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-200/60 dark:border-amber-800/40">
-                                  <Package className="w-3 h-3" />
                                   Warehouse Stock
                                 </span>
                               )}
@@ -3410,7 +3382,6 @@ export default function AdminDashboard() {
                             <td className="py-3.5 px-3 text-center">
                               {String(d.status || '').toUpperCase() === 'PENDING' ? (
                                 <span className="inline-flex items-center justify-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800 whitespace-nowrap">
-                                  <Clock className="w-3 h-3 text-purple-500 animate-pulse" />
                                   <span>{t('waitingForRegistration', 'Waiting for Registration')}</span>
                                 </span>
                               ) : String(d.status || '').toUpperCase() === 'IN_STOCK' || !d.merchant_id ? (
@@ -3480,7 +3451,6 @@ export default function AdminDashboard() {
                                 }
                                 return (
                                   <span className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
-                                    <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                                     {wInfo.text}
                                   </span>
                                 );
@@ -3493,7 +3463,6 @@ export default function AdminDashboard() {
                             <td className="py-3.5 px-3 text-center">
                               {String(d.status || '').toUpperCase() === 'ACTIVE' || String(d.status || '').toUpperCase() === 'ONLINE' ? (
                                 <span className="inline-flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
-                                  <Battery className="w-3.5 h-3.5 text-emerald-500" />
                                   {d.battery || '100%'}
                                 </span>
                               ) : (
@@ -3548,7 +3517,6 @@ export default function AdminDashboard() {
                                   }}
                                   className="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
                                 >
-                                  <Eye className="w-3.5 h-3.5 text-blue-500" />
                                   <span>{t('detail', 'Detail')}</span>
                                 </button>
                               </div>
@@ -3623,17 +3591,16 @@ export default function AdminDashboard() {
                             : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
                       }`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : String(d.status).toUpperCase() === 'PENDING' ? 'bg-purple-500 animate-pulse' : 'bg-slate-400'}`}></span>
-                        <span>{isOnline ? t('online', 'Online') : String(d.status).toUpperCase() === 'PENDING' ? (isKhmer ? '🟣 រង់ចាំការចុះឈ្មោះ' : '🟣 Waiting for Registration') : t('offline', 'Offline')}</span>
+                        <span>{isOnline ? t('online', 'Online') : String(d.status).toUpperCase() === 'PENDING' ? (isKhmer ? 'រង់ចាំការចុះឈ្មោះ' : 'Waiting for Registration') : t('offline', 'Offline')}</span>
                       </span>
                     </div>
 
                     {/* Store & Hardware Type */}
                     <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100 dark:border-slate-800">
                       <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 truncate max-w-[180px]">
-                        <Store className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                         <span className="truncate font-semibold">
                           {String(d.status).toUpperCase() === 'PENDING' && !d.merchant_id
-                            ? (isKhmer ? '⏳ រង់ចាំការភ្ជាប់ហាង' : '⏳ Awaiting Store Link')
+                            ? (isKhmer ? 'រង់ចាំការភ្ជាប់ហាង' : 'Awaiting Store Link')
                             : (d.store_name || d.owner_name || t('unassigned', 'Unassigned'))}
                         </span>
                       </div>
@@ -3642,7 +3609,7 @@ export default function AdminDashboard() {
                           ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300'
                           : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
                       }`}>
-                        {isDisplay ? '🖥️ Display' : '🏷️ Standard'}
+                        {isDisplay ? 'Display' : 'Standard'}
                       </span>
                     </div>
 
@@ -3650,11 +3617,9 @@ export default function AdminDashboard() {
                     <div className="flex items-center justify-between text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
                       <div className="flex items-center gap-3">
                         <span className="inline-flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
-                          <Battery className="w-3.5 h-3.5 text-emerald-500" />
                           <span>{d.battery || '100%'}</span>
                         </span>
                         <span className="inline-flex items-center gap-1 text-[11px]">
-                          <Signal className="w-3 h-3 text-emerald-500" />
                           <span>{d.signal || 'Good'}</span>
                         </span>
                       </div>
@@ -3675,7 +3640,6 @@ export default function AdminDashboard() {
                         }}
                         className="w-full py-2.5 px-4 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 active:scale-[0.98] text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-2xs cursor-pointer touch-manipulation min-h-[44px]"
                       >
-                        <Eye className="w-4 h-4 text-blue-500" />
                         <span>{t('detail', 'Detail')}</span>
                       </button>
                     </div>
@@ -3754,13 +3718,12 @@ export default function AdminDashboard() {
             {/* Top Row: Primary Search + Quick Actions + Filter Toggle */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
               <div className="relative flex-1">
-                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   value={stockSearchTerm}
                   onChange={(e) => setStockSearchTerm(e.target.value)}
                   placeholder={t('searchStockPlaceholder', 'Search Serial Number, Location, or Notes...')}
-                  className="w-full pl-10 pr-4 py-2.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
+                  className="w-full px-4 py-2.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
                 />
                 {stockSearchTerm && (
                   <button
@@ -3780,7 +3743,6 @@ export default function AdminDashboard() {
                   onClick={() => setIsStockModalOpen(true)}
                   className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition cursor-pointer touch-manipulation shrink-0"
                 >
-                  <PackagePlus className="w-4 h-4" />
                   <span>{t('addStockDevice', '+ Add Stock')}</span>
                 </button>
 
@@ -3790,7 +3752,6 @@ export default function AdminDashboard() {
                   className="px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer touch-manipulation"
                   title="Manage Suppliers"
                 >
-                  <Building className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                   <span>{t('suppliers', 'Suppliers')}</span>
                   <span className="px-1.5 py-0.2 bg-indigo-200/80 dark:bg-indigo-800 text-indigo-800 dark:text-indigo-200 text-[10px] font-bold rounded-full">
                     {suppliersList.length}
@@ -3806,14 +3767,12 @@ export default function AdminDashboard() {
                       : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                   }`}
                 >
-                  <SlidersHorizontal className="w-3.5 h-3.5" />
                   <span>Filters</span>
                   {activeStockFilterCount > 0 && (
                     <span className="px-1.5 py-0.2 bg-emerald-600 text-white text-[10px] font-bold rounded-full">
                       {activeStockFilterCount}
                     </span>
                   )}
-                  {isStockFiltersExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                 </button>
 
                 {activeStockFilterCount > 0 && (
@@ -3823,7 +3782,6 @@ export default function AdminDashboard() {
                     className="px-3 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1 shrink-0 touch-manipulation"
                     title="Reset Filters"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">{t('reset', 'Reset')}</span>
                   </button>
                 )}
@@ -3834,17 +3792,16 @@ export default function AdminDashboard() {
                   className="px-3.5 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs shrink-0 touch-manipulation"
                   title="Export CSV"
                 >
-                  <Download className="w-3.5 h-3.5 text-slate-400" />
                   <span className="hidden sm:inline">{t('exportCsv', 'Export')}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setIsStockColumnsModalOpen(true)}
-                  className="hidden sm:flex px-3 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer items-center gap-1.5 shadow-2xs shrink-0"
+                  className="hidden sm:flex px-3.5 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer items-center gap-1.5 shadow-2xs shrink-0"
                   title="Columns"
                 >
-                  <Columns className="w-3.5 h-3.5 text-slate-400" />
+                  <span>{t('columns', 'Columns')}</span>
                 </button>
               </div>
             </div>
@@ -3862,8 +3819,8 @@ export default function AdminDashboard() {
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
                 >
                   <option value="ALL">{t('allDeviceTypes', 'All Device Types')}</option>
-                  <option value="Display Soundbox">{t('displaySoundboxOpt', '🖥️ Display Soundbox (Screen QR)')}</option>
-                  <option value="Standard Soundbox">{t('standardSoundboxOpt', '🏷️ Standard Soundbox (Printed QR)')}</option>
+                  <option value="Display Soundbox">{t('displaySoundboxOpt', 'Display Soundbox (Screen QR)')}</option>
+                  <option value="Standard Soundbox">{t('standardSoundboxOpt', 'Standard Soundbox (Printed QR)')}</option>
                 </select>
               </div>
 
@@ -3880,7 +3837,7 @@ export default function AdminDashboard() {
                   <option value="ALL">{isKhmer ? 'គ្រប់អ្នកផ្គត់ផ្គង់ (All Suppliers)' : 'All Suppliers'}</option>
                   {suppliersList.map((s) => (
                     <option key={s.id} value={s.name}>
-                      {s.name.toLowerCase() === 'hemi' ? '🏭' : '🏢'} {s.name}
+                      {s.name}
                     </option>
                   ))}
                 </select>
@@ -3897,8 +3854,8 @@ export default function AdminDashboard() {
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
                 >
                   <option value="ALL">{t('allPrices', 'All Price Tiers')}</option>
-                  <option value="29">🏷️ $29.00 (Standard Audio)</option>
-                  <option value="39">🖥️ $39.00 (Display Screen)</option>
+                  <option value="29">$29.00 (Standard Audio)</option>
+                  <option value="39">$39.00 (Display Screen)</option>
                 </select>
               </div>
 
@@ -3925,12 +3882,12 @@ export default function AdminDashboard() {
                   onChange={(e) => setStockSortBy(e.target.value)}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer font-medium"
                 >
-                  <option value="NEWEST">✨ {t('sortNewest', 'Newest Registered')}</option>
-                  <option value="OLDEST">⏳ {t('sortOldest', 'Oldest Registered')}</option>
-                  <option value="SN_ASC">🔤 {t('sortSnAsc', 'Serial Number (A → Z)')}</option>
-                  <option value="SN_DESC">🔤 {t('sortSnDesc', 'Serial Number (Z → A)')}</option>
-                  <option value="PRICE_DESC">💰 {t('sortPriceDesc', 'Price (Highest First)')}</option>
-                  <option value="PRICE_ASC">💵 {t('sortPriceAsc', 'Price (Lowest First)')}</option>
+                  <option value="NEWEST">{t('sortNewest', 'Newest Registered')}</option>
+                  <option value="OLDEST">{t('sortOldest', 'Oldest Registered')}</option>
+                  <option value="SN_ASC">{t('sortSnAsc', 'Serial Number (A → Z)')}</option>
+                  <option value="SN_DESC">{t('sortSnDesc', 'Serial Number (Z → A)')}</option>
+                  <option value="PRICE_DESC">{t('sortPriceDesc', 'Price (Highest First)')}</option>
+                  <option value="PRICE_ASC">{t('sortPriceAsc', 'Price (Lowest First)')}</option>
                 </select>
               </div>
             </div>
@@ -3990,12 +3947,7 @@ export default function AdminDashboard() {
                         {/* Device ID (SN) */}
                         {visibleStockColumns.deviceId && (
                           <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white">
-                            <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center shrink-0">
-                                <Smartphone className="w-3.5 h-3.5" />
-                              </div>
-                              <span>{d.device_sn || d.device_id}</span>
-                            </div>
+                            <span>{d.device_sn || d.device_id}</span>
                           </td>
                         )}
 
@@ -4008,8 +3960,8 @@ export default function AdminDashboard() {
                                 : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
                             }`}>
                               {(d.device_type === 'Display Soundbox' || String(d.device_type || '').toLowerCase().includes('display') || String(d.device_type || '').toLowerCase().includes('screen'))
-                                ? t('displayScreenQr', '🖥️ Display (Screen QR)')
-                                : t('standardPrintedQr', '🏷️ Standard (Printed QR)')}
+                                ? t('displayScreenQr', 'Display (Screen QR)')
+                                : t('standardPrintedQr', 'Standard (Printed QR)')}
                             </span>
                           </td>
                         )}
@@ -4022,7 +3974,7 @@ export default function AdminDashboard() {
                                 ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                                 : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
                             }`}>
-                              {(d.supplier || 'Feishu').toLowerCase() === 'hemi' ? '🏭 Hemi' : '🏢 Feishu'}
+                              {(d.supplier || 'Feishu').toLowerCase() === 'hemi' ? 'Hemi' : 'Feishu'}
                             </span>
                           </td>
                         )}
@@ -4057,7 +4009,6 @@ export default function AdminDashboard() {
                                 onClick={() => openSellStockModal(d)}
                                 className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
                               >
-                                <ShoppingBag className="w-3.5 h-3.5" />
                                 <span>{t('sellDevice', 'Sell')}</span>
                               </button>
 
@@ -4066,7 +4017,6 @@ export default function AdminDashboard() {
                                 onClick={() => openEditDeviceModal(d)}
                                 className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
                               >
-                                <Edit className="w-3 h-3 text-blue-600 dark:text-blue-400" />
                                 <span>{t('edit', 'Edit')}</span>
                               </button>
 
@@ -4076,7 +4026,6 @@ export default function AdminDashboard() {
                                 className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
                                 title={t('delete', 'Delete')}
                               >
-                                <Trash2 className="w-3 h-3 text-rose-600 dark:text-rose-400" />
                                 <span>{t('delete', 'Delete')}</span>
                               </button>
                             </div>
@@ -4136,7 +4085,7 @@ export default function AdminDashboard() {
                           ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                           : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
                       }`}>
-                        {(d.supplier || 'Feishu').toLowerCase() === 'hemi' ? '🏭 Hemi' : '🏢 Feishu'}
+                        {(d.supplier || 'Feishu').toLowerCase() === 'hemi' ? 'Hemi' : 'Feishu'}
                       </span>
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         (d.device_type === 'Display Soundbox' || String(d.device_type || '').toLowerCase().includes('display'))
@@ -4144,8 +4093,8 @@ export default function AdminDashboard() {
                           : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
                       }`}>
                         {(d.device_type === 'Display Soundbox' || String(d.device_type || '').toLowerCase().includes('display'))
-                          ? '🖥️ Display'
-                          : '🏷️ Standard'}
+                          ? 'Display'
+                          : 'Standard'}
                       </span>
                     </div>
                   </div>
@@ -4168,24 +4117,23 @@ export default function AdminDashboard() {
                         onClick={() => openSellStockModal(d)}
                         className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs touch-manipulation"
                       >
-                        <ShoppingBag className="w-3.5 h-3.5" />
                         <span>{t('sellDevice', 'Sell')}</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => openEditDeviceModal(d)}
-                        className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 active:scale-95 text-slate-700 dark:text-slate-200 rounded-xl transition cursor-pointer touch-manipulation"
+                        className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 active:scale-95 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold transition cursor-pointer touch-manipulation"
                         title={t('edit', 'Edit')}
                       >
-                        <Edit className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{t('edit', 'Edit')}</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => openDeleteDeviceModal(d)}
-                        className="p-2 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 active:scale-95 text-rose-600 dark:text-rose-400 rounded-xl transition cursor-pointer touch-manipulation"
+                        className="px-2.5 py-1.5 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 active:scale-95 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-semibold transition cursor-pointer touch-manipulation"
                         title={t('delete', 'Delete')}
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>{t('delete', 'Delete')}</span>
                       </button>
                     </div>
                   </div>
@@ -4303,13 +4251,12 @@ export default function AdminDashboard() {
             <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
               {/* Primary Search */}
               <div className="relative flex-1">
-                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   value={salesSearchTerm}
                   onChange={(e) => setSalesSearchTerm(e.target.value)}
                   placeholder="Search Serial Number, Customer, Store, Seller, or Notes..."
-                  className="w-full pl-10 pr-4 py-2.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
+                  className="w-full px-4 py-2.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
                 />
                 {salesSearchTerm && (
                   <button
@@ -4330,7 +4277,6 @@ export default function AdminDashboard() {
                   className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 transition flex items-center gap-1.5 shadow-2xs cursor-pointer touch-manipulation"
                   title="Export Sales to CSV"
                 >
-                  <Download className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">{t('exportCsv', 'Export CSV')}</span>
                 </button>
 
@@ -4421,13 +4367,15 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs min-w-[860px]">
+                <table className="w-full text-left text-xs min-w-[960px]">
                   <thead className="bg-slate-50/80 dark:bg-slate-800/70 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200 dark:border-slate-800">
                     <tr>
                       <th className="px-4 py-3">Order / Date</th>
+                      <th className="px-4 py-3">Invoice Ref</th>
                       <th className="px-4 py-3">Soundbox / SN</th>
                       <th className="px-4 py-3">Store / Customer</th>
                       <th className="px-4 py-3">Sold By</th>
+                      <th className="px-4 py-3 text-center">Qty</th>
                       <th className="px-4 py-3 text-right">Price & Discount</th>
                       <th className="px-4 py-3">Warranty</th>
                       <th className="px-4 py-3">Status</th>
@@ -4443,15 +4391,24 @@ export default function AdminDashboard() {
                             #ORD-{String(sale.id).padStart(4, '0')}
                           </div>
                           <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
                             <span>{sale.created_at ? new Date(sale.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
                           </div>
+                        </td>
+
+                        {/* Invoice Ref */}
+                        <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                          {sale.invoice_reference ? (
+                            <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
+                              {sale.invoice_reference}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 font-mono text-xs">—</span>
+                          )}
                         </td>
 
                         {/* Soundbox & SN */}
                         <td className="px-4 py-3.5 align-top">
                           <div className="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-xs flex items-center gap-1.5">
-                            <Volume2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                             <span>{sale.device_sn}</span>
                           </div>
                           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -4462,7 +4419,7 @@ export default function AdminDashboard() {
                             )}
                             {sale.supplier_name && (
                               <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
-                                🏢 {sale.supplier_name}
+                                {sale.supplier_name}
                               </span>
                             )}
                           </div>
@@ -4472,12 +4429,10 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3.5 align-top">
                           {sale.store_name ? (
                             <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
-                              <Store className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                               <span>{sale.store_name}</span>
                             </div>
                           ) : sale.customer_name ? (
                             <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
-                              <User className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                               <span>{sale.customer_name}</span>
                             </div>
                           ) : (
@@ -4485,7 +4440,6 @@ export default function AdminDashboard() {
                           )}
                           {(sale.customer_phone || sale.merchant_phone) && (
                             <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
-                              <Phone className="w-2.5 h-2.5" />
                               <span>{sale.customer_phone || sale.merchant_phone}</span>
                             </div>
                           )}
@@ -4501,6 +4455,13 @@ export default function AdminDashboard() {
                               {sale.sold_by_phone}
                             </div>
                           )}
+                        </td>
+
+                        {/* Quantity */}
+                        <td className="px-4 py-3.5 align-top text-center whitespace-nowrap">
+                          <span className="inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-md font-mono font-bold text-xs bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
+                            {sale.quantity || 1}
+                          </span>
                         </td>
 
                         {/* Price & Discount */}
@@ -4521,7 +4482,6 @@ export default function AdminDashboard() {
                         {/* Warranty */}
                         <td className="px-4 py-3.5 align-top whitespace-nowrap">
                           <div className="text-slate-800 dark:text-slate-200 font-semibold text-xs flex items-center gap-1">
-                            <Shield className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                             <span>{sale.warranty_days ? `${sale.warranty_days} days` : 'No warranty'}</span>
                           </div>
                           {sale.warranty_end_date && (
@@ -4544,7 +4504,7 @@ export default function AdminDashboard() {
                           </span>
                           {sale.notes && (
                             <div className="text-[10px] text-slate-400 mt-1 max-w-[140px] truncate" title={sale.notes}>
-                              📝 {sale.notes}
+                              {sale.notes}
                             </div>
                           )}
                         </td>
@@ -4557,10 +4517,10 @@ export default function AdminDashboard() {
                               navigator.clipboard.writeText(sale.device_sn);
                               showToast({ type: 'success', title: 'Copied', message: `Copied SN ${sale.device_sn} to clipboard.` });
                             }}
-                            className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
+                            className="px-2 py-1 text-[11px] font-semibold text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg transition cursor-pointer"
                             title="Copy Serial Number"
                           >
-                            <Copy className="w-3.5 h-3.5" />
+                            <span>{isKhmer ? 'ចម្លង' : 'Copy'}</span>
                           </button>
                         </td>
                       </tr>
@@ -4681,13 +4641,12 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {/* Search */}
               <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   value={userActivitySearch}
                   onChange={(e) => setUserActivitySearch(e.target.value)}
                   placeholder="Search user, store, phone, SN, action..."
-                  className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
@@ -4698,10 +4657,10 @@ export default function AdminDashboard() {
                 className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
               >
                 <option value="ALL">All Activity Categories</option>
-                <option value="STORE_REGISTER">🏬 Store Registrations</option>
-                <option value="DEVICE_LINK">📱 Soundbox Links & Claims</option>
-                <option value="TELEGRAM_PAIR">🤖 Telegram Bot Pairings</option>
-                <option value="USER_LOGIN">🔑 User Logins & Auth</option>
+                <option value="STORE_REGISTER">Store Registrations</option>
+                <option value="DEVICE_LINK">Soundbox Links & Claims</option>
+                <option value="TELEGRAM_PAIR">Telegram Bot Pairings</option>
+                <option value="USER_LOGIN">User Logins & Auth</option>
               </select>
 
               <button
@@ -4709,7 +4668,6 @@ export default function AdminDashboard() {
                 onClick={() => { setUserActivitySearch(''); setUserActivityCategoryFilter('ALL'); }}
                 className="px-3.5 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5"
               >
-                <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
                 <span>Reset Filters</span>
               </button>
             </div>
@@ -4808,10 +4766,6 @@ export default function AdminDashboard() {
                                 ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60'
                                 : 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60'
                             }`}>
-                              {act.category === 'STORE_REGISTER' && <Store className="w-3 h-3" />}
-                              {act.category === 'DEVICE_LINK' && <Smartphone className="w-3 h-3" />}
-                              {act.category === 'TELEGRAM_PAIR' && <Send className="w-3 h-3" />}
-                              {act.category === 'USER_LOGIN' && <UserCheck className="w-3 h-3" />}
                               <span>{act.action_label}</span>
                             </span>
                           </td>
@@ -4825,7 +4779,6 @@ export default function AdminDashboard() {
                           </td>
                           <td className="py-3.5 px-4 whitespace-nowrap">
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                              <CheckCircle2 className="w-3 h-3" />
                               <span>{act.status}</span>
                             </span>
                           </td>
@@ -4951,13 +4904,12 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {/* Search */}
               <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   value={adminActivitySearch}
                   onChange={(e) => setAdminActivitySearch(e.target.value)}
                   placeholder="Search operator, device SN, action..."
-                  className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500"
                 />
               </div>
 
@@ -4968,12 +4920,12 @@ export default function AdminDashboard() {
                 className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 cursor-pointer"
               >
                 <option value="ALL">All Administrative Actions</option>
-                <option value="STOCK_INTAKE">📦 Stock Intakes</option>
-                <option value="SALE_DEPLOY">🛍️ Sales & Warranty Deployments</option>
-                <option value="VOICE_BROADCAST">🔊 Voice Broadcasts</option>
-                <option value="SET_VOLUME">🔉 Volume Adjustments</option>
-                <option value="REBOOT">🔄 Device Reboots</option>
-                <option value="USER_MANAGEMENT">👥 User Provisioning</option>
+                <option value="STOCK_INTAKE">Stock Intakes</option>
+                <option value="SALE_DEPLOY">Sales & Warranty Deployments</option>
+                <option value="VOICE_BROADCAST">Voice Broadcasts</option>
+                <option value="SET_VOLUME">Volume Adjustments</option>
+                <option value="REBOOT">Device Reboots</option>
+                <option value="USER_MANAGEMENT">User Provisioning</option>
               </select>
 
               <button
@@ -4981,7 +4933,6 @@ export default function AdminDashboard() {
                 onClick={() => { setAdminActivitySearch(''); setAdminActivityCategoryFilter('ALL'); }}
                 className="px-3.5 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5"
               >
-                <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
                 <span>Reset Filters</span>
               </button>
             </div>
@@ -5077,10 +5028,6 @@ export default function AdminDashboard() {
                                   ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60'
                                   : 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/60'
                               }`}>
-                                {act.category === 'STOCK_INTAKE' && <Warehouse className="w-3 h-3" />}
-                                {act.category === 'SALE_DEPLOY' && <ShoppingBag className="w-3 h-3" />}
-                                {(act.category === 'VOICE_BROADCAST' || act.category === 'SET_VOLUME') && <Volume2 className="w-3 h-3" />}
-                                {act.category === 'USER_MANAGEMENT' && <Users className="w-3 h-3" />}
                                 <span>{act.action_label}</span>
                               </span>
                             </td>
@@ -5092,7 +5039,6 @@ export default function AdminDashboard() {
                             </td>
                             <td className="py-3.5 px-4 whitespace-nowrap">
                               <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                                <CheckCircle2 className="w-3 h-3" />
                                 <span>{act.status}</span>
                               </span>
                             </td>
@@ -5314,8 +5260,8 @@ export default function AdminDashboard() {
                 }}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
               >
-                <option value="Display Soundbox">{t('displaySoundboxOpt', '🖥️ Display Soundbox (Screen QR)')}</option>
-                <option value="Standard Soundbox">{t('standardSoundboxOpt', '🏷️ Standard Soundbox (Printed QR)')}</option>
+                <option value="Display Soundbox">{t('displaySoundboxOpt', 'Display Soundbox (Screen QR)')}</option>
+                <option value="Standard Soundbox">{t('standardSoundboxOpt', 'Standard Soundbox (Printed QR)')}</option>
               </select>
             </div>
             <div>
@@ -5327,7 +5273,7 @@ export default function AdminDashboard() {
               >
                 {suppliersList.map((s) => (
                   <option key={s.id} value={s.name}>
-                    {s.name.toLowerCase() === 'hemi' ? '🏭' : '🏢'} {s.name}
+                    {s.name}
                   </option>
                 ))}
               </select>
@@ -6095,12 +6041,12 @@ export default function AdminDashboard() {
                     <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                       <span>
                         {selectedDeviceDetail.device_type === 'Display Soundbox' || String(selectedDeviceDetail.device_model || '').includes('Display')
-                          ? '🖥️ Display Soundbox (Screen QR)' 
-                          : '🏷️ Standard Soundbox (Printed QR)'}
+                          ? 'Display Soundbox (Screen QR)' 
+                          : 'Standard Soundbox (Printed QR)'}
                       </span>
                       <span>•</span>
                       <span className="font-semibold text-slate-700 dark:text-slate-300">
-                        {t('supplier', 'Supplier')}: {(selectedDeviceDetail.supplier || 'Feishu').toLowerCase() === 'hemi' ? '🏭 Hemi' : '🏢 Feishu'}
+                        {t('supplier', 'Supplier')}: {(selectedDeviceDetail.supplier || 'Feishu').toLowerCase() === 'hemi' ? 'Hemi' : 'Feishu'}
                       </span>
                     </div>
                   </div>
@@ -6115,7 +6061,7 @@ export default function AdminDashboard() {
                       : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
                   }`}>
                     {String(selectedDeviceDetail.status).toUpperCase() === 'PENDING'
-                      ? (isKhmer ? '🟣 រង់ចាំការចុះឈ្មោះ' : '🟣 Waiting for Registration')
+                      ? (isKhmer ? 'រង់ចាំការចុះឈ្មោះ' : 'Waiting for Registration')
                       : selectedDeviceDetail.status || 'Offline'}
                   </span>
                 )}
@@ -6768,8 +6714,8 @@ export default function AdminDashboard() {
                 }}
                 className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
               >
-                <option value="Display Soundbox">🖥️ Display Soundbox (Screen QR)</option>
-                <option value="Standard Soundbox">🏷️ Standard Soundbox (Printed QR)</option>
+                <option value="Display Soundbox">Display Soundbox (Screen QR)</option>
+                <option value="Standard Soundbox">Standard Soundbox (Printed QR)</option>
               </select>
             </div>
 
@@ -6784,7 +6730,7 @@ export default function AdminDashboard() {
               >
                 {suppliersList.map((s) => (
                   <option key={s.id} value={s.name}>
-                    {s.name.toLowerCase() === 'hemi' ? '🏭' : '🏢'} {s.name}
+                    {s.name}
                   </option>
                 ))}
               </select>
@@ -6869,7 +6815,7 @@ export default function AdminDashboard() {
                     {sellTargetDevice.device_sn || sellTargetDevice.device_id}
                   </div>
                   <div className="text-[11px] text-slate-400 font-sans mt-0.5">
-                    {sellTargetDevice.device_type === 'Display Soundbox' ? t('displaySoundboxOpt', '🖥️ Display Soundbox (Screen QR)') : t('standardSoundboxOpt', '🏷️ Standard Soundbox (Printed QR)')}
+                    {sellTargetDevice.device_type === 'Display Soundbox' ? t('displaySoundboxOpt', 'Display Soundbox (Screen QR)') : t('standardSoundboxOpt', 'Standard Soundbox (Printed QR)')}
                   </div>
                 </div>
               </div>
@@ -7002,6 +6948,39 @@ export default function AdminDashboard() {
                     value={sellWarrantyStartDate}
                     onChange={(e) => setSellWarrantyStartDate(e.target.value)}
                     className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-xs text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Quantity & Invoice Reference Configuration */}
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+              <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                {t('orderReferences', 'Order & Invoice References')}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                    {t('quantity', 'Quantity')}
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={sellQuantity}
+                    onChange={(e) => setSellQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                    {t('invoiceReference', 'Invoice Ref')}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. INV-2026-001"
+                    value={sellInvoiceRef}
+                    onChange={(e) => setSellInvoiceRef(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-xs text-slate-900 dark:text-white font-mono"
                   />
                 </div>
               </div>

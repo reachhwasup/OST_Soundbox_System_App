@@ -29,6 +29,8 @@ class SaleCreateSchema(BaseModel):
     warranty_end_date: Optional[str] = None
     payment_method: str = "CASH"
     notes: Optional[str] = None
+    quantity: int = Field(1, ge=1, description="Quantity of units sold")
+    invoice_reference: Optional[str] = Field(None, description="Invoice reference or receipt number")
     target_status: str = "PENDING"  # 'PENDING' (waiting for QR registration) or 'ACTIVE'
 
 
@@ -92,9 +94,9 @@ async def create_device_sale(
                 customer_name, customer_phone, price, discount_type,
                 discount_percent, discount_amount, final_price, currency,
                 warranty_days, warranty_start_date, warranty_end_date,
-                payment_method, status, notes
+                payment_method, status, notes, quantity, invoice_reference
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'COMPLETED', $17)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'COMPLETED', $17, $18, $19)
             RETURNING *
         """,
             device["id"],
@@ -113,7 +115,9 @@ async def create_device_sale(
             start_dt,
             end_dt,
             payload.payment_method,
-            payload.notes
+            payload.notes,
+            payload.quantity,
+            payload.invoice_reference
         )
 
         # 5. Synchronize device state
@@ -172,6 +176,7 @@ async def list_sales(
                 (s.device_sn ILIKE ${idx} OR 
                  s.customer_name ILIKE ${idx} OR 
                  s.customer_phone ILIKE ${idx} OR 
+                 s.invoice_reference ILIKE ${idx} OR
                  COALESCE(m.merchant_name, m.name) ILIKE ${idx})
             """)
             params.append(s_clean)
@@ -197,7 +202,7 @@ async def list_sales(
                    s.customer_name, s.customer_phone,
                    s.price, s.discount_type, s.discount_percent, s.discount_amount, s.final_price, s.currency,
                    s.warranty_days, s.warranty_start_date, s.warranty_end_date,
-                   s.payment_method, s.status, s.notes, s.created_at,
+                   s.payment_method, s.status, s.notes, s.quantity, s.invoice_reference, s.created_at,
                    COALESCE(m.merchant_name, m.name) AS store_name,
                    u.full_name AS seller_name,
                    d.device_type,
@@ -239,6 +244,8 @@ async def list_sales(
                 "payment_method": r["payment_method"] or "CASH",
                 "status": r["status"] or "COMPLETED",
                 "notes": r["notes"],
+                "quantity": int(r["quantity"] or 1),
+                "invoice_reference": r["invoice_reference"],
                 "created_at": r["created_at"].isoformat() if r["created_at"] else None,
             })
 

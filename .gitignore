@@ -94,3 +94,4 @@ frontend/dist/
 dist/
 userbot_state.json
 
+local_db_backup.sql

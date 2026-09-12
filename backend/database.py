@@ -185,7 +185,6 @@ async def init_db():
                 version_wifi VARCHAR(255),
                 last_online TIMESTAMP WITH TIME ZONE,
                 device_id VARCHAR(100),
-                device_name VARCHAR(255),
                 chat_id VARCHAR(100),
                 is_active BOOLEAN DEFAULT TRUE,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -210,7 +209,6 @@ async def init_db():
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS last_online TIMESTAMP WITH TIME ZONE;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_id VARCHAR(100);
-            ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_name VARCHAR(255);
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS qr_code TEXT;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
             ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier_id INT REFERENCES suppliers(id) ON DELETE SET NULL;
@@ -248,14 +246,19 @@ async def init_db():
                 payment_method VARCHAR(50) DEFAULT 'CASH',
                 status VARCHAR(50) DEFAULT 'COMPLETED',
                 notes TEXT,
+                quantity INT NOT NULL DEFAULT 1,
+                invoice_reference VARCHAR(100),
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
+            ALTER TABLE sales ADD COLUMN IF NOT EXISTS quantity INT NOT NULL DEFAULT 1;
+            ALTER TABLE sales ADD COLUMN IF NOT EXISTS invoice_reference VARCHAR(100);
             CREATE INDEX IF NOT EXISTS idx_sales_device_id ON sales(device_id);
             CREATE INDEX IF NOT EXISTS idx_sales_device_sn ON sales(device_sn);
             CREATE INDEX IF NOT EXISTS idx_sales_merchant_id ON sales(merchant_id);
             CREATE INDEX IF NOT EXISTS idx_sales_sold_by ON sales(sold_by_user_id);
             CREATE INDEX IF NOT EXISTS idx_sales_created_at ON sales(created_at);
+            CREATE INDEX IF NOT EXISTS idx_sales_invoice_reference ON sales(invoice_reference);
 
             -- Ensure any existing active/sold devices are safely registered in sales before dropping columns
             DO $$
@@ -291,6 +294,19 @@ async def init_db():
             ALTER TABLE devices DROP COLUMN IF EXISTS warranty_end_date;
             ALTER TABLE devices DROP COLUMN IF EXISTS supplier;
             ALTER TABLE devices DROP COLUMN IF EXISTS chat_id;
+            ALTER TABLE devices DROP COLUMN IF EXISTS device_name;
+            ALTER TABLE devices DROP COLUMN IF EXISTS store_id;
+            ALTER TABLE devices DROP COLUMN IF EXISTS telegram_bot_token;
+
+            -- Remove legacy/unused fields from merchants and group_users
+            ALTER TABLE merchants DROP COLUMN IF EXISTS password_hash;
+            ALTER TABLE merchants DROP COLUMN IF EXISTS role;
+            ALTER TABLE merchants DROP COLUMN IF EXISTS status;
+            ALTER TABLE merchants DROP COLUMN IF EXISTS telegram_bot_token;
+            ALTER TABLE group_users DROP COLUMN IF EXISTS first_name;
+            ALTER TABLE group_users DROP COLUMN IF EXISTS last_name;
+            ALTER TABLE group_users DROP COLUMN IF EXISTS is_bot;
+            DROP TABLE IF EXISTS stores CASCADE;
         """)
 
         # 7. Transactions Table
@@ -372,6 +388,55 @@ async def init_db():
                 ('123456789', 'ababank_bot', 'ABA Bank Bot', TRUE),
                 ('987654321', 'acleda_bot', 'ACLEDA Bank Bot', TRUE)
             ON CONFLICT (bot_id) DO NOTHING;
+
+            -- 8. Branches, Products & Stock Transactions Module
+            DO $$ BEGIN
+                CREATE TYPE stock_action AS ENUM ('IN', 'OUT', 'REJECT');
+            EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+            CREATE TABLE IF NOT EXISTS branches (
+                branch_id SERIAL PRIMARY KEY,
+                branch_code VARCHAR(50) NOT NULL UNIQUE,
+                branch_name VARCHAR(150) NOT NULL,
+                location TEXT,
+                created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                is_active BOOLEAN DEFAULT TRUE
+            );
+
+            CREATE TABLE IF NOT EXISTS products (
+                product_id SERIAL PRIMARY KEY,
+                item_code VARCHAR(50) NOT NULL UNIQUE,
+                item_name VARCHAR(150) NOT NULL,
+                unit VARCHAR(30) NOT NULL,
+                cost_price NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+                selling_price NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+                min_stock_level INTEGER DEFAULT 5,
+                created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                warranty_months INTEGER DEFAULT 0,
+                is_active BOOLEAN DEFAULT TRUE
+            );
+
+            CREATE TABLE IF NOT EXISTS stock_transactions (
+                transaction_id SERIAL PRIMARY KEY,
+                branch_id INTEGER REFERENCES branches(branch_id) ON DELETE RESTRICT,
+                product_id INTEGER REFERENCES products(product_id) ON DELETE RESTRICT,
+                quantity INTEGER NOT NULL CHECK (quantity > 0),
+                action_type stock_action NOT NULL,
+                unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+                reference_no VARCHAR(100),
+                remarks TEXT,
+                created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                discount_percent NUMERIC(5, 2) DEFAULT 0.00,
+                discount_amount NUMERIC(12, 2) DEFAULT 0.00,
+                serial_number VARCHAR(100),
+                warranty_expired_date DATE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_stock_trans_action ON stock_transactions(action_type);
+            CREATE INDEX IF NOT EXISTS idx_stock_trans_branch ON stock_transactions(branch_id);
+            CREATE INDEX IF NOT EXISTS idx_stock_trans_date ON stock_transactions(created_at);
+            CREATE INDEX IF NOT EXISTS idx_stock_trans_product ON stock_transactions(product_id);
+            CREATE INDEX IF NOT EXISTS idx_stock_trans_serial ON stock_transactions(serial_number);
         """)
 
 
