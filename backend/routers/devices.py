@@ -488,7 +488,7 @@ async def lookup_device_by_sn(
 
 @router.get("/")
 async def list_devices(
-    search: Optional[str] = Query(None, description="Search item code, item name, or supplier name"),
+    search: Optional[str] = Query(None, description="Search item name or supplier name"),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     pool = await get_db_pool()
@@ -497,66 +497,81 @@ async def list_devices(
         params = []
         param_idx = 1
 
-        if search and search.strip():
-            s = f"%{search.strip()}%"
-            where_clauses.append(f"""(
-                p.item_code ILIKE ${param_idx}
-                OR p.item_name ILIKE ${param_idx}
-                OR s.name ILIKE ${param_idx}
-            )""")
-            params.append(s)
-            param_idx += 1
+    if search and search.strip():
+        s = f"%{search.strip()}%"
+        where_clauses.append(f"""(
+            p.item_name ILIKE ${param_idx}
+            OR s.name ILIKE ${param_idx}
+        )""")
+        params.append(s)
+        param_idx += 1
 
-        where_sql = " AND ".join(where_clauses)
+    where_sql = " AND ".join(where_clauses)
 
-        query = f"""
-            SELECT p.product_id AS id, 
-                   p.item_code AS device_id,
-                   p.item_code AS device_sn,
-                   'Soundbox' AS device_type,
-                   p.item_name AS device_model,
-                   COALESCE(p.selling_price, 29.00) AS price,
-                   COALESCE(p.selling_price, 29.00) AS final_price,
-                   COALESCE(p.warranty_months, 12) AS warranty_days,
-                   p.supplier_id,
-                   COALESCE(s.name, 'Feishu') AS supplier,
-                   CASE WHEN p.is_active = TRUE THEN 'Online' ELSE 'IN_STOCK' END AS status,
-                   p.created_at AS last_time,
-                   p.created_at AS last_heartbeat,
-                   p.created_at
-            FROM products p
-            LEFT JOIN suppliers s ON p.supplier_id = s.id
-            WHERE {where_sql}
-            ORDER BY p.product_id DESC
-        """
+    query = f"""
+        SELECT 
+            MIN(p.product_id) AS id,
+            p.item_name AS device_model,
+            'Soundbox' AS device_type,
+            p.supplier_id,
+            COALESCE(s.name, 'Feishu') AS supplier,
+            COALESCE(p.selling_price, 29.00) AS price,
+            COALESCE(p.selling_price, 29.00) AS final_price,
+            COALESCE(p.warranty_months, 12) AS warranty_days,
+            COUNT(p.product_id) AS total_quantity,
+            MIN(p.created_at) AS created_at,
+            MAX(p.created_at) AS last_time
+        FROM products p
+        LEFT JOIN suppliers s ON p.supplier_id = s.id
+        LEFT JOIN LATERAL (
+            SELECT st.action_type 
+            FROM stock_transactions st 
+            WHERE st.product_id = p.product_id OR st.serial_number = p.item_code
+            ORDER BY st.transaction_id DESC 
+            LIMIT 1
+        ) st ON true
+        LEFT JOIN LATERAL (
+            SELECT sales.id 
+            FROM sales 
+            WHERE sales.device_id = p.product_id OR sales.device_sn = p.item_code
+            ORDER BY sales.id DESC 
+            LIMIT 1
+        ) sales ON true
+        WHERE {where_sql}
+            -- បន្ថែមលក្ខខណ្ឌដកចេញនូវទំនិញដែលបានលក់ (OUT) ឬមានក្នុងตาราง sales និង REJECT
+            AND (st.action_type IS NULL OR st.action_type::text NOT IN ('OUT', 'REJECT'))
+            AND sales.id IS NULL
+        GROUP BY p.item_name, p.supplier_id, s.name, p.selling_price, p.warranty_months
+        HAVING COUNT(p.product_id) > 0
+        ORDER BY id DESC
+    """
 
+    try:
+        products = await conn.fetch(query, *params)
+    except Exception as e:
+        logger.warning(f"list_devices available stock query failed: {e}. Returning empty list.")
+        products = []
+
+    formatted_devices = []
+    for p in products:
         try:
-            products = await conn.fetch(query, *params)
-        except Exception as e:
-            logger.warning(f"list_devices query on products failed: {e}. Returning empty list.")
-            products = []
+            row = dict(p)
+            created_at = row.get("created_at")
+            l_time = row.get("last_time")
 
-        formatted_devices = []
-        for p in products:
-            try:
-                row = dict(p)
-                created_at = row.get("created_at")
-                l_time = row.get("last_time")
+            formatted_devices.append({
+                **row,
+                "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else (str(created_at) if created_at else None),
+                "last_heartbeat": created_at.isoformat() if hasattr(created_at, "isoformat") else (str(created_at) if created_at else None),
+                "last_time": l_time.strftime("%Y-%m-%d %H:%M:%S") if hasattr(l_time, "strftime") else (str(l_time) if l_time else None)
+            })
+        except Exception:
+            formatted_devices.append(dict(p))
 
-                formatted_devices.append({
-                    **row,
-                    "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else (str(created_at) if created_at else None),
-                    "last_heartbeat": created_at.isoformat() if hasattr(created_at, "isoformat") else (str(created_at) if created_at else None),
-                    "last_time": l_time.strftime("%Y-%m-%d %H:%M:%S") if hasattr(l_time, "strftime") else (str(l_time) if l_time else None)
-                })
-            except Exception:
-                formatted_devices.append(dict(p))
-
-        return {
-            "status": "success",
-            "devices": formatted_devices
-        }
-
+    return {
+        "status": "success",
+        "devices": formatted_devices
+    }
 
 class DeviceBulkImportSchema(BaseModel):
     serial_numbers: List[str] = Field(..., description="List of serial numbers to import into stock")
@@ -647,7 +662,6 @@ class DeviceIntakeSchema(BaseModel):
     supplier: Optional[str] = "Feishu"
 
 
-
 @router.post("/intake", status_code=status.HTTP_201_CREATED)
 async def intake_single_device(
     payload: DeviceIntakeSchema,
@@ -674,9 +688,11 @@ async def intake_single_device(
         supp_id, supp_name = await resolve_supplier(conn, payload.supplier_id, payload.supplier)
 
         is_active = True if payload.merchant_id else False
+        qty_val = int(payload.unit) if str(payload.unit).isdigit() else 1
+        batch_number = payload.batch_no or f"BATCH-{datetime.now().strftime('%Y%m%d')}"
 
         try:
-            # Insert ចូលទៅ products
+            # 1. บันทึกข้อมูลสินค้าลงตาราง products
             new_id = await conn.fetchval("""
                 INSERT INTO products (
                     item_code, item_name, unit, cost_price, selling_price, 
@@ -684,16 +700,45 @@ async def intake_single_device(
                 )
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                 RETURNING product_id
-           """, 
+            """, 
             sn, 
             payload.device_model or "Y6B", 
-            payload.unit or "1", 
+            str(payload.unit or "1"), 
             float(payload.price or 29.00), 
             float(payload.sell_price or 29.00), 
             int(payload.mini_stk or 1), 
             int(payload.warran_months or 0), 
             is_active, 
             supp_id)
+
+            # 2.ប្រើប្រាស់ពេលដែលអ្នក នាំចូលទំនិញចូលស្តុក (Stock IN) ច្រើនៗក្នុងទម្រង់ជាបាច់ ឬឡូតិ៍ (Batch/Lot) ពី Supplier
+            await conn.execute("""
+                INSERT INTO inventory_batches (
+                    batch_no, supplier_id, total_qty, unit_cost, notes
+                )
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (batch_no) DO UPDATE 
+                SET total_qty = inventory_batches.total_qty + EXCLUDED.total_qty
+            """, 
+            batch_number, 
+            supp_id, 
+            qty_val, 
+            float(payload.price or 29.00), 
+            payload.notes or "Initial bulk or single stock intake batch")
+
+            # 3. บันทึกประวัติการนำเข้าลงตาราง stock_transactions (Stock IN Ledger)
+            await conn.execute("""
+                INSERT INTO stock_transactions (
+                    product_id, quantity, action_type, unit_price, reference_no, remarks, serial_number
+                )
+                VALUES ($1, $2, 'IN', $3, $4, $5, $6)
+            """, 
+            new_id, 
+            qty_val, 
+            float(payload.price or 29.00), 
+            batch_number, 
+            payload.notes or "Initial stock import (IN)", 
+            sn)
                 
         except Exception as insert_err:
             logger.warning(f"Product intake failed: {insert_err}. Attempting schema auto-heal and fallback...")
@@ -711,20 +756,49 @@ async def intake_single_device(
                 """)
                 new_id = await conn.fetchval("""
                     INSERT INTO products (
-                        item_code, item_name, unit, cost_price, selling_price, is_active, supplier_id
+                        item_code, item_name, unit, cost_price, selling_price, 
+                        min_stock_level, warranty_months, is_active, supplier_id
                     )
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                     RETURNING product_id
                 """, 
                 sn, 
                 payload.device_model or "Y6B", 
-                payload.unit or "1", 
+                str(payload.unit or "1"), 
                 float(payload.price or 29.00), 
                 float(payload.sell_price or 29.00), 
                 int(payload.mini_stk or 1), 
                 int(payload.warran_months or 0), 
                 is_active, 
                 supp_id)
+
+                # Fallback Inventory Batches Insertion
+                await conn.execute("""
+                    INSERT INTO inventory_batches (
+                        batch_no, supplier_id, total_qty, unit_cost, notes
+                    )
+                    VALUES ($1, $2, $3, $4, $5)
+                    ON CONFLICT (batch_no) DO NOTHING
+                """, 
+                batch_number, 
+                supp_id, 
+                qty_val, 
+                float(payload.price or 29.00), 
+                payload.notes or "Initial stock import batch")
+
+                # Fallback Record Stock IN Transaction Ledger
+                await conn.execute("""
+                    INSERT INTO stock_transactions (
+                        product_id, quantity, action_type, unit_price, reference_no, remarks, serial_number
+                    )
+                    VALUES ($1, $2, 'IN', $3, $4, $5, $6)
+                """, 
+                new_id, 
+                qty_val, 
+                float(payload.price or 29.00), 
+                batch_number, 
+                payload.notes or "Initial stock import (IN)", 
+                sn)
                     
             except Exception as final_err:
                 logger.error(f"Product intake permanently failed for SN '{sn}': {final_err}", exc_info=True)
@@ -735,10 +809,10 @@ async def intake_single_device(
 
         return {
             "status": "success",
-            "message": f"Soundbox '{sn}' registered successfully into stock.",
-            "product_id": new_id
+            "message": f"Soundbox '{sn}' registered, batched, and imported into stock successfully.",
+            "product_id": new_id,
+            "batch_no": batch_number
         }
-
 
 
 @router.post("/{device_id}/return-to-stock")
