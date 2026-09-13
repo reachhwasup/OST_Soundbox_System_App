@@ -1235,7 +1235,7 @@ export default function AdminDashboard() {
       // Must be unassigned and strictly in warehouse stock (not pending/sold or active)
       if (d.merchant_id) return false;
       const st = String(d.status || '').toUpperCase();
-      if (st === 'PENDING' || st === 'ACTIVE') return false;
+      if (st === 'PENDING' || st === 'ACTIVE' || st === 'OUT' || st === 'REJECT') return false;
 
       if (stockSearchTerm.trim()) {
         const q = stockSearchTerm.toLowerCase().trim();
