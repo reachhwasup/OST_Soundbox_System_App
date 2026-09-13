@@ -488,7 +488,7 @@ async def lookup_device_by_sn(
 
 @router.get("/")
 async def list_devices(
-    search: Optional[str] = Query(None, description="Search item name or supplier name"),
+    search: Optional[str] = Query(None, description="Search serial number, model, or supplier"),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     pool = await get_db_pool()
@@ -497,81 +497,89 @@ async def list_devices(
         params = []
         param_idx = 1
 
-    if search and search.strip():
-        s = f"%{search.strip()}%"
-        where_clauses.append(f"""(
-            p.item_name ILIKE ${param_idx}
-            OR s.name ILIKE ${param_idx}
-        )""")
-        params.append(s)
-        param_idx += 1
+        if search and search.strip():
+            s = f"%{search.strip()}%"
+            where_clauses.append(f"(p.item_code ILIKE ${param_idx} OR p.item_name ILIKE ${param_idx} OR s.name ILIKE ${param_idx})")
+            params.append(s)
+            param_idx += 1
 
-    where_sql = " AND ".join(where_clauses)
+        where_sql = " AND ".join(where_clauses)
 
-    query = f"""
-        SELECT 
-            MIN(p.product_id) AS id,
-            p.item_name AS device_model,
-            'Soundbox' AS device_type,
-            p.supplier_id,
-            COALESCE(s.name, 'Feishu') AS supplier,
-            COALESCE(p.selling_price, 29.00) AS price,
-            COALESCE(p.selling_price, 29.00) AS final_price,
-            COALESCE(p.warranty_months, 12) AS warranty_days,
-            COUNT(p.product_id) AS total_quantity,
-            MIN(p.created_at) AS created_at,
-            MAX(p.created_at) AS last_time
-        FROM products p
-        LEFT JOIN suppliers s ON p.supplier_id = s.id
-        LEFT JOIN LATERAL (
-            SELECT st.action_type 
-            FROM stock_transactions st 
-            WHERE st.product_id = p.product_id OR st.serial_number = p.item_code
-            ORDER BY st.transaction_id DESC 
-            LIMIT 1
-        ) st ON true
-        LEFT JOIN LATERAL (
-            SELECT sales.id 
-            FROM sales 
-            WHERE sales.device_id = p.product_id OR sales.device_sn = p.item_code
-            ORDER BY sales.id DESC 
-            LIMIT 1
-        ) sales ON true
-        WHERE {where_sql}
-            -- បន្ថែមលក្ខខណ្ឌដកចេញនូវទំនិញដែលបានលក់ (OUT) ឬមានក្នុងตาราง sales និង REJECT
-            AND (st.action_type IS NULL OR st.action_type::text NOT IN ('OUT', 'REJECT'))
-            AND sales.id IS NULL
-        GROUP BY p.item_name, p.supplier_id, s.name, p.selling_price, p.warranty_months
-        HAVING COUNT(p.product_id) > 0
-        ORDER BY id DESC
-    """
+        # 1. សាកល្បង Query ជាមួយ Advanced Lateral Join
+        advanced_query = f"""
+            SELECT 
+                p.product_id AS id,
+                p.item_code AS device_id,
+                p.item_code AS device_sn,
+                'Soundbox' AS device_type,
+                p.item_name AS device_model,
+                COALESCE(p.selling_price, 29.00) AS price,
+                COALESCE(p.selling_price, 29.00) AS final_price,
+                COALESCE(p.warranty_months, 12) AS warranty_days,
+                p.supplier_id,
+                COALESCE(s.name, 'Feishu') AS supplier,
+                COALESCE(st.action_type::text, CASE WHEN p.is_active = TRUE THEN 'IN_STOCK' ELSE 'INACTIVE' END) AS status,
+                p.created_at AS last_time,
+                p.created_at AS created_at,
+                p.unit,
+                NULL AS notes
+            FROM products p
+            LEFT JOIN suppliers s ON p.supplier_id = s.id
+            LEFT JOIN LATERAL (
+                SELECT st.action_type
+                FROM stock_transactions st
+                WHERE st.product_id = p.product_id
+                ORDER BY st.transaction_id DESC
+                LIMIT 1
+            ) st ON true
+            WHERE {where_sql}
+            ORDER BY p.product_id DESC
+        """
 
-    try:
-        products = await conn.fetch(query, *params)
-    except Exception as e:
-        logger.warning(f"list_devices available stock query failed: {e}. Returning empty list.")
-        products = []
-
-    formatted_devices = []
-    for p in products:
         try:
+            products = await conn.fetch(advanced_query, *params)
+        except Exception as e:
+            logger.warning(f"Advanced query failed: {e}. Falling back to basic products query...")
+            # 2. Fallback Query ប្រសិនបើតារាង stock_transactions មានបញ្ហា
+            basic_query = f"""
+                SELECT 
+                    p.product_id AS id,
+                    p.item_code AS device_id,
+                    p.item_code AS device_sn,
+                    'Soundbox' AS device_type,
+                    p.item_name AS device_model,
+                    COALESCE(p.selling_price, 29.00) AS price,
+                    COALESCE(p.selling_price, 29.00) AS final_price,
+                    COALESCE(p.warranty_months, 12) AS warranty_days,
+                    p.supplier_id,
+                    COALESCE(s.name, 'Feishu') AS supplier,
+                    CASE WHEN p.is_active = TRUE THEN 'IN_STOCK' ELSE 'INACTIVE' END AS status,
+                    p.created_at AS last_time,
+                    p.created_at AS created_at,
+                    p.unit,
+                    NULL AS notes
+                FROM products p
+                LEFT JOIN suppliers s ON p.supplier_id = s.id
+                WHERE {where_sql}
+                ORDER BY p.product_id DESC
+            """
+            products = await conn.fetch(basic_query, *params)
+
+        formatted_devices = []
+        for p in products:
             row = dict(p)
             created_at = row.get("created_at")
             l_time = row.get("last_time")
-
             formatted_devices.append({
                 **row,
-                "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else (str(created_at) if created_at else None),
-                "last_heartbeat": created_at.isoformat() if hasattr(created_at, "isoformat") else (str(created_at) if created_at else None),
-                "last_time": l_time.strftime("%Y-%m-%d %H:%M:%S") if hasattr(l_time, "strftime") else (str(l_time) if l_time else None)
+                "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else str(created_at),
+                "last_time": l_time.strftime("%Y-%m-%d %H:%M:%S") if hasattr(l_time, "strftime") else str(l_time)
             })
-        except Exception:
-            formatted_devices.append(dict(p))
 
-    return {
-        "status": "success",
-        "devices": formatted_devices
-    }
+        return {
+            "status": "success",
+            "devices": formatted_devices
+        }
 
 class DeviceBulkImportSchema(BaseModel):
     serial_numbers: List[str] = Field(..., description="List of serial numbers to import into stock")
