@@ -3998,6 +3998,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* 2. Warehouse Stock Table Card (Desktop >= lg) */}
+          {/* 2. Warehouse Stock Table Card (Desktop >= lg) */}
           <div className="hidden lg:block mt-6 mb-4 bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs min-w-[760px]">
@@ -4016,13 +4017,13 @@ export default function AdminDashboard() {
                         )}
                       </button>
                     </th>
-                    {visibleStockColumns.deviceId && <th className="py-4 px-5 font-semibold min-w-[160px]">{t('deviceId', 'Device SN')}</th>}
-                    {visibleStockColumns.deviceType && <th className="py-4 px-5 font-semibold min-w-[190px]">{t('deviceType', 'Device Type')}</th>}
-                    {visibleStockColumns.supplier && <th className="py-4 px-4 font-semibold min-w-[120px]">{t('supplier', 'Supplier')}</th>}
-                    {visibleStockColumns.price && <th className="py-4 px-5 font-semibold text-center min-w-[95px]">{t('price', 'Price')}</th>}
-                    {visibleStockColumns.intakeDate && <th className="py-4 px-5 font-semibold min-w-[130px]">{t('registrationDate', 'Registration Date')}</th>}
-                    {visibleStockColumns.notes && <th className="py-4 px-5 font-semibold min-w-[200px]">{t('warehouseNotes', 'Warehouse Notes')}</th>}
-                    {visibleStockColumns.operation && <th className="py-4 px-5 font-semibold text-center min-w-[100px]">{t('operation', 'Operation')}</th>}
+                    {visibleStockColumns.deviceId && <th className="py-4 px-5 font-semibold min-w-[160px]">Device SN</th>}
+                    {visibleStockColumns.deviceType && <th className="py-4 px-5 font-semibold min-w-[190px]">Device Type</th>}
+                    {visibleStockColumns.supplier && <th className="py-4 px-4 font-semibold min-w-[120px]">Supplier</th>}
+                    {visibleStockColumns.price && <th className="py-4 px-5 font-semibold text-center min-w-[95px]">Price</th>}
+                    {visibleStockColumns.intakeDate && <th className="py-4 px-5 font-semibold min-w-[130px]">Registration Date</th>}
+                    {visibleStockColumns.notes && <th className="py-4 px-5 font-semibold min-w-[200px]">Warehouse / Deployment Notes</th>}
+                    {visibleStockColumns.operation && <th className="py-4 px-5 font-semibold text-center min-w-[180px]">Operation</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
@@ -4048,6 +4049,7 @@ export default function AdminDashboard() {
                             )}
                           </button>
                         </td>
+
                         {/* Device ID (SN) */}
                         {visibleStockColumns.deviceId && (
                           <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white">
@@ -4058,14 +4060,8 @@ export default function AdminDashboard() {
                         {/* Device Type */}
                         {visibleStockColumns.deviceType && (
                           <td className="py-3.5 px-3">
-                            <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1.5 whitespace-nowrap ${
-                              (d.device_type === 'Display Soundbox' || String(d.device_type || '').toLowerCase().includes('display') || String(d.device_type || '').toLowerCase().includes('screen'))
-                                ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
-                                : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                            }`}>
-                              {(d.device_type === 'Display Soundbox' || String(d.device_type || '').toLowerCase().includes('display') || String(d.device_type || '').toLowerCase().includes('screen'))
-                                ? t('displayScreenQr', 'Display (Screen QR)')
-                                : t('standardPrintedQr', 'Standard (Printed QR)')}
+                            <span className="px-3 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1.5 whitespace-nowrap bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                              🏷️ {d.device_model || 'Standard (Printed QR)'}
                             </span>
                           </td>
                         )}
@@ -4073,34 +4069,34 @@ export default function AdminDashboard() {
                         {/* Supplier */}
                         {visibleStockColumns.supplier && (
                           <td className="py-3.5 px-4 font-semibold text-xs">
-                            <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1 whitespace-nowrap ${
+                            <span className={`px-3 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1 whitespace-nowrap ${
                               (d.supplier || 'Feishu').toLowerCase() === 'hemi'
-                                ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                                : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
+                                ? 'bg-amber-500 text-white dark:bg-amber-600'
+                                : 'bg-indigo-900 text-white dark:bg-indigo-800'
                             }`}>
-                              {(d.supplier || 'Feishu').toLowerCase() === 'hemi' ? 'Hemi' : 'Feishu'}
+                              {d.supplier || 'Feishu'}
                             </span>
                           </td>
                         )}
 
                         {/* Unit Price */}
                         {visibleStockColumns.price && (
-                          <td className="py-3.5 px-3 text-center font-mono font-bold text-slate-800 dark:text-slate-200">
+                          <td className="py-3.5 px-3 text-center font-mono font-bold text-slate-900 dark:text-white">
                             ${Number(d.price || 29).toFixed(2)}
                           </td>
                         )}
 
                         {/* Registration Date */}
                         {visibleStockColumns.intakeDate && (
-                          <td className="py-3.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                            {d.created_at ? new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Aug 30, 2026'}
+                          <td className="py-3.5 px-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                            {d.created_at ? new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Sep 13, 2026'}
                           </td>
                         )}
 
                         {/* Warehouse Notes */}
                         {visibleStockColumns.notes && (
                           <td className="py-3.5 px-3 text-slate-600 dark:text-slate-400 max-w-[220px] truncate" title={d.notes}>
-                            {d.notes || t('warehouseReadyTested', 'Warehouse Ready (Tested)')}
+                            {d.notes || 'Warehouse Ready (Tested)'}
                           </td>
                         )}
 
@@ -4111,26 +4107,26 @@ export default function AdminDashboard() {
                               <button
                                 type="button"
                                 onClick={() => openSellStockModal(d)}
-                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer shadow-2xs"
                               >
-                                <span>{t('sellDevice', 'Sell')}</span>
+                                Sell
                               </button>
 
                               <button
                                 type="button"
                                 onClick={() => openEditDeviceModal(d)}
-                                className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                                className="px-3 py-1 bg-blue-900 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold transition cursor-pointer shadow-2xs"
                               >
-                                <span>{t('edit', 'Edit')}</span>
+                                Edit
                               </button>
 
                               <button
                                 type="button"
                                 onClick={() => openDeleteDeviceModal(d)}
-                                className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                                title={t('delete', 'Delete')}
+                                className="px-3 py-1 bg-rose-900 hover:bg-rose-800 text-white rounded-lg text-xs font-semibold transition cursor-pointer shadow-2xs"
+                                title="Delete"
                               >
-                                <span>{t('delete', 'Delete')}</span>
+                                Delete
                               </button>
                             </div>
                           </td>
@@ -4140,7 +4136,7 @@ export default function AdminDashboard() {
                   ) : (
                     <tr>
                       <td colSpan={12} className="py-12 text-center text-slate-400 text-sm">
-                        No warehouse stock items match the specified filters.
+                        No grouped warehouse stock items match the specified filters.
                       </td>
                     </tr>
                   )}
