@@ -97,6 +97,21 @@ CREATE INDEX idx_logs_serial ON inventory_logs(inventory_serial_id);
 ALTER TABLE inventory_serials 
 ADD COLUMN purchase_price NUMERIC(10,2) DEFAULT 0.00;
 
+
+ALTER TABLE inventory_serials
+ADD COLUMN branch_id BIGINT REFERENCES branches(branch_id);
+
+ALTER TABLE pos_invoices
+ADD COLUMN branch_id BIGINT REFERENCES branches(branch_id) NOT NULL;
+
+
+ALTER TABLE inventory_logs 
+ADD COLUMN branch_id INTEGER REFERENCES branches(branch_id);
+
+
+ALTER TABLE products 
+ADD COLUMN is_order INTEGER ;
+
 ---------
 INSERT INTO inventory_serials (product_id, serial_number, warehouse_location, purchase_price) 
 VALUES 
@@ -365,3 +380,82 @@ SELECT
 FROM SalesSummary s
 FULL OUTER JOIN AdjustmentSummary a ON s.report_month = a.report_month
 ORDER BY month DESC;
+
+-------
+
+មើលស្តុកផលិតផលទាំងអស់ នៅក្នុង "សាខា A"
+
+
+
+SELECT 
+    b.branch_name,
+    p.sku,
+    p.name AS product_name,
+    COUNT(s.id) AS stock_qty
+FROM inventory_serials s
+JOIN products p ON s.product_id = p.id
+JOIN branches b ON s.branch_id = b.branch_id
+WHERE s.status = 'IN_STOCK' 
+  AND b.branch_name = 'Branch A' -- ប្តូរឈ្មោះសាខា ឬប្រើ b.branch_id = 1
+GROUP BY b.branch_name, p.sku, p.name
+ORDER BY p.name;
+
+
+---
+មើលស្តុកផលិតផលទាំងអស់ នៅក្នុង "សាខា B"
+
+SELECT 
+    b.branch_name,
+    p.sku,
+    p.name AS product_name,
+    COUNT(s.id) AS stock_qty
+FROM inventory_serials s
+JOIN products p ON s.product_id = p.id
+JOIN branches b ON s.branch_id = b.branch_id
+WHERE s.status = 'IN_STOCK' 
+  AND b.branch_name = 'Branch B' -- ប្តូរទៅ Branch B
+GROUP BY b.branch_name, p.sku, p.name
+ORDER BY p.name;
+
+
+----
+របៀបមើលស្តុកគ្រប់សាខាទាំងអស់ក្នុងពេលតែមួយ (ងាយស្រួលប្រៀបធៀប)
+
+
+SELECT 
+    p.name AS product_name,
+    b.branch_name,
+    COUNT(s.id) AS stock_qty
+FROM inventory_serials s
+JOIN products p ON s.product_id = p.id
+JOIN branches b ON s.branch_id = b.branch_id
+WHERE s.status = 'IN_STOCK'
+GROUP BY p.name, b.branch_name
+ORDER BY p.name, b.branch_name;
+
+
+---------
+
+
+របៀបឆែកមើលថាតើទំនិញ (Serial Number ណាមួយ) នៅសល់ធានាឬអត់
+
+
+SELECT 
+    s.serial_number,
+    s.status AS inventory_status,
+    p.name AS product_name,
+    COALESCE(i.receipt_no, 'គ្មានវិក្កយបត្រ (មិនទាន់លក់)') AS receipt_no,
+    pii.warranty_start_date,
+    pii.warranty_end_date,
+    CASE 
+        WHEN s.status = 'IN_STOCK' THEN 'ទំនិញថ្មីក្នុងស្តុក (មិនទាន់លក់)'
+        WHEN s.status = 'DEFECTIVE' THEN 'ទំនិញខូច (Defective)'
+        WHEN s.status = 'SOLD' AND pii.warranty_end_date >= CURRENT_DATE THEN 'ស្ថិតក្នុងរយៈពេលធានា (Under Warranty)'
+        WHEN s.status = 'SOLD' AND pii.warranty_end_date < CURRENT_DATE THEN 'អស់សុពលភាពធានា (Expired)'
+        ELSE 'មិនមានទិន្នន័យធានា'
+    END AS evaluation_result
+FROM inventory_serials s
+JOIN products p ON s.product_id = p.id
+LEFT JOIN pos_invoice_items pii ON s.id = pii.inventory_serial_id
+LEFT JOIN pos_invoices i ON pii.invoice_id = i.id
+WHERE s.serial_number = 'SN-PRO-006'; -- ប្តូរជា Serial Number ជាក់ស្តែងដែលចង់ឆែក

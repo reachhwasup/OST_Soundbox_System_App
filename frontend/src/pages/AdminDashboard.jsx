@@ -4017,13 +4017,10 @@ export default function AdminDashboard() {
                         )}
                       </button>
                     </th>
-                    {visibleStockColumns.deviceId && <th className="py-4 px-5 font-semibold min-w-[160px]">Device SN</th>}
-                    {visibleStockColumns.deviceType && <th className="py-4 px-5 font-semibold min-w-[190px]">Device Type</th>}
-                    {visibleStockColumns.supplier && <th className="py-4 px-4 font-semibold min-w-[120px]">Supplier</th>}
+                    {visibleStockColumns.productname && <th className="py-4 px-5 font-semibold min-w-[160px]">Product Name</th>}
+                    {visibleStockColumns.puantity && <th className="py-4 px-5 font-semibold min-w-[190px]">Quantity</th>}
                     {visibleStockColumns.price && <th className="py-4 px-5 font-semibold text-center min-w-[95px]">Price</th>}
-                    {visibleStockColumns.intakeDate && <th className="py-4 px-5 font-semibold min-w-[130px]">Registration Date</th>}
-                    {visibleStockColumns.notes && <th className="py-4 px-5 font-semibold min-w-[200px]">Warehouse / Deployment Notes</th>}
-                    {visibleStockColumns.operation && <th className="py-4 px-5 font-semibold text-center min-w-[180px]">Operation</th>}
+                    {visibleStockColumns.branchname && <th className="py-4 px-5 font-semibold min-w-[130px]">Branch Name</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
