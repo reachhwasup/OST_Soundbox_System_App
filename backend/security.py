@@ -10,7 +10,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "soundbox-secret-key-change-in-production-2026-xyz-security")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "")
+if len(SECRET_KEY) < 32:
+    raise RuntimeError("JWT_SECRET_KEY must be configured with at least 32 random characters.")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 7
 
@@ -75,7 +77,7 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
 def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
     """Decodes and validates a JWT token."""
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"require": ["exp", "iat", "sub"]})
         return payload
     except jwt.PyJWTError:
         return None
@@ -101,37 +103,25 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user_id = payload.get("user_id") or payload.get("id")
-    sub_val = payload.get("sub")
-    phone_val = payload.get("phone_number")
+    subject = payload["sub"]
+    if not isinstance(subject, str) or not subject.isascii() or not subject.isdigit():
+        raise HTTPException(status_code=401, detail="Invalid authentication subject.")
+    user_id = int(subject)
+    if user_id < 1 or user_id > 2147483647:
+        raise HTTPException(status_code=401, detail="Invalid authentication subject.")
+
+    user_cols = """
+        u.id, u.phone_number, u.full_name, u.role, u.status, u.is_active, u.last_login_at, u.created_at, u.updated_at,
+        u.branch_id, b.branch_name, b.branch_code,
+        COALESCE(u.permissions, '{"tabs": ["all"], "crud": ["all"]}'::jsonb) AS permissions
+    """
+    user_from = "FROM users u LEFT JOIN branches b ON u.branch_id = b.branch_id"
 
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        user = None
-        if user_id is not None and str(user_id).isdigit():
-            user = await conn.fetchrow(
-                """
-                SELECT id, phone_number, full_name, role, status, last_login_at, created_at, updated_at
-                FROM users WHERE id = $1
-                """,
-                int(user_id)
-            )
-
-        if not user and sub_val:
-            if str(sub_val).isdigit() and len(str(sub_val)) <= 8:
-                # Could be integer ID
-                user = await conn.fetchrow(
-                    "SELECT id, phone_number, full_name, role, status, last_login_at, created_at, updated_at FROM users WHERE id = $1",
-                    int(sub_val)
-                )
-
-        if not user:
-            lookup_phone = phone_val or (str(sub_val) if sub_val and not str(sub_val).isdigit() or len(str(sub_val)) >= 9 else None)
-            if lookup_phone:
-                user = await conn.fetchrow(
-                    "SELECT id, phone_number, full_name, role, status, last_login_at, created_at, updated_at FROM users WHERE phone_number = $1",
-                    lookup_phone
-                )
+        user = await conn.fetchrow(
+            f"SELECT {user_cols} {user_from} WHERE u.id = $1", user_id
+        )
 
     if not user:
         raise HTTPException(
@@ -141,7 +131,7 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
         )
 
     user_dict = dict(user)
-    if user_dict["status"] == "SUSPENDED":
+    if user_dict.get("is_active") is False or user_dict["status"] != "ACTIVE":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This account has been suspended. Please contact administrator.",
@@ -158,3 +148,65 @@ async def require_admin(current_user: Dict[str, Any] = Depends(get_current_user)
             detail="Administrative privileges required for this action.",
         )
     return current_user
+
+
+def can_view_cost(user: Dict[str, Any]) -> bool:
+    """
+    Supplier cost (base price, stock value) is visible to super admins (no branch) and to users whose
+    permissions.crud contains "all" or "view_cost".
+    """
+    if not user or user.get("role") != "ADMIN":
+        return False
+    if user.get("branch_id") is None:
+        return True
+    perms = user.get("permissions") or {}
+    if isinstance(perms, str):
+        import json
+        try:
+            perms = json.loads(perms)
+        except Exception:
+            perms = {}
+    crud = perms.get("crud") or []
+    return "all" in crud or "view_cost" in crud
+
+
+def require_permission(perm: str):
+    """FastAPI dependency to verify if user has specific CRUD or action permission."""
+    async def permission_checker(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+        perms = current_user.get("permissions") or {}
+        if isinstance(perms, str):
+            import json
+            try:
+                perms = json.loads(perms)
+            except Exception:
+                perms = {}
+        crud = perms.get("crud", [])
+        if "all" in crud or perm in crud or (current_user.get("role") == "ADMIN" and (not crud or "all" in crud)):
+            return current_user
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Action forbidden: '{perm}' permission required."
+        )
+    return permission_checker
+
+
+
+def check_account_management(actor, target=None, action="update"):
+    """Enforce account administration scope independently of UI visibility."""
+    if actor.get("role") != "ADMIN":
+        raise HTTPException(status_code=403, detail="Administrative privileges required.")
+    branch = actor.get("branch_id")
+    if branch is None:
+        return
+    import json
+    permissions = actor.get("permissions") or {}
+    if isinstance(permissions, str):
+        try:
+            permissions = json.loads(permissions)
+        except (ValueError, TypeError):
+            permissions = {}
+    crud = permissions.get("crud", []) if isinstance(permissions, dict) else []
+    if "all" not in crud and action not in crud:
+        raise HTTPException(status_code=403, detail="Account management permission required.")
+    if target is not None and target.get("branch_id") != branch:
+        raise HTTPException(status_code=403, detail="Account is outside your branch.")

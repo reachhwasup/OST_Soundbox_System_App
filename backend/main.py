@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.database import init_db, get_db_pool
-from backend.routers import auth, stores, devices, admin, suppliers, sales
+from backend.routers import auth, stores, devices, admin, suppliers, sales, branches, products
 
 # --- LOGGING CONFIGURATION ---
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -46,8 +46,10 @@ app = FastAPI(
 # --- CORS MIDDLEWARE ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=[origin.strip() for origin in os.getenv(
+        "CORS_ALLOWED_ORIGINS", "http://localhost:5175,http://127.0.0.1:5175"
+    ).split(",") if origin.strip()],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -59,6 +61,8 @@ app.include_router(devices.router)
 app.include_router(admin.router)
 app.include_router(suppliers.router)
 app.include_router(sales.router)
+app.include_router(branches.router)
+app.include_router(products.router)
 
 
 @app.get("/health", tags=["System"])

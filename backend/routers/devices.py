@@ -6,6 +6,16 @@ from datetime import datetime, timedelta, timezone
 
 from backend.database import get_db_pool
 from backend.security import get_current_user
+from backend.device_types import (
+    DEVICE_TYPE_COLUMNS_SQL,
+    has_screen,
+    DEVICE_TYPE_JOIN_SQL,
+    get_product_type,
+    resolve_product_id,
+    resolve_product_id_for_serial,
+)
+from backend.services import stock as stock_service
+from backend.services.warranty import resolve_warranty
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +33,7 @@ class DeviceRegisterSchema(BaseModel):
     discount_amount: Optional[float] = 0.00
     discount_percent: Optional[float] = 0.00
     final_price: Optional[float] = None
-    warranty_days: Optional[int] = 90
+    warranty_days: Optional[int] = None  # omit to use the product's warranty
     warranty_start_date: Optional[str] = None
     warranty_end_date: Optional[str] = None
 
@@ -36,13 +46,109 @@ class BatchDeviceItem(BaseModel):
     price: Optional[float] = 29.00
     discount_amount: Optional[float] = 0.00
     discount_percent: Optional[float] = 0.00
-    warranty_days: Optional[int] = 90
+    warranty_days: Optional[int] = None  # omit to use the product's warranty
 
 
 class DeviceBatchRegisterSchema(BaseModel):
     merchant_id: Union[int, str]
     devices: List[BatchDeviceItem]
     telegram_chat_id: Optional[str] = None
+
+
+async def record_device_deployment(
+    conn,
+    device_id: int,
+    device_sn: str,
+    merchant: dict,
+    current_user: dict,
+    base_price: float,
+    discount_percent: float,
+    discount_amount: float,
+    warranty_days: Optional[int],
+    start_dt: datetime,
+    branch_id: Optional[int] = None,
+    product_id: Optional[int] = None
+):
+    """Records device deployment as a sale: pos_invoices + items, inventory_serials (SOLD), inventory_logs."""
+    try:
+        # Branch: explicit, then the user's, then the device's own branch, then the first branch
+        user_branch = branch_id or current_user.get("branch_id")
+        if not user_branch:
+            user_branch = await conn.fetchval("SELECT branch_id FROM devices WHERE id = $1", device_id)
+        if not user_branch:
+            user_branch = await conn.fetchval("SELECT branch_id FROM branches ORDER BY branch_id ASC LIMIT 1") or 1
+
+        # Make sure device is linked to its product and branch
+        await conn.execute("""
+            UPDATE devices SET
+                product_id = COALESCE($1, product_id),
+                branch_id = COALESCE(branch_id, $2)
+            WHERE id = $3
+        """, product_id, user_branch, device_id)
+
+        # Product: from the serial's stock intake, else the device's own product
+        linked_product_id = product_id or await conn.fetchval("SELECT product_id FROM devices WHERE id = $1", device_id)
+        product_id = await resolve_product_id_for_serial(conn, device_sn, linked_product_id) or 1
+
+        # Warranty follows the product unless the request overrides it
+        end_dt, _ = await resolve_warranty(conn, product_id=product_id, start=start_dt, warranty_days=warranty_days)
+
+        ref_no = f"DEP-{device_sn[:8]}-{int(start_dt.timestamp())}"
+        merchant_name = merchant.get("name") or "Merchant"
+        remarks_str = f"Payment: CASH | Customer: {merchant_name} | Phone: {merchant.get('owner_phone') or 'N/A'} | Deployed to Merchant ID {merchant.get('id')}"
+
+        # Stock OUT movement, inventory serial SOLD, audit log
+        clean_start = start_dt.replace(tzinfo=None) if getattr(start_dt, "tzinfo", None) else start_dt
+        await stock_service.record_stock_out(
+            conn,
+            serial=device_sn,
+            product_id=product_id,
+            branch_id=user_branch,
+            # unit_price is the final price: what the customer actually pays
+            unit_price=max(float(base_price) - float(discount_amount or 0), 0.0),
+            discount_percent=discount_percent,
+            discount_amount=discount_amount,
+            reference_no=ref_no,
+            warranty_end=end_dt.date(),
+            remarks=remarks_str,
+            warranty_start=clean_start,
+            moved_at=clean_start,
+            changed_by=current_user.get("id"),
+            log_note=f"Device deployed to merchant {merchant_name} (Ref: {ref_no})",
+            customer_name=merchant_name,
+            customer_phone=merchant.get("owner_phone"),
+        )
+
+    except Exception as e:
+        logger.warning(f"Failed to record deployment transaction for {device_sn}: {e}")
+
+
+async def _link_product_id(conn, existing_device_id: Optional[int], device_type: Optional[str], device_model: Optional[str]) -> Optional[int]:
+    """Product (device type) for a link/register request, keeping the existing device's supplier."""
+    supplier_id = None
+    if existing_device_id:
+        supplier_id = await conn.fetchval("""
+            SELECT p.supplier_id FROM devices d
+            JOIN products p ON p.id = d.product_id
+            WHERE d.id = $1
+        """, existing_device_id)
+    return await resolve_product_id(conn, device_type, device_model, supplier_id)
+
+
+DEVICE_STATUSES = {"ACTIVE", "INACTIVE", "MAINTENANCE", "IN_STOCK", "PENDING", "RETIRED"}
+
+
+async def resolve_merchant_pk(conn, merchant_ref: Union[int, str, None]) -> Optional[int]:
+    """Store reference (merchants.id or its merchant code) -> merchants.id. 404 when unknown."""
+    if merchant_ref is None or str(merchant_ref).strip() == "":
+        return None
+    pk = await conn.fetchval(
+        "SELECT id FROM merchants WHERE id::text = $1 OR merchant_id::text = $1 ORDER BY (id::text = $1) DESC LIMIT 1",
+        str(merchant_ref).strip()
+    )
+    if pk is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Store/Merchant not found.")
+    return pk
 
 
 @router.post("/register-batch", status_code=status.HTTP_201_CREATED)
@@ -63,34 +169,11 @@ async def register_devices_batch(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Store/Merchant not found.")
 
         if current_user["role"] != "ADMIN":
-            if merchant["user_id"] != current_user["id"] and merchant["owner_phone"] != current_user["phone_number"]:
+            if merchant["user_id"] != current_user["id"]:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not own this store.")
 
-        # Ensure schema integrity
-        try:
-            await conn.execute("""
-                ALTER TABLE devices DROP CONSTRAINT IF EXISTS devices_merchant_id_fkey;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_type VARCHAR(100) DEFAULT 'Display Soundbox';
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_model VARCHAR(100) DEFAULT 'Y6B';
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(255);
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS qr_code TEXT;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'ACTIVE';
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
-            """)
-        except Exception as mig_err:
-            logger.warning(f"Schema check in register_devices_batch: {mig_err}")
 
-        col_type = await conn.fetchval("""
-            SELECT data_type 
-            FROM information_schema.columns 
-            WHERE table_name = 'devices' AND column_name = 'merchant_id'
-        """)
-        if col_type in ('integer', 'bigint', 'smallint'):
-            m_id_target = int(payload.merchant_id)
-        else:
-            m_id_target = str(payload.merchant_id)
+        m_id_target = merchant["id"]
 
         chat_id = payload.telegram_chat_id.strip() if payload.telegram_chat_id and payload.telegram_chat_id.strip() else None
         linked_results = []
@@ -107,29 +190,27 @@ async def register_devices_batch(
             if item.discount_percent and float(item.discount_percent) > 0:
                 disc_amt = (float(item.discount_percent) / 100.0) * base_price
             calc_final_price = max(0.0, base_price - disc_amt)
-            w_days = int(item.warranty_days or 90)
-            now_dt = datetime.now(timezone.utc)
-            w_end_dt = now_dt + timedelta(days=w_days)
+            now_dt = datetime.now()
 
             try:
                 existing = await conn.fetchrow(
-                    "SELECT id, merchant_id, status FROM devices WHERE device_sn = $1",
+                    "SELECT id, merchant_id, status FROM devices WHERE device_id = $1 ORDER BY id DESC LIMIT 1",
                     dev_sn
                 )
+                type_id = await _link_product_id(conn, existing["id"] if existing else None, item.device_type, item.device_model)
                 if existing:
                     dev_id = existing["id"]
                     try:
                         await conn.execute("""
-                            UPDATE devices 
-                            SET merchant_id = $1, telegram_chat_id = $2, device_type = $3, device_model = $4, 
-                                price = $5, qr_code = COALESCE($6, qr_code),
+                            UPDATE devices
+                            SET merchant_id = $1, telegram_chat_id = $2, product_id = $3,
+                                price = $4, qr_code = COALESCE($5, qr_code),
                                 status = 'ACTIVE', is_active = TRUE, updated_at = CURRENT_TIMESTAMP
-                            WHERE id = $7
-                        """, m_id_target, chat_id, item.device_type or "Display Soundbox", item.device_model or "Display Soundbox", 
-                           base_price, qr_val, dev_id)
+                            WHERE id = $6
+                        """, m_id_target, chat_id, type_id, base_price, qr_val, dev_id)
                     except Exception:
                         await conn.execute("""
-                            UPDATE devices 
+                            UPDATE devices
                             SET merchant_id = $1, telegram_chat_id = $2, qr_code = COALESCE($3, qr_code), status = 'ACTIVE', is_active = TRUE, updated_at = CURRENT_TIMESTAMP
                             WHERE id = $4
                         """, m_id_target, chat_id, qr_val, dev_id)
@@ -137,39 +218,28 @@ async def register_devices_batch(
                     try:
                         dev_id = await conn.fetchval("""
                             INSERT INTO devices (
-                                merchant_id, device_sn, device_type, device_model, telegram_chat_id, 
+                                merchant_id, device_id, product_id, telegram_chat_id,
                                 price, qr_code, status, is_active
                             )
-                            VALUES ($1, $2, $3, $4, $5, $6, $7, 'ACTIVE', TRUE)
+                            VALUES ($1, $2, $3, $4, $5, $6, 'ACTIVE', TRUE)
                             RETURNING id
-                        """, m_id_target, dev_sn, item.device_type or "Display Soundbox", item.device_model or "Display Soundbox", chat_id, 
-                           base_price, qr_val)
+                        """, m_id_target, dev_sn, type_id, chat_id, base_price, qr_val)
                     except Exception:
                         dev_id = await conn.fetchval("""
                             INSERT INTO devices (
-                                merchant_id, device_sn, device_type, telegram_chat_id, qr_code, status, is_active
+                                merchant_id, device_id, product_id, telegram_chat_id, qr_code, status, is_active
                             )
                             VALUES ($1, $2, $3, $4, $5, 'ACTIVE', TRUE)
                             RETURNING id
-                        """, m_id_target, dev_sn, item.device_type or "Display Soundbox", chat_id, qr_val)
+                        """, m_id_target, dev_sn, type_id, chat_id, qr_val)
 
-                # Record sales record
-                try:
-                    await conn.execute("""
-                        INSERT INTO sales (
-                            device_id, device_sn, merchant_id, sold_by_user_id,
-                            customer_name, customer_phone, price, discount_type,
-                            discount_percent, discount_amount, final_price, currency,
-                            warranty_days, warranty_start_date, warranty_end_date,
-                            payment_method, status
-                        )
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, 'PERCENTAGE', $8, $9, $10, 'USD', $11, $12, $13, 'CASH', 'COMPLETED')
-                    """, dev_id, dev_sn, merchant["id"], current_user.get("id"),
-                       merchant.get("name") or "Merchant", merchant.get("owner_phone"), base_price,
-                       float(item.discount_percent or 0.0), disc_amt, calc_final_price,
-                       w_days, now_dt, w_end_dt)
-                except Exception as sale_err:
-                    logger.warning(f"Batch sale insert warning for {dev_sn}: {sale_err}")
+                # Record deployment as a sale: invoice, serial marked SOLD, audit log
+                await record_device_deployment(
+                    conn, dev_id, dev_sn, merchant, current_user, base_price,
+                    float(item.discount_percent or 0.0), disc_amt, item.warranty_days, now_dt,
+                    branch_id=current_user.get("branch_id"),
+                    product_id=type_id
+                )
 
                 linked_results.append({
                     "device_sn": dev_sn,
@@ -209,7 +279,7 @@ async def register_device(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Store/Merchant not found.")
 
         if current_user["role"] != "ADMIN":
-            if merchant["user_id"] != current_user["id"] and merchant["owner_phone"] != current_user["phone_number"]:
+            if merchant["user_id"] != current_user["id"]:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not own this store.")
 
         device_sn = payload.device_sn.strip()
@@ -218,39 +288,17 @@ async def register_device(
 
         # Check if device_sn already registered
         existing_device = await conn.fetchrow(
-            "SELECT id, merchant_id, status FROM devices WHERE device_sn = $1",
+            "SELECT id, merchant_id, status FROM devices WHERE device_id = $1 ORDER BY id DESC LIMIT 1",
             device_sn
         )
 
         chat_id = payload.telegram_chat_id.strip() if payload.telegram_chat_id and payload.telegram_chat_id.strip() else None
         qr_code_val = payload.qr_code.strip() if payload.qr_code and payload.qr_code.strip() else None
 
-        # Eager schema migration to ensure all core hardware columns exist
-        try:
-            await conn.execute("""
-                ALTER TABLE devices DROP CONSTRAINT IF EXISTS devices_merchant_id_fkey;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_type VARCHAR(100) DEFAULT 'Display Soundbox';
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_model VARCHAR(100) DEFAULT 'Y6B';
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(255);
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS qr_code TEXT;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'ACTIVE';
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
-            """)
-        except Exception as mig_err:
-            logger.warning(f"Schema migration warning in register_device: {mig_err}")
 
-        # Check merchant_id column datatype in devices table to avoid asyncpg DataError
-        col_type = await conn.fetchval("""
-            SELECT data_type 
-            FROM information_schema.columns 
-            WHERE table_name = 'devices' AND column_name = 'merchant_id'
-        """)
-        if col_type in ('integer', 'bigint', 'smallint'):
-            m_id_target = int(payload.merchant_id)
-        else:
-            m_id_target = str(payload.merchant_id)
+        type_id = await _link_product_id(conn, existing_device["id"] if existing_device else None, payload.device_type, payload.device_model)
+
+        m_id_target = merchant["id"]
 
         # Base price and discount calculation for sales recording
         base_price = float(payload.price or 29.00)
@@ -258,22 +306,19 @@ async def register_device(
         if payload.discount_percent and float(payload.discount_percent) > 0:
             disc_amt = (float(payload.discount_percent) / 100.0) * base_price
         calc_final_price = max(0.0, base_price - disc_amt)
-        w_days = int(payload.warranty_days or 90)
-        now_dt = datetime.now(timezone.utc)
-        w_end_dt = now_dt + timedelta(days=w_days)
+        now_dt = datetime.now()
 
         if existing_device:
             dev_id = existing_device["id"]
             # Reassign / link to this merchant and activate hardware
             try:
                 await conn.execute("""
-                    UPDATE devices 
-                    SET merchant_id = $1, telegram_chat_id = $2, device_type = $3, device_model = $4, 
-                        price = $5, qr_code = COALESCE($6, qr_code),
+                    UPDATE devices
+                    SET merchant_id = $1, telegram_chat_id = $2, product_id = $3,
+                        price = $4, qr_code = COALESCE($5, qr_code),
                         status = 'ACTIVE', is_active = TRUE, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $7
-                """, m_id_target, chat_id, payload.device_type or "Display Soundbox", payload.device_model or "Display Soundbox", 
-                   base_price, qr_code_val, dev_id)
+                    WHERE id = $6
+                """, m_id_target, chat_id, type_id, base_price, qr_code_val, dev_id)
             except Exception as update_err:
                 logger.warning(f"Full device link update failed: {update_err}. Running minimal fallback...")
                 try:
@@ -286,23 +331,13 @@ async def register_device(
                     logger.error(f"Device link update completely failed: {final_update_err}", exc_info=True)
                     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to link device: {str(final_update_err)}")
 
-            # Record commercial sale transaction in sales table
-            try:
-                await conn.execute("""
-                    INSERT INTO sales (
-                        device_id, device_sn, merchant_id, sold_by_user_id,
-                        customer_name, customer_phone, price, discount_type,
-                        discount_percent, discount_amount, final_price, currency,
-                        warranty_days, warranty_start_date, warranty_end_date,
-                        payment_method, status
-                    )
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, 'PERCENTAGE', $8, $9, $10, 'USD', $11, $12, $13, 'CASH', 'COMPLETED')
-                """, dev_id, device_sn, merchant["id"], current_user.get("id"),
-                   merchant.get("name") or "Merchant", merchant.get("owner_phone"), base_price,
-                   float(payload.discount_percent or 0.0), disc_amt, calc_final_price,
-                   w_days, now_dt, w_end_dt)
-            except Exception as sale_err:
-                logger.warning(f"Could not auto-insert sale record during device link: {sale_err}")
+            # Record deployment as a sale: invoice, serial marked SOLD, audit log
+            await record_device_deployment(
+                conn, dev_id, device_sn, merchant, current_user, base_price,
+                float(payload.discount_percent or 0.0), disc_amt, payload.warranty_days, now_dt,
+                branch_id=current_user.get("branch_id"),
+                product_id=type_id
+            )
 
             return {
                 "status": "success",
@@ -314,60 +349,39 @@ async def register_device(
             try:
                 new_id = await conn.fetchval("""
                     INSERT INTO devices (
-                        merchant_id, device_sn, device_type, device_model, telegram_chat_id, 
+                        merchant_id, device_id, product_id, telegram_chat_id,
                         price, qr_code, status, is_active
                     )
                     VALUES (
-                        $1, $2, $3, $4, $5, 
-                        $6, $7, 'ACTIVE', TRUE
+                        $1, $2, $3, $4,
+                        $5, $6, 'ACTIVE', TRUE
                     )
                     RETURNING id
-                """, m_id_target, device_sn, payload.device_type or "Display Soundbox", payload.device_model or "Display Soundbox", chat_id, 
-                   base_price, qr_code_val)
+                """, m_id_target, device_sn, type_id, chat_id, base_price, qr_code_val)
             except Exception as insert_err:
                 logger.warning(f"Standard device link insert failed: {insert_err}. Retrying with fallback schema...")
                 try:
                     new_id = await conn.fetchval("""
                         INSERT INTO devices (
-                            merchant_id, device_sn, device_type, telegram_chat_id, qr_code, status, is_active
+                            merchant_id, device_id, product_id, telegram_chat_id, qr_code, status, is_active
                         )
                         VALUES ($1, $2, $3, $4, $5, 'ACTIVE', TRUE)
                         RETURNING id
-                    """, m_id_target, device_sn, payload.device_type or "Display Soundbox", chat_id, qr_code_val)
-                except Exception as fallback_err:
-                    alt_m_id = str(payload.merchant_id) if isinstance(m_id_target, int) else (int(payload.merchant_id) if str(payload.merchant_id).isdigit() else payload.merchant_id)
-                    try:
-                        new_id = await conn.fetchval("""
-                            INSERT INTO devices (
-                                merchant_id, device_sn, device_type, telegram_chat_id, qr_code, status, is_active
-                            )
-                            VALUES ($1, $2, $3, $4, $5, 'ACTIVE', TRUE)
-                            RETURNING id
-                        """, alt_m_id, device_sn, payload.device_type or "Display Soundbox", chat_id, qr_code_val)
-                    except Exception as final_err:
-                        logger.error(f"Device insert failed completely: {final_err}", exc_info=True)
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"Failed to link Soundbox: {str(final_err)}"
-                        )
-
-            # Record commercial sale transaction in sales table
-            try:
-                await conn.execute("""
-                    INSERT INTO sales (
-                        device_id, device_sn, merchant_id, sold_by_user_id,
-                        customer_name, customer_phone, price, discount_type,
-                        discount_percent, discount_amount, final_price, currency,
-                        warranty_days, warranty_start_date, warranty_end_date,
-                        payment_method, status
+                    """, m_id_target, device_sn, type_id, chat_id, qr_code_val)
+                except Exception as final_err:
+                    logger.error(f"Device insert failed completely: {final_err}", exc_info=True)
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Failed to link Soundbox: {str(final_err)}"
                     )
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, 'PERCENTAGE', $8, $9, $10, 'USD', $11, $12, $13, 'CASH', 'COMPLETED')
-                """, new_id, device_sn, merchant["id"], current_user.get("id"),
-                   merchant.get("name") or "Merchant", merchant.get("owner_phone"), base_price,
-                   float(payload.discount_percent or 0.0), disc_amt, calc_final_price,
-                   w_days, now_dt, w_end_dt)
-            except Exception as sale_err:
-                logger.warning(f"Could not auto-insert sale record during new device link: {sale_err}")
+
+            # Record deployment as a sale: invoice, serial marked SOLD, audit log
+            await record_device_deployment(
+                conn, new_id, device_sn, merchant, current_user, base_price,
+                float(payload.discount_percent or 0.0), disc_amt, payload.warranty_days, now_dt,
+                branch_id=current_user.get("branch_id"),
+                product_id=type_id
+            )
 
             return {
                 "status": "success",
@@ -377,47 +391,22 @@ async def register_device(
 
 
 async def resolve_supplier(conn, supplier_id: Optional[int] = None, supplier_name: Optional[str] = None) -> tuple:
-    """Helper to resolve supplier_id and supplier_name against the suppliers table with graceful fallback."""
-    try:
-        # Check if suppliers table exists; if not, create it
-        await conn.execute("""
-            CREATE TABLE IF NOT EXISTS suppliers (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(150) NOT NULL UNIQUE,
-                contact_person VARCHAR(150),
-                phone VARCHAR(50),
-                email VARCHAR(150),
-                address TEXT,
-                notes TEXT,
-                is_active BOOLEAN DEFAULT TRUE,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-            );
-            INSERT INTO suppliers (name, is_active)
-            VALUES ('Feishu', TRUE), ('Hemi', TRUE)
-            ON CONFLICT (name) DO NOTHING;
-        """)
-
-        if supplier_id:
-            row = await conn.fetchrow("SELECT id, name FROM suppliers WHERE id = $1", int(supplier_id))
-            if row:
-                return row["id"], row["name"]
-        name_clean = (supplier_name or "Feishu").strip()
-        if not name_clean:
-            name_clean = "Feishu"
-        row = await conn.fetchrow("SELECT id, name FROM suppliers WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))", name_clean)
-        if row:
-            return row["id"], row["name"]
-        # Fallback to Feishu
-        row = await conn.fetchrow("SELECT id, name FROM suppliers WHERE name = 'Feishu' LIMIT 1")
-        if row:
-            return row["id"], row["name"]
-        # If no suppliers table seed exists yet, auto-create
-        new_row = await conn.fetchrow("INSERT INTO suppliers (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET is_active = TRUE RETURNING id, name", name_clean)
-        return new_row["id"], new_row["name"]
-    except Exception as e:
-        logger.warning(f"Failed to resolve supplier ({e}), falling back to (None, 'Feishu')")
-        return None, "Feishu"
+    """
+    Resolves a supplier by id or name to (id, name). Returns (None, None) when neither is given.
+    An unknown id or name is rejected (400) instead of silently falling back to another supplier.
+    """
+    if supplier_id:
+        row = await conn.fetchrow("SELECT id, name FROM suppliers WHERE id = $1", int(supplier_id))
+        if not row:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Supplier ID {supplier_id} does not exist.")
+        return row["id"], row["name"]
+    name_clean = (supplier_name or "").strip()
+    if not name_clean:
+        return None, None
+    row = await conn.fetchrow("SELECT id, name FROM suppliers WHERE LOWER(TRIM(name)) = LOWER($1)", name_clean)
+    if not row:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Supplier '{name_clean}' does not exist.")
+    return row["id"], row["name"]
 
 
 @router.get("/lookup/{device_sn}")
@@ -432,16 +421,13 @@ async def lookup_device_by_sn(
     pool = await get_db_pool()
     async with pool.acquire() as conn:
         sn = device_sn.strip()
-        row = await conn.fetchrow("""
-            SELECT d.id, d.device_sn, 
-                   COALESCE(d.device_type, 'Display Soundbox') AS device_type,
-                   COALESCE(d.device_model, 'Y6B') AS device_model,
-                   d.qr_code, d.telegram_chat_id, d.status,
-                   d.supplier_id,
-                   COALESCE(s.name, 'Feishu') AS supplier
+        row = await conn.fetchrow(f"""
+            SELECT d.id, d.device_id AS device_sn,
+                   {DEVICE_TYPE_COLUMNS_SQL},
+                   d.qr_code, d.telegram_chat_id, d.status
             FROM devices d
-            LEFT JOIN suppliers s ON d.supplier_id = s.id
-            WHERE d.device_sn = $1 OR d.device_id = $1
+            {DEVICE_TYPE_JOIN_SQL}
+            WHERE d.device_id = $1
             ORDER BY d.id DESC
             LIMIT 1
         """, sn)
@@ -456,21 +442,15 @@ async def lookup_device_by_sn(
                 "qr_code": None,
                 "telegram_chat_id": None,
                 "status": None,
-                "supplier_id": 1,
-                "supplier": "Feishu"
+                "supplier_id": None,
+                "supplier": None
             }
 
         d_type = str(row["device_type"] or "Display Soundbox")
         d_model = str(row["device_model"] or "Y6B")
         
-        # Check if the device has an LCD screen (Display Soundbox)
-        has_lcd = (
-            "display" in d_type.lower() or 
-            "lcd" in d_type.lower() or 
-            "screen" in d_type.lower() or
-            "display" in d_model.lower() or
-            "lcd" in d_model.lower()
-        )
+        # Does the device have an LED screen? (a "None LED Screen" product does not)
+        has_lcd = has_screen(d_type, d_model)
 
         return {
             "found": True,
@@ -482,13 +462,13 @@ async def lookup_device_by_sn(
             "telegram_chat_id": row["telegram_chat_id"],
             "status": row["status"],
             "supplier_id": row["supplier_id"],
-            "supplier": row["supplier"] or "Feishu"
+            "supplier": row["supplier"]
         }
 
 
 @router.get("/")
 async def list_devices(
-    search: Optional[str] = Query(None, description="Search serial number, model, or supplier"),
+    search: Optional[str] = Query(None, description="Search serial number, model, telegram chat ID, or store name"),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     pool = await get_db_pool()
@@ -497,89 +477,108 @@ async def list_devices(
         params = []
         param_idx = 1
 
+        if current_user["role"] != "ADMIN":
+            where_clauses.append(f"m.user_id = ${param_idx}")
+            params.append(current_user["id"])
+            param_idx += 1
+
         if search and search.strip():
             s = f"%{search.strip()}%"
-            where_clauses.append(f"(p.item_code ILIKE ${param_idx} OR p.item_name ILIKE ${param_idx} OR s.name ILIKE ${param_idx})")
+            where_clauses.append(f"""(
+                d.device_id ILIKE ${param_idx}
+                OR d.telegram_chat_id ILIKE ${param_idx}
+                OR dp.device_model ILIKE ${param_idx}
+                OR dp.name ILIKE ${param_idx}
+                OR m.name ILIKE ${param_idx}
+                OR m.owner_phone ILIKE ${param_idx}
+            )""")
             params.append(s)
             param_idx += 1
 
         where_sql = " AND ".join(where_clauses)
 
-        # 1. សាកល្បង Query ជាមួយ Advanced Lateral Join
-        advanced_query = f"""
-            SELECT 
-                p.product_id AS id,
-                p.item_code AS device_id,
-                p.item_code AS device_sn,
-                'Soundbox' AS device_type,
-                p.item_name AS device_model,
-                COALESCE(p.selling_price, 29.00) AS price,
-                COALESCE(p.selling_price, 29.00) AS final_price,
-                COALESCE(p.warranty_months, 12) AS warranty_days,
-                p.supplier_id,
-                COALESCE(s.name, 'Feishu') AS supplier,
-                COALESCE(st.action_type::text, CASE WHEN p.is_active = TRUE THEN 'IN_STOCK' ELSE 'INACTIVE' END) AS status,
-                p.created_at AS last_time,
-                p.created_at AS created_at,
-                p.unit,
-                NULL AS notes
-            FROM products p
-            LEFT JOIN suppliers s ON p.supplier_id = s.id
+        query = f"""
+            SELECT d.id, 
+                   COALESCE(d.device_id, d.id::text) AS device_id,
+                   COALESCE(d.device_id, d.id::text) AS device_sn,
+                   {DEVICE_TYPE_COLUMNS_SQL},
+                   d.merchant_id,
+                   d.batch_no,
+                   d.notes,
+                   COALESCE(latest_sale.price, d.price, 29.00) AS price,
+                   COALESCE(latest_sale.discount_amount, 0.00) AS discount_amount,
+                   COALESCE(latest_sale.discount_percent, 0.00) AS discount_percent,
+                   COALESCE(latest_sale.final_price, d.price, 29.00) AS final_price,
+                   COALESCE(latest_sale.warranty_days, 90) AS warranty_days,
+                   latest_sale.warranty_start_date,
+                   latest_sale.warranty_end_date,
+                   d.telegram_chat_id,
+                   d.qr_code,
+                   COALESCE(NULLIF(d.status::text, ''), CASE WHEN d.merchant_id IS NULL THEN 'IN_STOCK' WHEN d.is_active = FALSE THEN 'Offline' ELSE 'Online' END, 'IN_STOCK') AS status,
+                   -- Prefer the gateway telemetry columns written on production
+                   COALESCE(d.battery_percentage::text || '%', d.battery, '100%') AS battery,
+                   COALESCE(d.signal, d.signal_strength::text, 'Good') AS signal,
+                   COALESCE(d.firmware_version_4g, d.version_4g, 'Y6_LCD_1605_V1.0') AS version_4g,
+                   COALESCE(d.firmware_version_wifi, d.version_wifi, 'esp32c2x_2M_OTA') AS version_wifi,
+                   COALESCE(d.last_seen_at, d.last_online, d.last_heartbeat, d.updated_at, d.created_at) AS last_time,
+                   COALESCE(d.last_seen_at, d.last_heartbeat, d.last_online) AS last_heartbeat,
+                   d.created_at,
+                   COALESCE(m.merchant_name, m.name) AS store_name,
+                   COALESCE(u.full_name, m.merchant_name, m.name) AS merchant_name,
+                   COALESCE(m.owner_phone, u.phone_number) AS owner_phone,
+                   COALESCE(u.phone_number, m.owner_phone) AS user_phone,
+                   COALESCE(u.full_name, m.merchant_name, m.name) AS owner_name
+            FROM devices d
+            {DEVICE_TYPE_JOIN_SQL}
             LEFT JOIN LATERAL (
-                SELECT st.action_type
-                FROM stock_transactions st
-                WHERE st.product_id = p.product_id
+                SELECT st.transaction_id AS id,
+                       -- unit_price is the final price; the price before discount adds it back
+                       (st.unit_price + COALESCE(st.discount_amount, 0.00)) AS price,
+                       st.discount_amount,
+                       st.discount_percent,
+                       st.unit_price AS final_price,
+                       COALESCE((st.warranty_expired_date - st.created_at::date), 90) AS warranty_days,
+                       st.created_at AS warranty_start_date,
+                       st.warranty_expired_date AS warranty_end_date
+                FROM v_sales st
+                WHERE st.serial_number = d.device_id
                 ORDER BY st.transaction_id DESC
                 LIMIT 1
-            ) st ON true
+            ) latest_sale ON true
+            LEFT JOIN merchants m ON (d.merchant_id::text = m.merchant_id::text OR d.merchant_id::text = m.id::text)
+            LEFT JOIN users u ON m.user_id = u.id OR (m.user_id IS NULL AND m.owner_phone = u.phone_number)
             WHERE {where_sql}
-            ORDER BY p.product_id DESC
+            ORDER BY d.id DESC
         """
 
-        try:
-            products = await conn.fetch(advanced_query, *params)
-        except Exception as e:
-            logger.warning(f"Advanced query failed: {e}. Falling back to basic products query...")
-            # 2. Fallback Query ប្រសិនបើតារាង stock_transactions មានបញ្ហា
-            basic_query = f"""
-                SELECT 
-                    p.product_id AS id,
-                    p.item_code AS device_id,
-                    p.item_code AS device_sn,
-                    'Soundbox' AS device_type,
-                    p.item_name AS device_model,
-                    COALESCE(p.selling_price, 29.00) AS price,
-                    COALESCE(p.selling_price, 29.00) AS final_price,
-                    COALESCE(p.warranty_months, 12) AS warranty_days,
-                    p.supplier_id,
-                    COALESCE(s.name, 'Feishu') AS supplier,
-                    CASE WHEN p.is_active = TRUE THEN 'IN_STOCK' ELSE 'INACTIVE' END AS status,
-                    p.created_at AS last_time,
-                    p.created_at AS created_at,
-                    p.unit,
-                    NULL AS notes
-                FROM products p
-                LEFT JOIN suppliers s ON p.supplier_id = s.id
-                WHERE {where_sql}
-                ORDER BY p.product_id DESC
-            """
-            products = await conn.fetch(basic_query, *params)
+        devices = await conn.fetch(query, *params)
 
         formatted_devices = []
-        for p in products:
-            row = dict(p)
-            created_at = row.get("created_at")
-            l_time = row.get("last_time")
-            formatted_devices.append({
-                **row,
-                "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else str(created_at),
-                "last_time": l_time.strftime("%Y-%m-%d %H:%M:%S") if hasattr(l_time, "strftime") else str(l_time)
-            })
+        for d in devices:
+            try:
+                row = dict(d)
+                created_at = row.get("created_at")
+                w_start = row.get("warranty_start_date")
+                w_end = row.get("warranty_end_date")
+                heartbeat = row.get("last_heartbeat")
+                l_time = row.get("last_time")
+
+                formatted_devices.append({
+                    **row,
+                    "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else (str(created_at) if created_at else None),
+                    "warranty_start_date": w_start.isoformat() if hasattr(w_start, "isoformat") else (str(w_start) if w_start else None),
+                    "warranty_end_date": w_end.isoformat() if hasattr(w_end, "isoformat") else (str(w_end) if w_end else None),
+                    "last_heartbeat": heartbeat.isoformat() if hasattr(heartbeat, "isoformat") else (str(heartbeat) if heartbeat else None),
+                    "last_time": l_time.strftime("%Y-%m-%d %H:%M:%S") if hasattr(l_time, "strftime") else (str(l_time) if l_time else None)
+                })
+            except Exception:
+                formatted_devices.append(dict(d))
 
         return {
             "status": "success",
             "devices": formatted_devices
         }
+
 
 class DeviceBulkImportSchema(BaseModel):
     serial_numbers: List[str] = Field(..., description="List of serial numbers to import into stock")
@@ -588,7 +587,7 @@ class DeviceBulkImportSchema(BaseModel):
     notes: Optional[str] = None
     price: Optional[float] = 29.00
     supplier_id: Optional[int] = None
-    supplier: Optional[str] = "Feishu"
+    supplier: Optional[str] = None
 
 
 @router.post("/bulk-import", status_code=status.HTTP_201_CREATED)
@@ -610,40 +609,27 @@ async def bulk_import_devices(
     pool = await get_db_pool()
     async with pool.acquire() as conn:
         supp_id, supp_name = await resolve_supplier(conn, payload.supplier_id, payload.supplier)
+        type_id = await resolve_product_id(conn, None, payload.device_model, supp_id)
         imported_count = 0
         skipped_count = 0
 
         for sn in set(raw_sns):
-            existing = await conn.fetchrow("SELECT id FROM devices WHERE device_sn = $1", sn)
+            existing = await conn.fetchrow("SELECT id FROM devices WHERE device_id = $1 LIMIT 1", sn)
             if existing:
                 skipped_count += 1
                 continue
 
             try:
                 await conn.execute("""
-                    INSERT INTO devices (device_id, device_sn, device_model, batch_no, notes, price, status, is_active, battery, signal, supplier_id)
-                    VALUES ($1, $1, $2, $3, $4, $5, 'IN_STOCK', FALSE, '100%', 'Good', $6)
-                """, sn, payload.device_model or "Y6B", payload.batch_no, payload.notes, payload.price or 29.00, supp_id)
+                    INSERT INTO devices (device_id, product_id, batch_no, notes, price, status, is_active, battery, signal)
+                    VALUES ($1, $2, $3, $4, $5, 'IN_STOCK', FALSE, '100%', 'Good')
+                """, sn, type_id, payload.batch_no, payload.notes, payload.price or 29.00)
             except Exception as e:
-                # Auto-heal missing columns if running against older DB schema
+                logger.warning(f"Bulk import insert for {sn} failed: {e}. Retrying with minimal columns...")
                 await conn.execute("""
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_model VARCHAR(100) DEFAULT 'Y6B';
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS batch_no VARCHAR(100) DEFAULT 'BATCH-BULK';
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_type VARCHAR(100) DEFAULT 'Display Soundbox';
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
-                    ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier_id INT;
-                """)
-                try:
-                    await conn.execute("""
-                        INSERT INTO devices (device_id, device_sn, notes, price, status, is_active, battery, signal, supplier_id)
-                        VALUES ($1, $1, $2, $3, 'IN_STOCK', FALSE, '100%', 'Good', $4)
-                    """, sn, payload.notes, payload.price or 29.00, supp_id)
-                except Exception:
-                    await conn.execute("""
-                        INSERT INTO devices (device_id, device_sn, notes, price, status, is_active, battery, signal)
-                        VALUES ($1, $1, $2, $3, 'IN_STOCK', FALSE, '100%', 'Good')
-                    """, sn, payload.notes, payload.price or 29.00)
+                    INSERT INTO devices (device_id, product_id, notes, price, status, is_active, battery, signal)
+                    VALUES ($1, $2, $3, $4, 'IN_STOCK', FALSE, '100%', 'Good')
+                """, sn, type_id, payload.notes, payload.price or 29.00)
             imported_count += 1
 
         return {
@@ -658,16 +644,13 @@ class DeviceIntakeSchema(BaseModel):
     device_sn: str
     device_type: str = "Soundbox"
     device_model: str = "Y6B"
-    unit: Optional[str] = "1"
-    mini_stk: Optional[str] = "1"
-    warran_months: Optional[str] = "0"
     batch_no: Optional[str] = None
     notes: Optional[str] = None
     merchant_id: Optional[Union[int, str]] = None
     price: Optional[float] = 29.00
-    sell_price: Optional[float] = 29.00
     supplier_id: Optional[int] = None
-    supplier: Optional[str] = "Feishu"
+    supplier: Optional[str] = None
+    branch_id: Optional[int] = None
 
 
 @router.post("/intake", status_code=status.HTTP_201_CREATED)
@@ -677,7 +660,7 @@ async def intake_single_device(
 ):
     """
     Registers a single Soundbox device into warehouse stock or assigns it to a store.
-    Requires Admin privileges.
+    Requires Admin privileges. Automatically scopes to user's branch.
     """
     if current_user.get("role") != "ADMIN":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only administrators can intake device stock.")
@@ -686,141 +669,60 @@ async def intake_single_device(
     if not sn:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Serial number is required.")
 
+    target_branch_id = current_user.get("branch_id") or payload.branch_id or 1
+
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        # ឆែកមើលថាតើមាន SN នេះក្នុង products (item_code) រួចហើយឬនៅ
-        existing = await conn.fetchrow("SELECT product_id FROM products WHERE item_code = $1 and is_active = true", sn)
+        existing = await conn.fetchrow("SELECT id FROM devices WHERE device_id = $1 LIMIT 1", sn)
         if existing:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Device SN '{sn}' is already registered in the system.")
 
         supp_id, supp_name = await resolve_supplier(conn, payload.supplier_id, payload.supplier)
+        type_id = await resolve_product_id(conn, payload.device_type, payload.device_model, supp_id)
 
+        initial_status = 'ACTIVE' if payload.merchant_id else 'IN_STOCK'
         is_active = True if payload.merchant_id else False
-        qty_val = int(payload.unit) if str(payload.unit).isdigit() else 1
-        batch_number = payload.batch_no or f"BATCH-{datetime.now().strftime('%Y%m%d')}"
+
+        m_id_target = await resolve_merchant_pk(conn, payload.merchant_id)
 
         try:
-            # 1. บันทึกข้อมูลสินค้าลงตาราง products
             new_id = await conn.fetchval("""
-                INSERT INTO products (
-                    item_code, item_name, unit, cost_price, selling_price, 
-                    min_stock_level, warranty_months, is_active, supplier_id
+                INSERT INTO devices (
+                    device_id, product_id,
+                    merchant_id, batch_no, notes, price, status, is_active, battery, signal, branch_id
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                RETURNING product_id
-            """, 
-            sn, 
-            payload.device_model or "Y6B", 
-            str(payload.unit or "1"), 
-            float(payload.price or 29.00), 
-            float(payload.sell_price or 29.00), 
-            int(payload.mini_stk or 1), 
-            int(payload.warran_months or 0), 
-            is_active, 
-            supp_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, '100%', 'Good', $9)
+                RETURNING id
+            """, sn, type_id, m_id_target, payload.batch_no, payload.notes, payload.price or 29.00, initial_status, is_active, target_branch_id)
+        except Exception as e:
+            logger.error(f"Device intake failed: {e}")
+            raise HTTPException(status_code=500, detail=f"Database insert error: {e}")
 
-            # 2.ប្រើប្រាស់ពេលដែលអ្នក នាំចូលទំនិញចូលស្តុក (Stock IN) ច្រើនៗក្នុងទម្រង់ជាបាច់ ឬឡូតិ៍ (Batch/Lot) ពី Supplier
-            await conn.execute("""
-                INSERT INTO inventory_batches (
-                    batch_no, supplier_id, total_qty, unit_cost, notes
-                )
-                VALUES ($1, $2, $3, $4, $5)
-                ON CONFLICT (batch_no) DO UPDATE 
-                SET total_qty = inventory_batches.total_qty + EXCLUDED.total_qty
-            """, 
-            batch_number, 
-            supp_id, 
-            qty_val, 
-            float(payload.price or 29.00), 
-            payload.notes or "Initial bulk or single stock intake batch")
-
-            # 3. บันทึกประวัติการนำเข้าลงตาราง stock_transactions (Stock IN Ledger)
-            await conn.execute("""
-                INSERT INTO stock_transactions (
-                    product_id, quantity, action_type, unit_price, reference_no, remarks, serial_number
-                )
-                VALUES ($1, $2, 'IN', $3, $4, $5, $6)
-            """, 
-            new_id, 
-            qty_val, 
-            float(payload.price or 29.00), 
-            batch_number, 
-            payload.notes or "Initial stock import (IN)", 
-            sn)
-                
-        except Exception as insert_err:
-            logger.warning(f"Product intake failed: {insert_err}. Attempting schema auto-heal and fallback...")
-            try:
-                # Auto-heal សម្រាប់ Table products ករណីខ្វះ Column
-                await conn.execute("""
-                    ALTER TABLE products ADD COLUMN IF NOT EXISTS item_code VARCHAR(100);
-                    ALTER TABLE products ADD COLUMN IF NOT EXISTS item_name VARCHAR(150);
-                    ALTER TABLE products ADD COLUMN IF NOT EXISTS unit VARCHAR(30) DEFAULT 'pcs';
-                    ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price NUMERIC(12, 2);
-                    ALTER TABLE products ADD COLUMN IF NOT EXISTS selling_price NUMERIC(12, 2);
-                    ALTER TABLE products ADD COLUMN IF NOT EXISTS min_stock_level INT DEFAULT 5;
-                    ALTER TABLE products ADD COLUMN IF NOT EXISTS warranty_months INT DEFAULT 12;
-                    ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_id INT;
-                """)
-                new_id = await conn.fetchval("""
-                    INSERT INTO products (
-                        item_code, item_name, unit, cost_price, selling_price, 
-                        min_stock_level, warranty_months, is_active, supplier_id
+        # Record the stock IN movement (devices row already created above)
+        if not payload.merchant_id:
+            prod_id = await resolve_product_id_for_serial(conn, None, type_id)
+            if prod_id:
+                base_cost = await conn.fetchval("SELECT base_price FROM products WHERE id = $1", prod_id)
+                try:
+                    await stock_service.record_stock_in(
+                        conn,
+                        serials=[sn],
+                        product_id=prod_id,
+                        branch_id=target_branch_id,
+                        unit_price=payload.price or 29.00,
+                        cost_price=float(base_cost or 0),
+                        remarks=payload.notes or "Intake via Device API",
+                        sync_devices=False,
                     )
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                    RETURNING product_id
-                """, 
-                sn, 
-                payload.device_model or "Y6B", 
-                str(payload.unit or "1"), 
-                float(payload.price or 29.00), 
-                float(payload.sell_price or 29.00), 
-                int(payload.mini_stk or 1), 
-                int(payload.warran_months or 0), 
-                is_active, 
-                supp_id)
-
-                # Fallback Inventory Batches Insertion
-                await conn.execute("""
-                    INSERT INTO inventory_batches (
-                        batch_no, supplier_id, total_qty, unit_cost, notes
-                    )
-                    VALUES ($1, $2, $3, $4, $5)
-                    ON CONFLICT (batch_no) DO NOTHING
-                """, 
-                batch_number, 
-                supp_id, 
-                qty_val, 
-                float(payload.price or 29.00), 
-                payload.notes or "Initial stock import batch")
-
-                # Fallback Record Stock IN Transaction Ledger
-                await conn.execute("""
-                    INSERT INTO stock_transactions (
-                        product_id, quantity, action_type, unit_price, reference_no, remarks, serial_number
-                    )
-                    VALUES ($1, $2, 'IN', $3, $4, $5, $6)
-                """, 
-                new_id, 
-                qty_val, 
-                float(payload.price or 29.00), 
-                batch_number, 
-                payload.notes or "Initial stock import (IN)", 
-                sn)
-                    
-            except Exception as final_err:
-                logger.error(f"Product intake permanently failed for SN '{sn}': {final_err}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Failed to intake product: {str(final_err)}"
-                )
+                except stock_service.StockError as e:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
         return {
             "status": "success",
-            "message": f"Soundbox '{sn}' registered, batched, and imported into stock successfully.",
-            "product_id": new_id,
-            "batch_no": batch_number
+            "message": f"Soundbox '{sn}' registered successfully into stock.",
+            "device_id": new_id
         }
+
 
 
 @router.post("/{device_id}/return-to-stock")
@@ -837,8 +739,8 @@ async def return_device_to_stock(
 
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        existing = await conn.fetchrow("SELECT product_id FROM products WHERE item_code = $1 AND is_active = true", device_id)
-        if not existing:
+        device = await conn.fetchrow("SELECT id, device_id AS device_sn FROM devices WHERE id = $1", device_id)
+        if not device:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
 
         await conn.execute("""
@@ -847,9 +749,17 @@ async def return_device_to_stock(
             WHERE id = $1
         """, device_id)
 
+        # The stock view reads inventory_serials, so the serial has to be put back there too
+        await stock_service.return_to_stock(
+            conn, serial=device["device_sn"],
+            branch_id=current_user.get("branch_id"),
+            changed_by=current_user.get("id"),
+            note="Returned to warehouse stock",
+        )
+
         return {
             "status": "success",
-            "message": f"Device '{device_id['device_sn']}' returned to warehouse stock."
+            "message": f"Device '{device['device_sn']}' returned to warehouse stock."
         }
 
 
@@ -867,7 +777,7 @@ async def mark_device_maintenance(
 
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        device = await conn.fetchrow("SELECT id, device_sn FROM devices WHERE id = $1", device_id)
+        device = await conn.fetchrow("SELECT id, device_id AS device_sn FROM devices WHERE id = $1", device_id)
         if not device:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
 
@@ -902,7 +812,7 @@ async def send_device_command(
     """
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        device = await conn.fetchrow("SELECT id, device_sn, merchant_id, is_active FROM devices WHERE id = $1", device_id)
+        device = await conn.fetchrow("SELECT id, device_id AS device_sn, merchant_id, is_active FROM devices WHERE id = $1", device_id)
         if not device:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
 
@@ -914,7 +824,9 @@ async def send_device_command(
         await conn.execute("""
             INSERT INTO security_alerts (device_id, merchant_id, alert_type, severity, bank_name, amount, currency, sender_name, raw_message, reason, created_at)
             VALUES ($1, $2, 'COMMAND_DISPATCH', 'INFO', 'SYSTEM', $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
-        """, device_id, device["merchant_id"], amt, payload.currency or 'USD', current_user.get("full_name", "Admin"), f"Command [{payload.command_type}] dispatched", f"Volume: {payload.volume}%, Custom Text: {payload.custom_text or 'N/A'}")
+        """, device["device_sn"] or str(device_id),
+           str(device["merchant_id"]) if device["merchant_id"] is not None else None,
+           amt, payload.currency or 'USD', current_user.get("full_name", "Admin"), f"Command [{payload.command_type}] dispatched", f"Volume: {payload.volume}%, Custom Text: {payload.custom_text or 'N/A'}")
 
         return {
             "status": "success",
@@ -959,6 +871,7 @@ async def batch_send_commands(
 class DeviceUpdateSchema(BaseModel):
     device_sn: Optional[str] = None
     telegram_chat_id: Optional[str] = None
+    product_id: Optional[int] = Field(None, description="The product this device is (supplier and model come with it)")
     device_type: Optional[str] = None
     device_model: Optional[str] = None
     qr_code: Optional[str] = None
@@ -989,7 +902,7 @@ async def update_device(
     """
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        device = await conn.fetchrow("SELECT id, device_sn, merchant_id FROM devices WHERE id = $1", device_id)
+        device = await conn.fetchrow("SELECT id, device_id AS device_sn, merchant_id, product_id FROM devices WHERE id = $1", device_id)
         if not device:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
 
@@ -999,8 +912,8 @@ async def update_device(
                 owns = await conn.fetchval("""
                     SELECT 1 FROM merchants m 
                     WHERE (m.id::text = $1 OR m.merchant_id::text = $1)
-                      AND (m.user_id = $2 OR (m.user_id IS NULL AND m.owner_phone = $3))
-                """, str(device["merchant_id"]), current_user["id"], current_user.get("phone_number"))
+                      AND m.user_id = $2
+                """, str(device["merchant_id"]), current_user["id"])
             if not owns:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
@@ -1010,7 +923,7 @@ async def update_device(
         # Check if new SN conflicts with existing
         if payload.device_sn and payload.device_sn.strip() != device["device_sn"]:
             existing_sn = await conn.fetchrow(
-                "SELECT id FROM devices WHERE device_sn = $1 AND id != $2",
+                "SELECT id FROM devices WHERE device_id = $1 AND id != $2",
                 payload.device_sn.strip(), device_id
             )
             if existing_sn:
@@ -1021,7 +934,7 @@ async def update_device(
         idx = 2
 
         if payload.device_sn is not None:
-            updates.append(f"device_sn = ${idx}")
+            updates.append(f"device_id = ${idx}")
             params.append(payload.device_sn.strip())
             idx += 1
 
@@ -1035,14 +948,33 @@ async def update_device(
             params.append(payload.qr_code.strip() if payload.qr_code.strip() else None)
             idx += 1
 
-        if payload.device_type is not None:
-            updates.append(f"device_type = ${idx}")
-            params.append(payload.device_type.strip())
+        # An explicit product wins; otherwise type / model / supplier text is resolved to one
+        if payload.product_id is not None:
+            if not await conn.fetchval("SELECT id FROM products WHERE id = $1", payload.product_id):
+                raise HTTPException(status_code=400, detail=f"Product ID {payload.product_id} does not exist.")
+            updates.append(f"product_id = ${idx}")
+            params.append(payload.product_id)
             idx += 1
 
-        if payload.device_model is not None:
-            updates.append(f"device_model = ${idx}")
-            params.append(payload.device_model.strip())
+        type_fields_sent = payload.product_id is None and any(v is not None for v in (
+            payload.device_type, payload.device_model, payload.supplier_id, payload.supplier
+        ))
+        if type_fields_sent:
+            current_type = await get_product_type(conn, device["product_id"])
+            if payload.supplier_id is not None or payload.supplier is not None:
+                supp_id, _ = await resolve_supplier(conn, payload.supplier_id, payload.supplier)
+            else:
+                supp_id = current_type["supplier_id"] if current_type else None
+            new_type_name = payload.device_type if payload.device_type is not None else (current_type["name"] if current_type else None)
+            if payload.device_model is not None:
+                new_model = payload.device_model
+            elif payload.device_type is not None:
+                new_model = None  # type changed without a model: pick that type's model
+            else:
+                new_model = current_type["device_model"] if current_type else None
+            new_type_id = await resolve_product_id(conn, new_type_name, new_model, supp_id)
+            updates.append(f"product_id = ${idx}")
+            params.append(new_type_id)
             idx += 1
 
         if payload.batch_no is not None:
@@ -1060,71 +992,75 @@ async def update_device(
             params.append(float(payload.price))
             idx += 1
 
-        # Synchronize sales & warranty updates to the sales table if any commercial fields are supplied
+        # Synchronize sales & warranty edits onto the invoice item this device was sold on
         has_sales_update = any(v is not None for v in [
             payload.discount_amount, payload.discount_percent, payload.final_price,
             payload.warranty_days, payload.warranty_start_date, payload.warranty_end_date
         ])
         if has_sales_update:
             try:
-                latest_sale = await conn.fetchrow("""
-                    SELECT s.id, s.price, s.discount_amount, s.discount_percent, s.final_price,
-                           s.warranty_days, s.warranty_start_date, s.warranty_end_date
-                    FROM sales s
-                    JOIN devices d ON (s.device_id = d.id OR s.device_sn = d.device_sn)
+                latest_tx = await conn.fetchrow("""
+                    SELECT st.transaction_id AS id, st.unit_price AS price, st.discount_amount,
+                           st.discount_percent, st.warranty_expired_date, st.created_at
+                    FROM v_sales st
+                    JOIN devices d ON st.serial_number = d.device_id
                     WHERE d.id = $1
-                    ORDER BY s.id DESC
+                    ORDER BY st.transaction_id DESC
                     LIMIT 1
                 """, device_id)
-                if latest_sale:
-                    s_id = latest_sale["id"]
-                    s_price = float(payload.price if payload.price is not None else (latest_sale["price"] or 29.0))
-                    s_disc_pct = float(payload.discount_percent if payload.discount_percent is not None else (latest_sale["discount_percent"] or 0.0))
-                    s_disc_amt = float(payload.discount_amount if payload.discount_amount is not None else (latest_sale["discount_amount"] or 0.0))
+                if latest_tx:
+                    tx_id = latest_tx["id"]
+                    s_price = float(payload.price if payload.price is not None else (latest_tx["price"] or 29.0))
+                    s_disc_pct = float(payload.discount_percent if payload.discount_percent is not None else (latest_tx["discount_percent"] or 0.0))
+                    s_disc_amt = float(payload.discount_amount if payload.discount_amount is not None else (latest_tx["discount_amount"] or 0.0))
                     if payload.discount_percent is not None and s_disc_pct > 0:
                         s_disc_amt = (s_disc_pct / 100.0) * s_price
-                    s_final = float(payload.final_price if payload.final_price is not None else max(0.0, s_price - s_disc_amt))
-                    s_wdays = int(payload.warranty_days if payload.warranty_days is not None else (latest_sale["warranty_days"] or 90))
+                    s_wdays = int(payload.warranty_days if payload.warranty_days is not None else 90)
                     
-                    s_start = latest_sale["warranty_start_date"]
-                    if payload.warranty_start_date:
-                        try:
-                            s_start = datetime.fromisoformat(payload.warranty_start_date.replace("Z", "+00:00"))
-                        except Exception:
-                            pass
-                    s_end = latest_sale["warranty_end_date"]
+                    s_end = latest_tx["warranty_expired_date"]
                     if payload.warranty_end_date:
                         try:
-                            s_end = datetime.fromisoformat(payload.warranty_end_date.replace("Z", "+00:00"))
+                            s_end = datetime.fromisoformat(payload.warranty_end_date.replace("Z", "+00:00")).date()
                         except Exception:
                             pass
-                    elif s_start and payload.warranty_days is not None:
-                        s_end = s_start + timedelta(days=s_wdays)
+                    elif payload.warranty_start_date or payload.warranty_days is not None:
+                        try:
+                            base_dt = datetime.fromisoformat(payload.warranty_start_date.replace("Z", "+00:00")).date() if payload.warranty_start_date else (latest_tx["created_at"].date() if latest_tx["created_at"] else datetime.now().date())
+                            s_end = base_dt + timedelta(days=s_wdays)
+                        except Exception:
+                            pass
 
+                    # v_sales.transaction_id is the invoice item; the final price is what is charged
+                    final_price = max(s_price - s_disc_amt, 0.0)
                     await conn.execute("""
-                        UPDATE sales
-                        SET price = $1, discount_percent = $2, discount_amount = $3, final_price = $4,
-                            warranty_days = $5, warranty_start_date = $6, warranty_end_date = $7,
-                            updated_at = CURRENT_TIMESTAMP
-                        WHERE id = $8
-                    """, s_price, s_disc_pct, s_disc_amt, s_final, s_wdays, s_start, s_end, s_id)
+                        UPDATE pos_invoice_items
+                        SET original_price = $1, discount_percent = $2, discount_amount = $3,
+                            final_price = $4, warranty_end_date = $5
+                        WHERE id = $6
+                    """, s_price, s_disc_pct, s_disc_amt, final_price, s_end, tx_id)
+                    await conn.execute("""
+                        UPDATE pos_invoices inv
+                        SET subtotal = totals.subtotal, total_discount = totals.discount, grand_total = totals.total
+                        FROM (
+                            SELECT invoice_id, SUM(original_price) AS subtotal,
+                                   SUM(COALESCE(discount_amount, 0)) AS discount, SUM(final_price) AS total
+                            FROM pos_invoice_items WHERE invoice_id = (
+                                SELECT invoice_id FROM pos_invoice_items WHERE id = $1
+                            ) GROUP BY invoice_id
+                        ) totals
+                        WHERE inv.id = totals.invoice_id
+                    """, tx_id)
             except Exception as s_err:
                 logger.warning(f"Could not synchronize sale updates for device {device_id}: {s_err}")
 
         if payload.status is not None:
             st_val = payload.status.strip().upper()
-            col_type = await conn.fetchval("""
-                SELECT udt_name FROM information_schema.columns 
-                WHERE table_name = 'devices' AND column_name = 'status'
-            """)
-            if col_type == 'device_status':
-                try:
-                    await conn.execute(f"ALTER TYPE device_status ADD VALUE IF NOT EXISTS '{st_val}';")
-                except Exception:
-                    pass
-                updates.append(f"status = ${idx}::device_status")
-            else:
-                updates.append(f"status = ${idx}")
+            if st_val not in DEVICE_STATUSES:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid status '{payload.status}'. Allowed: {', '.join(sorted(DEVICE_STATUSES))}."
+                )
+            updates.append(f"status = ${idx}::device_status")
             params.append(st_val)
             idx += 1
             if st_val == 'ACTIVE':
@@ -1135,17 +1071,7 @@ async def update_device(
                 updates.append("merchant_id = NULL")
 
         if payload.merchant_id is not None:
-            col_type = await conn.fetchval("""
-                SELECT data_type FROM information_schema.columns 
-                WHERE table_name = 'devices' AND column_name = 'merchant_id'
-            """)
-            if col_type in ('integer', 'bigint', 'smallint'):
-                try:
-                    m_id_target = int(payload.merchant_id)
-                except Exception:
-                    m_id_target = None
-            else:
-                m_id_target = str(payload.merchant_id)
+            m_id_target = await resolve_merchant_pk(conn, payload.merchant_id)
             updates.append(f"merchant_id = ${idx}")
             params.append(m_id_target)
             idx += 1
@@ -1153,24 +1079,13 @@ async def update_device(
                 updates.append("status = 'ACTIVE'::device_status")
                 updates.append("is_active = TRUE")
 
-        if payload.supplier_id is not None or payload.supplier is not None:
-            supp_id, supp_name = await resolve_supplier(conn, payload.supplier_id, payload.supplier)
-            updates.append(f"supplier_id = ${idx}")
-            params.append(supp_id)
-            idx += 1
-
         if not updates:
             return {"status": "success", "message": "No changes requested."}
 
         updates.append("updated_at = CURRENT_TIMESTAMP")
         set_sql = ", ".join(updates)
 
-        try:
-            await conn.execute(f"UPDATE devices SET {set_sql} WHERE id = $1", *params)
-        except Exception as upd_err:
-            logger.warning(f"Device update error with sql '{set_sql}': {upd_err}. Retrying without enum cast...")
-            set_sql_clean = set_sql.replace("::device_status", "")
-            await conn.execute(f"UPDATE devices SET {set_sql_clean} WHERE id = $1", *params)
+        await conn.execute(f"UPDATE devices SET {set_sql} WHERE id = $1", *params)
 
         return {
             "status": "success",
@@ -1188,7 +1103,7 @@ async def unlink_device(
     async with pool.acquire() as conn:
         device = await conn.fetchrow(
             """
-            SELECT d.id, d.merchant_id, d.device_sn, m.user_id, m.owner_phone
+            SELECT d.id, d.merchant_id, d.device_id AS device_sn, m.user_id, m.owner_phone
             FROM devices d
             LEFT JOIN merchants m ON (d.merchant_id::text = m.merchant_id::text OR d.merchant_id::text = m.id::text)
             WHERE d.id = $1
@@ -1201,7 +1116,7 @@ async def unlink_device(
         # Permission check
         if current_user["role"] != "ADMIN":
             if device["merchant_id"] is not None:
-                if device["user_id"] != current_user["id"] and device["owner_phone"] != current_user["phone_number"]:
+                if device["user_id"] != current_user["id"]:
                     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to unlink this device.")
 
         # Delete device (cascades or unlinks cleanly)

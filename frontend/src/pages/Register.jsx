@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
+import { translateServerMessage } from '../lib/serverMessage';
+import { useToast } from '../context/ToastContext';
 import { Phone, Lock, User, Eye, EyeOff, UserPlus, Volume2, Sun, Moon, Globe } from 'lucide-react';
 
 export default function Register({ onSwitchToLogin }) {
@@ -13,23 +15,24 @@ export default function Register({ onSwitchToLogin }) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const { showToast } = useToast();
+
+  // Errors are raised as toasts, so the form itself never shifts as messages come and go
+  const fail = (message) => showToast({ type: 'error', title: t('errorLabel', 'Error'), message });
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-
     if (!phoneNumber.trim()) {
-      setError('Please enter your phone number.');
+      fail(t('phoneRequired', 'Please enter your phone number.'));
       return;
     }
     if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+      fail(t('passwordMinLength', 'Password must be at least 6 characters.'));
       return;
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      fail(t('passwordsDoNotMatch', 'Passwords do not match.'));
       return;
     }
 
@@ -37,8 +40,7 @@ export default function Register({ onSwitchToLogin }) {
     try {
       await register(phoneNumber.trim(), password, fullName.trim() || undefined);
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to create account. Please try again.';
-      setError(msg);
+      fail(translateServerMessage(err.response?.data?.detail, t) || t('registerFailed', 'Failed to create account. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -83,13 +85,6 @@ export default function Register({ onSwitchToLogin }) {
             {t('createAccountSub', 'Sign up with your phone number to manage your store')}
           </p>
         </div>
-
-        {/* Error Alert */}
-        {error && (
-          <div className="mb-4 sm:mb-6 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 rounded-xl text-rose-700 dark:text-rose-300 text-xs sm:text-sm flex items-center gap-2">
-            <span className="font-semibold">Error:</span> {error}
-          </div>
-        )}
 
         {/* Register Form */}
         <form onSubmit={handleSubmit} className="space-y-4">

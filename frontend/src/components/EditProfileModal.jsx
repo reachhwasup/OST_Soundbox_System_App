@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Phone, CheckCircle2, AlertCircle, Shield, Store, Calendar, BadgeCheck, Sparkles, KeyRound, ChevronRight } from 'lucide-react';
+import { User, Phone, CheckCircle2, AlertCircle, Calendar, BadgeCheck } from 'lucide-react';
 import Modal from './Modal';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';

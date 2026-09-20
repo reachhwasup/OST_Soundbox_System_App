@@ -2,22 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
-import { 
-  LogOut, 
-  User as UserIcon, 
-  Shield, 
-  Store, 
-  Volume2, 
-  Sun, 
-  Moon, 
-  Globe, 
-  KeyRound, 
-  UserCheck, 
-  ChevronDown, 
-  Menu,
-  Sparkles,
-  BadgeCheck
-} from 'lucide-react';
+import { LogOut, User as UserIcon, Sun, Moon, Globe, KeyRound, UserCheck, ChevronDown, Menu } from 'lucide-react';
 import OstLogo from './OstLogo';
 import ChangePasswordModal from './ChangePasswordModal';
 import EditProfileModal from './EditProfileModal';
@@ -115,12 +100,12 @@ export default function Navbar({ onOpenSidebar }) {
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-emerald-600 group-hover:bg-emerald-700 text-white font-bold flex items-center justify-center text-xs shadow-xs shrink-0 transition">
                 <UserIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
-              <div className="hidden sm:block text-left max-w-[120px]">
+              <div className="hidden sm:block text-left max-w-[140px]">
                 <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
                   {user?.full_name ? user.full_name.replace(/\s*\([^)]*\)/g, '').trim() : user?.phone_number}
                 </div>
                 <div className="text-[10px] text-slate-400 font-mono truncate">
-                  {user?.phone_number}
+                  {user?.branch_name ? user.branch_name : user?.phone_number}
                 </div>
               </div>
               <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isProfileDropdownOpen ? 'rotate-180 text-emerald-600' : ''}`} />
@@ -130,6 +115,23 @@ export default function Navbar({ onOpenSidebar }) {
             {isProfileDropdownOpen && (
               <div className="absolute right-0 mt-2 w-56 sm:w-64 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150 space-y-1">
                 
+                {/* User Info Header in Dropdown */}
+                <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 mb-1">
+                  <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                    {user?.full_name || user?.phone_number}
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono truncate">
+                    {user?.phone_number}
+                  </div>
+                  {user?.role === 'ADMIN' && (
+                    <div className="mt-1.5">
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                        {user?.branch_name ? user.branch_name : 'All Branches'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
                 {/* Action 1: Change Name / Edit Profile */}
                 <button
                   type="button"

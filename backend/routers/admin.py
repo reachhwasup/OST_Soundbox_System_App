@@ -4,7 +4,7 @@ from typing import Optional, Dict, Any, List
 import json
 
 from backend.database import get_db_pool
-from backend.security import require_admin, hash_password, normalize_phone_number
+from backend.security import require_admin, hash_password, normalize_phone_number, check_account_management
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"], dependencies=[Depends(require_admin)])
 
@@ -15,15 +15,20 @@ class AdminCreateUserSchema(BaseModel):
     phone_number: str = Field(..., min_length=8, max_length=20, description="Unique phone number")
     full_name: str = Field(..., min_length=2, max_length=255)
     password: str = Field(..., min_length=6, description="Initial password")
-    role: str = Field("USER", description="ADMIN or USER")
-    status: str = Field("ACTIVE", description="ACTIVE, PENDING, or SUSPENDED")
+    role: str = Field("ADMIN", description="Must be ADMIN. Standard users must sign up via /register.")
+    status: str = Field("ACTIVE", description="ACTIVE or SUSPENDED")
+    branch_id: Optional[int] = Field(None, description="Assigned branch ID (None for SuperAdmin)")
+    permissions: Optional[Dict[str, Any]] = Field(None, description="Granular Tab and CRUD permissions")
 
 
 class AdminUpdateUserSchema(BaseModel):
-    phone_number: Optional[str] = Field(None, min_length=8, max_length=20, description="Forbidden: Administrators cannot edit user data")
-    full_name: Optional[str] = Field(None, min_length=2, max_length=255, description="Forbidden: Administrators cannot edit user data")
+    phone_number: Optional[str] = Field(None, min_length=8, max_length=20)
+    full_name: Optional[str] = Field(None, min_length=2, max_length=255)
     role: Optional[str] = None
     status: Optional[str] = None
+    branch_id: Optional[int] = None
+    permissions: Optional[Dict[str, Any]] = None
+
 
 
 class AdminResetPasswordSchema(BaseModel):
@@ -40,11 +45,6 @@ class AdminStatusToggleSchema(BaseModel):
 async def get_system_stats():
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        try:
-            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE")
-        except Exception:
-            pass
-
         total_users = await conn.fetchval("SELECT COUNT(*) FROM users WHERE COALESCE(is_active, TRUE) = TRUE")
         active_users = await conn.fetchval("SELECT COUNT(*) FROM users WHERE status = 'ACTIVE' AND COALESCE(is_active, TRUE) = TRUE")
         suspended_users = await conn.fetchval("SELECT COUNT(*) FROM users WHERE status = 'SUSPENDED' AND COALESCE(is_active, TRUE) = TRUE")
@@ -72,8 +72,10 @@ async def list_users(
     search: Optional[str] = Query(None, description="Search phone, name, store name, place, or location"),
     role: Optional[str] = Query(None, description="Filter by role (ADMIN, USER)"),
     status: Optional[str] = Query(None, description="Filter by status (ACTIVE, SUSPENDED)"),
+    branch_id: Optional[int] = Query(None, description="Filter by branch ID"),
     page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=200)
+    limit: int = Query(50, ge=1, le=200),
+    current_admin: Dict[str, Any] = Depends(require_admin)
 ):
     pool = await get_db_pool()
     offset = (page - 1) * limit
@@ -81,6 +83,19 @@ async def list_users(
     where_clauses = ["COALESCE(u.is_active, TRUE) = TRUE"]
     params = []
     param_idx = 1
+
+    # Branch scoping: If admin is branch-scoped, lock to their branch. If SuperAdmin, allow filtering.
+    if current_admin.get("branch_id"):
+        where_clauses.append(f"(u.branch_id = ${param_idx} OR u.branch_id IS NULL)")
+        params.append(current_admin["branch_id"])
+        param_idx += 1
+    elif branch_id is not None:
+        if branch_id <= 0:
+            where_clauses.append("u.branch_id IS NULL")
+        else:
+            where_clauses.append(f"u.branch_id = ${param_idx}")
+            params.append(branch_id)
+            param_idx += 1
 
     if search and search.strip():
         s = f"%{search.strip()}%"
@@ -115,6 +130,8 @@ async def list_users(
             u.id, u.phone_number, u.full_name, u.role, u.status, 
             COALESCE(u.is_active, TRUE) AS is_active,
             u.last_login_at, u.created_at, u.updated_at,
+            u.branch_id, b.branch_name, b.branch_code,
+            COALESCE(u.permissions, '{{"tabs": ["all"], "crud": ["all"]}}'::jsonb) AS permissions,
             COALESCE(
                 (
                     SELECT json_agg(json_build_object(
@@ -131,6 +148,7 @@ async def list_users(
                 '[]'::json
             ) AS stores
         FROM users u
+        LEFT JOIN branches b ON u.branch_id = b.branch_id
         WHERE {where_sql}
         ORDER BY u.id DESC 
         LIMIT ${param_idx} OFFSET ${param_idx + 1}
@@ -138,11 +156,6 @@ async def list_users(
     params.extend([limit, offset])
 
     async with pool.acquire() as conn:
-        try:
-            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE")
-        except Exception:
-            pass
-
         total_count = await conn.fetchval(count_query, *params[:-2])
         rows = await conn.fetch(query, *params)
 
@@ -156,6 +169,13 @@ async def list_users(
 
             primary_store = stores_data[0] if len(stores_data) > 0 else None
 
+            perms = r["permissions"]
+            if isinstance(perms, str):
+                try:
+                    perms = json.loads(perms)
+                except Exception:
+                    perms = {}
+
             users.append({
                 "id": r["id"],
                 "phone_number": r["phone_number"],
@@ -163,6 +183,10 @@ async def list_users(
                 "role": r["role"],
                 "status": r["status"],
                 "is_active": r["is_active"],
+                "branch_id": r["branch_id"],
+                "branch_name": r["branch_name"],
+                "branch_code": r["branch_code"],
+                "permissions": perms,
                 "last_login_at": r["last_login_at"].isoformat() if r["last_login_at"] else None,
                 "created_at": r["created_at"].isoformat() if r["created_at"] else None,
                 "updated_at": r["updated_at"].isoformat() if r["updated_at"] else None,
@@ -181,30 +205,50 @@ async def list_users(
 
 
 @router.post("/users")
-async def create_user(payload: AdminCreateUserSchema):
+async def create_user(
+    payload: AdminCreateUserSchema,
+    current_admin: Dict[str, Any] = Depends(require_admin)
+):
+    check_account_management(current_admin, action="create")
+    if current_admin.get("branch_id") is not None and payload.permissions is not None:
+        raise HTTPException(status_code=403, detail="Only a super admin can assign permissions.")
+    # Enforce: Administrators can ONLY create Administrator accounts!
+    if payload.role and payload.role.strip().upper() != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Administrators can only create Administrator accounts. Standard users (merchants) must register via the public sign-up page."
+        )
+
     pool = await get_db_pool()
     clean_phone = normalize_phone_number(payload.phone_number)
     
-    async with pool.acquire() as conn:
-        try:
-            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE")
-        except Exception:
-            pass
+    # If the creator admin is branch-scoped, lock the new admin to their branch
+    admin_branch = current_admin.get("branch_id")
+    target_branch = admin_branch if admin_branch else (payload.branch_id if payload.branch_id and payload.branch_id > 0 else None)
 
-        existing = await conn.fetchrow("SELECT id, is_active FROM users WHERE phone_number = $1", clean_phone)
+    async with pool.acquire() as conn:
+        existing = await conn.fetchrow("SELECT id, is_active, branch_id FROM users WHERE phone_number = $1", clean_phone)
         hashed = hash_password(payload.password)
 
+        assigned_permissions = current_admin.get("permissions") if admin_branch is not None else payload.permissions
+        if isinstance(assigned_permissions, str):
+            assigned_permissions = json.loads(assigned_permissions)
+        perms_json = json.dumps(assigned_permissions) if assigned_permissions else '{"tabs": ["all"], "crud": ["all"]}'
+
         if existing:
+            check_account_management(current_admin, existing, "create")
             if existing.get("is_active") is False:
-                # Reactivate previously soft-deleted account
+                # Reactivate previously soft-deleted account as Admin
                 await conn.execute("""
                     UPDATE users 
-                    SET full_name = $1, password_hash = $2, role = $3::user_role, status = $4::user_status, is_active = TRUE, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $5
-                """, payload.full_name.strip(), hashed, payload.role.upper(), payload.status.upper(), existing["id"])
+                    SET full_name = $1, password_hash = $2, role = 'ADMIN'::user_role, status = $3::user_status,
+                        branch_id = $4, permissions = $5::jsonb, is_active = TRUE, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = $6
+                """, payload.full_name.strip(), hashed, payload.status.upper(),
+                   target_branch, perms_json, existing["id"])
                 return {
                     "status": "success",
-                    "message": f"User '{payload.full_name}' reactivated successfully.",
+                    "message": f"Admin '{payload.full_name}' reactivated successfully.",
                     "user_id": existing["id"]
                 }
             raise HTTPException(
@@ -214,18 +258,20 @@ async def create_user(payload: AdminCreateUserSchema):
 
         new_id = await conn.fetchval(
             """
-            INSERT INTO users (phone_number, full_name, password_hash, role, status, is_active)
-            VALUES ($1, $2, $3, $4, $5, TRUE)
+            INSERT INTO users (phone_number, full_name, password_hash, role, status, is_active, branch_id, permissions)
+            VALUES ($1, $2, $3, 'ADMIN'::user_role, $4::user_status, TRUE, $5, $6::jsonb)
             RETURNING id
             """,
-            clean_phone, payload.full_name.strip(), hashed, payload.role.upper(), payload.status.upper()
+            clean_phone, payload.full_name.strip(), hashed, payload.status.upper(),
+            target_branch, perms_json
         )
 
         return {
             "status": "success",
-            "message": f"User '{payload.full_name}' created successfully.",
+            "message": f"Administrator '{payload.full_name}' created successfully.",
             "user_id": new_id
         }
+
 
 
 @router.put("/users/{user_id}")
@@ -234,13 +280,8 @@ async def update_user(
     payload: AdminUpdateUserSchema,
     current_admin: Dict[str, Any] = Depends(require_admin)
 ):
-    # Enforce rule: Administrators are not permitted to edit user personal data
-    if payload.phone_number is not None or payload.full_name is not None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Administrators are not permitted to edit user personal data (phone number, full name)."
-        )
-
+    if current_admin.get("branch_id") is not None and (payload.permissions is not None or payload.branch_id is not None):
+        raise HTTPException(status_code=403, detail="Only a super admin can change branches or permissions.")
     if user_id == current_admin["id"]:
         if payload.status and payload.status.upper() != "ACTIVE":
             raise HTTPException(
@@ -255,22 +296,64 @@ async def update_user(
 
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        user = await conn.fetchrow("SELECT id FROM users WHERE id = $1", user_id)
+        user = await conn.fetchrow("SELECT id, phone_number, role, branch_id FROM users WHERE id = $1", user_id)
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+        check_account_management(current_admin, user)
+
+        if user["role"] == "USER":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Administrators cannot edit user information. Standard users (merchants) manage their own profile information."
+            )
+
+        if payload.role and payload.role.strip().upper() != "ADMIN":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Administrator accounts cannot be changed to standard user accounts."
+            )
 
         updates = []
         params = []
         idx = 1
 
-        if payload.role is not None:
-            updates.append(f"role = ${idx}")
-            params.append(payload.role.upper())
+        if payload.phone_number is not None:
+            clean_phone = normalize_phone_number(payload.phone_number)
+            dup = await conn.fetchrow("SELECT id FROM users WHERE phone_number = $1 AND id != $2", clean_phone, user_id)
+            if dup:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A user with this phone number already exists.")
+            updates.append(f"phone_number = ${idx}")
+            params.append(clean_phone)
             idx += 1
 
+        if payload.full_name is not None:
+            updates.append(f"full_name = ${idx}")
+            params.append(payload.full_name.strip())
+            idx += 1
+
+        if payload.role is not None:
+            r_val = payload.role.strip().upper()
+            if r_val in ("ADMIN", "USER"):
+                updates.append(f"role = ${idx}::user_role")
+                params.append(r_val)
+                idx += 1
+
         if payload.status is not None:
-            updates.append(f"status = ${idx}")
-            params.append(payload.status.upper())
+            s_val = payload.status.strip().upper()
+            if s_val in ("ACTIVE", "PENDING", "SUSPENDED"):
+                updates.append(f"status = ${idx}::user_status")
+                params.append(s_val)
+                idx += 1
+
+        if payload.branch_id is not None:
+            updates.append(f"branch_id = ${idx}")
+            params.append(payload.branch_id if payload.branch_id > 0 else None)
+            idx += 1
+
+        if payload.permissions is not None:
+            updates.append(f"permissions = ${idx}::jsonb")
+            params.append(json.dumps(payload.permissions))
             idx += 1
 
         if updates:
@@ -280,9 +363,88 @@ async def update_user(
             query = f"UPDATE users SET {set_clause} WHERE id = ${idx}"
             await conn.execute(query, *params)
 
+        updated = await conn.fetchrow("""
+            SELECT u.id, u.phone_number, u.full_name, u.role, u.status, u.is_active,
+                   u.branch_id, b.branch_name, b.branch_code, u.updated_at
+            FROM users u
+            LEFT JOIN branches b ON u.branch_id = b.branch_id
+            WHERE u.id = $1
+        """, user_id)
+
         return {
             "status": "success",
-            "message": "User updated successfully."
+            "message": "User updated successfully.",
+            "user": dict(updated) if updated else None
+        }
+
+
+@router.get("/users/{user_id}/details")
+async def get_user_details(
+    user_id: int,
+    current_admin: Dict[str, Any] = Depends(require_admin)
+):
+    """Returns detailed profile for a user, along with owned stores and deployed devices."""
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        user = await conn.fetchrow("""
+            SELECT u.id, u.phone_number, u.full_name, u.role, u.status, u.is_active,
+                   u.branch_id, b.branch_name, b.branch_code,
+                   u.last_login_at, u.created_at, u.updated_at,
+                   COALESCE(u.permissions, '{"tabs": ["all"], "crud": ["all"]}'::jsonb) AS permissions
+            FROM users u
+            LEFT JOIN branches b ON u.branch_id = b.branch_id
+            WHERE u.id = $1 AND COALESCE(u.is_active, TRUE) = TRUE
+        """, user_id)
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+        check_account_management(current_admin, user, "read")
+
+        stores = await conn.fetch("""
+            SELECT m.id, COALESCE(m.merchant_id, m.id::text) AS merchant_id,
+                   COALESCE(m.merchant_name, m.name) AS name,
+                   m.place, m.location, m.owner_phone, m.created_at
+            FROM merchants m
+            WHERE m.user_id = $1 OR (m.user_id IS NULL AND m.owner_phone = $2)
+            ORDER BY m.id ASC
+        """, user_id, user["phone_number"])
+
+        devices = await conn.fetch("""
+            SELECT d.id, d.device_id AS device_sn, dp.name AS device_type, dp.device_model, d.status,
+                   d.battery, d.signal, d.price, d.created_at, d.last_online,
+                   COALESCE(m.merchant_name, m.name) AS store_name
+            FROM devices d
+            LEFT JOIN products dp ON dp.id = d.product_id
+            LEFT JOIN merchants m ON (d.merchant_id = m.id OR d.merchant_id::text = m.merchant_id::text)
+            WHERE m.user_id = $1 OR (m.user_id IS NULL AND m.owner_phone = $2)
+            ORDER BY d.id DESC
+        """, user_id, user["phone_number"])
+
+        perms = user["permissions"]
+        if isinstance(perms, str):
+            try:
+                perms = json.loads(perms)
+            except Exception:
+                perms = {}
+
+        return {
+            "status": "success",
+            "user": {
+                "id": user["id"],
+                "phone_number": user["phone_number"],
+                "full_name": user["full_name"],
+                "role": user["role"],
+                "status": user["status"],
+                "branch_id": user["branch_id"],
+                "branch_name": user["branch_name"],
+                "branch_code": user["branch_code"],
+                "last_login_at": user["last_login_at"].isoformat() if user["last_login_at"] else None,
+                "created_at": user["created_at"].isoformat() if user["created_at"] else None,
+                "updated_at": user["updated_at"].isoformat() if user["updated_at"] else None,
+                "permissions": perms,
+                "stores": [dict(s) for s in stores],
+                "devices": [dict(d) for d in devices]
+            }
         }
 
 
@@ -300,9 +462,11 @@ async def toggle_user_status(
 
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        user = await conn.fetchrow("SELECT id, phone_number, role FROM users WHERE id = $1", user_id)
+        user = await conn.fetchrow("SELECT id, phone_number, role, branch_id FROM users WHERE id = $1", user_id)
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+        check_account_management(current_admin, user)
 
         await conn.execute(
             "UPDATE users SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
@@ -316,12 +480,14 @@ async def toggle_user_status(
 
 
 @router.patch("/users/{user_id}/reset-password")
-async def reset_user_password(user_id: int, payload: AdminResetPasswordSchema):
+async def reset_user_password(user_id: int, payload: AdminResetPasswordSchema, current_admin: Dict[str, Any] = Depends(require_admin)):
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        user = await conn.fetchrow("SELECT id FROM users WHERE id = $1", user_id)
+        user = await conn.fetchrow("SELECT id, branch_id FROM users WHERE id = $1", user_id)
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+        check_account_management(current_admin, user)
 
         hashed = hash_password(payload.new_password)
         await conn.execute(
@@ -345,18 +511,15 @@ async def delete_user(user_id: int, current_admin: Dict[str, Any] = Depends(requ
 
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        try:
-            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE")
-        except Exception:
-            pass
-
-        user = await conn.fetchrow("SELECT id, full_name, phone_number, is_active FROM users WHERE id = $1", user_id)
+        user = await conn.fetchrow("SELECT id, full_name, phone_number, is_active, branch_id FROM users WHERE id = $1", user_id)
         if not user:
             # Idempotent deletion: if user already deleted from DB, return success
             return {
                 "status": "success",
                 "message": "User was already removed or does not exist."
             }
+
+        check_account_management(current_admin, user, "delete")
 
         # Soft-delete: Do not delete user from database, set is_active = FALSE and status = 'SUSPENDED'
         await conn.execute("""
@@ -491,7 +654,7 @@ async def get_admin_logs(
                 t.bank_tx_id ILIKE ${param_idx}
                 OR t.bank_name ILIKE ${param_idx}
                 OR t.payer_name ILIKE ${param_idx}
-                OR d.device_sn ILIKE ${param_idx}
+                OR d.device_id ILIKE ${param_idx}
                 OR d.device_id ILIKE ${param_idx}
                 OR m.name ILIKE ${param_idx}
                 OR m.owner_phone ILIKE ${param_idx}
@@ -511,11 +674,15 @@ async def get_admin_logs(
                 COALESCE(t.status::text, 'PROCESSED') AS status,
                 t.created_at,
                 COALESCE(t.raw_telegram_message, '') AS raw_message,
-                COALESCE(d.device_sn, d.device_id, 'Y6B') AS device_sn,
+                COALESCE(d.device_id, 'Y6B') AS device_sn,
                 COALESCE(m.merchant_name, m.name, 'Store') AS store_name,
                 m.owner_phone
             FROM transactions t
-            LEFT JOIN devices d ON (t.device_id::text = d.id::text OR t.device_id::text = d.device_sn::text OR t.device_id::text = d.device_id::text)
+            LEFT JOIN LATERAL (
+                SELECT dev.* FROM devices dev
+                WHERE dev.device_id = t.device_id::text OR dev.id::text = t.device_id::text
+                ORDER BY (dev.device_id = t.device_id::text) DESC, dev.id DESC LIMIT 1
+            ) d ON true
             LEFT JOIN merchants m ON (d.merchant_id::text = m.id::text OR d.merchant_id::text = m.merchant_id::text)
             WHERE {" AND ".join(tx_where)}
             ORDER BY t.created_at DESC
@@ -535,7 +702,7 @@ async def get_admin_logs(
                 OR a.bank_name ILIKE ${s_idx}
                 OR a.sender_name ILIKE ${s_idx}
                 OR a.reason ILIKE ${s_idx}
-                OR d.device_sn ILIKE ${s_idx}
+                OR d.device_id ILIKE ${s_idx}
                 OR m.name ILIKE ${s_idx}
             )""")
             sec_params.append(s)
@@ -556,11 +723,15 @@ async def get_admin_logs(
                 a.sender_user_id,
                 a.created_at,
                 a.raw_message,
-                COALESCE(d.device_sn, d.device_id, 'Y6B') AS device_sn,
+                COALESCE(d.device_id, 'Y6B') AS device_sn,
                 COALESCE(m.merchant_name, m.name, 'Store') AS store_name,
                 m.owner_phone
             FROM security_alerts a
-            LEFT JOIN devices d ON (a.device_id::text = d.id::text OR a.device_id::text = d.device_sn::text OR a.device_id::text = d.device_id::text)
+            LEFT JOIN LATERAL (
+                SELECT dev.* FROM devices dev
+                WHERE dev.device_id = a.device_id::text OR dev.id::text = a.device_id::text
+                ORDER BY (dev.device_id = a.device_id::text) DESC, dev.id DESC LIMIT 1
+            ) d ON true
             LEFT JOIN merchants m ON (a.merchant_id::text = m.id::text OR a.merchant_id::text = m.merchant_id::text)
             WHERE {" AND ".join(sec_where)}
             ORDER BY a.created_at DESC

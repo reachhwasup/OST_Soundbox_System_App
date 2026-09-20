@@ -1,0 +1,201 @@
+"table_name","position","column_name","data_type","is_nullable","column_default"
+"branches",1,"branch_id","integer","NO","nextval('branches_branch_id_seq'::regclass)"
+"branches",2,"branch_code","character varying(50)","NO",NULL
+"branches",3,"branch_name","character varying(150)","NO",NULL
+"branches",4,"location","text","YES",NULL
+"branches",5,"created_at","timestamp without time zone","YES","CURRENT_TIMESTAMP"
+"branches",6,"is_active","boolean","YES","true"
+"devices",1,"id","integer","NO","nextval('devices_id_seq'::regclass)"
+"devices",2,"device_id","character varying(100)","YES",NULL
+"devices",4,"merchant_id","integer","YES",NULL
+"devices",5,"supplier_id","integer","YES",NULL
+"devices",8,"telegram_chat_id","character varying(100)","YES",NULL
+"devices",10,"is_active","boolean","YES","true"
+"devices",11,"battery","character varying(50)","YES",NULL
+"devices",12,"signal","character varying(50)","YES",NULL
+"devices",13,"version_4g","character varying(255)","YES",NULL
+"devices",14,"version_wifi","character varying(255)","YES",NULL
+"devices",23,"imei","character varying(50)","YES",NULL
+"devices",24,"imsi","character varying(50)","YES",NULL
+"devices",25,"iccid","character varying(50)","YES",NULL
+"devices",26,"volume","integer","YES",NULL
+"devices",27,"vlver","character varying(100)","YES",NULL
+"devices",28,"lang","integer","YES",NULL
+"devices",29,"batt_mv","integer","YES",NULL
+"devices",30,"adc","character varying(50)","YES",NULL
+"devices",31,"ssid","character varying(100)","YES",NULL
+"devices",32,"mac","character varying(50)","YES",NULL
+"devices",33,"notes","text","YES",NULL
+"devices",34,"last_heartbeat","timestamp with time zone","YES",NULL
+"devices",37,"qr_code","text","YES",NULL
+"devices",38,"last_online","timestamp with time zone","YES",NULL
+"devices",39,"created_at","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"devices",40,"updated_at","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"devices",41,"firmware_version_4g","character varying(64)","YES",NULL
+"devices",42,"verno","character varying(32)","YES",NULL
+"devices",43,"firmware_version_wifi","character varying(64)","YES",NULL
+"devices",44,"battery_percentage","integer","YES",NULL
+"devices",45,"battery_mv","integer","YES",NULL
+"devices",46,"signal_strength","integer","YES",NULL
+"devices",47,"language","character varying(16)","YES",NULL
+"devices",48,"last_seen_at","timestamp with time zone","YES",NULL
+"devices",49,"raw_telemetry","jsonb","YES",NULL
+"discounts",1,"id","bigint","NO","nextval('discounts_id_seq'::regclass)"
+"discounts",2,"code","character varying(50)","NO",NULL
+"discounts",3,"discount_type","character varying(20)","NO",NULL
+"discounts",4,"discount_value","numeric(10,2)","NO",NULL
+"discounts",5,"is_active","boolean","YES","true"
+"group_users",1,"id","integer","NO","nextval('group_users_id_seq'::regclass)"
+"group_users",2,"chat_id","character varying(50)","NO",NULL
+"group_users",3,"user_id","character varying(50)","NO",NULL
+"group_users",4,"username","character varying(100)","YES",NULL
+"group_users",7,"full_name","text","YES",NULL
+"group_users",9,"is_authorized","boolean","YES","false"
+"group_users",10,"created_at","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"group_users",11,"updated_at","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"inventory_logs",1,"id","bigint","NO","nextval('inventory_logs_id_seq'::regclass)"
+"inventory_logs",2,"inventory_serial_id","bigint","YES",NULL
+"inventory_logs",3,"previous_status","character varying(20)","YES",NULL
+"inventory_logs",4,"new_status","character varying(20)","YES",NULL
+"inventory_logs",5,"changed_by","bigint","YES",NULL
+"inventory_logs",6,"changed_at","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"inventory_logs",7,"notes","text","YES",NULL
+"inventory_logs",8,"branch_id","integer","YES",NULL
+"inventory_serials",1,"id","bigint","NO","nextval('inventory_serials_id_seq'::regclass)"
+"inventory_serials",2,"product_id","bigint","YES",NULL
+"inventory_serials",3,"serial_number","character varying(100)","NO",NULL
+"inventory_serials",4,"status","character varying(20)","YES","'IN_STOCK'::character varying"
+"inventory_serials",5,"warehouse_location","character varying(50)","YES",NULL
+"inventory_serials",6,"received_date","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"inventory_serials",7,"updated_at","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"inventory_serials",8,"purchase_price","numeric(10,2)","YES","0.00"
+"inventory_serials",10,"branch_id","integer","YES",NULL
+"merchants",1,"id","integer","NO","nextval('merchants_id_seq'::regclass)"
+"merchants",2,"merchant_id","character varying(100)","YES",NULL
+"merchants",3,"user_id","integer","YES",NULL
+"merchants",4,"name","character varying(255)","NO",NULL
+"merchants",5,"merchant_name","character varying(255)","YES",NULL
+"merchants",6,"owner_phone","character varying(50)","NO",NULL
+"merchants",7,"place","character varying(255)","YES",NULL
+"merchants",8,"location","character varying(255)","YES",NULL
+"merchants",9,"province","character varying(100)","YES",NULL
+"merchants",10,"district","character varying(100)","YES",NULL
+"merchants",11,"commune","character varying(100)","YES",NULL
+"merchants",12,"village","character varying(100)","YES",NULL
+"merchants",13,"street","character varying(255)","YES",NULL
+"merchants",14,"created_at","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"merchants",15,"updated_at","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"merchants",16,"telegram_chat_id","character varying(100)","YES",NULL
+"official_bank_bots",1,"bot_id","character varying(50)","NO",NULL
+"official_bank_bots",2,"bot_name","character varying(100)","YES",NULL
+"official_bank_bots",3,"bank_name","character varying(50)","YES",NULL
+"official_bank_bots",4,"is_active","boolean","YES","true"
+"official_bank_bots",5,"created_at","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"official_bank_bots",6,"updated_at","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"pos_invoice_items",1,"id","bigint","NO","nextval('pos_invoice_items_id_seq'::regclass)"
+"pos_invoice_items",2,"invoice_id","bigint","YES",NULL
+"pos_invoice_items",3,"product_id","bigint","YES",NULL
+"pos_invoice_items",4,"inventory_serial_id","bigint","YES",NULL
+"pos_invoice_items",5,"original_price","numeric(10,2)","NO",NULL
+"pos_invoice_items",6,"discount_id","bigint","YES",NULL
+"pos_invoice_items",7,"discount_amount","numeric(10,2)","YES","0.00"
+"pos_invoice_items",8,"final_price","numeric(10,2)","NO",NULL
+"pos_invoice_items",9,"warranty_start_date","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"pos_invoice_items",10,"warranty_end_date","timestamp with time zone","NO",NULL
+"pos_invoice_items",11,"warranty_status","character varying(20)","YES","'ACTIVE'::character varying"
+"pos_invoices",1,"id","bigint","NO","nextval('pos_invoices_id_seq'::regclass)"
+"pos_invoices",2,"receipt_no","character varying(50)","NO",NULL
+"pos_invoices",3,"subtotal","numeric(10,2)","NO",NULL
+"pos_invoices",4,"total_discount","numeric(10,2)","YES","0.00"
+"pos_invoices",5,"grand_total","numeric(10,2)","NO",NULL
+"pos_invoices",6,"payment_method","character varying(20)","NO",NULL
+"pos_invoices",7,"cashier_id","bigint","NO",NULL
+"pos_invoices",8,"sale_date","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"pos_invoices",10,"branch_id","integer","NO",NULL
+"products",1,"id","bigint","NO","nextval('products_id_seq'::regclass)"
+"products",2,"sku","character varying(50)","NO",NULL
+"products",3,"name","character varying(100)","YES",NULL
+"products",4,"base_price","numeric(10,2)","NO",NULL
+"products",5,"default_warranty_months","integer","YES","3"
+"products",6,"device_model","character varying(120)","YES",NULL
+"products",10,"supplier_id","integer","YES",NULL
+"products",7,"is_active","boolean","YES","true"
+"products",8,"created_at","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"products",9,"is_order","integer","YES",NULL
+"sales",1,"id","integer","NO","nextval('sales_id_seq'::regclass)"
+"sales",2,"device_id","integer","YES",NULL
+"sales",3,"device_sn","character varying(100)","NO",NULL
+"sales",4,"merchant_id","integer","YES",NULL
+"sales",5,"sold_by_user_id","integer","YES",NULL
+"sales",6,"customer_name","character varying(150)","YES",NULL
+"sales",7,"customer_phone","character varying(50)","YES",NULL
+"sales",8,"price","numeric(10,2)","NO","29.00"
+"sales",9,"discount_type","character varying(20)","YES","'NONE'::character varying"
+"sales",10,"discount_percent","numeric(5,2)","YES","0.00"
+"sales",11,"discount_amount","numeric(10,2)","YES","0.00"
+"sales",12,"final_price","numeric(10,2)","NO","29.00"
+"sales",13,"currency","character varying(10)","YES","'USD'::character varying"
+"sales",14,"warranty_days","integer","YES","90"
+"sales",15,"warranty_start_date","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"sales",16,"warranty_end_date","timestamp with time zone","YES",NULL
+"sales",17,"payment_method","character varying(50)","YES","'CASH'::character varying"
+"sales",18,"status","character varying(50)","YES","'COMPLETED'::character varying"
+"sales",19,"notes","text","YES",NULL
+"sales",20,"quantity","integer","NO","1"
+"sales",21,"invoice_reference","character varying(100)","YES",NULL
+"sales",22,"created_at","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"sales",23,"updated_at","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"security_alerts",1,"id","bigint","NO","nextval('security_alerts_id_seq'::regclass)"
+"security_alerts",2,"device_id","character varying(100)","YES",NULL
+"security_alerts",3,"merchant_id","character varying(100)","YES",NULL
+"security_alerts",4,"alert_type","character varying(50)","NO",NULL
+"security_alerts",5,"severity","character varying(20)","YES","'WARNING'::character varying"
+"security_alerts",6,"bank_name","character varying(50)","YES",NULL
+"security_alerts",7,"bank_tx_id","character varying(150)","YES",NULL
+"security_alerts",8,"amount","numeric(12,2)","YES",NULL
+"security_alerts",9,"currency","character varying(10)","YES","'USD'::character varying"
+"security_alerts",10,"sender_user_id","character varying(100)","YES",NULL
+"security_alerts",11,"sender_name","character varying(255)","YES",NULL
+"security_alerts",12,"raw_message","text","YES",NULL
+"security_alerts",13,"reason","text","YES",NULL
+"security_alerts",14,"created_at","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"suppliers",1,"id","integer","NO","nextval('suppliers_id_seq'::regclass)"
+"suppliers",2,"name","character varying(150)","NO",NULL
+"suppliers",3,"contact_person","character varying(150)","YES",NULL
+"suppliers",4,"phone","character varying(50)","YES",NULL
+"suppliers",5,"email","character varying(150)","YES",NULL
+"suppliers",6,"address","text","YES",NULL
+"suppliers",7,"notes","text","YES",NULL
+"suppliers",8,"is_active","boolean","YES","true"
+"suppliers",9,"created_at","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"suppliers",10,"updated_at","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"transactions",1,"id","character varying(64)","NO","nextval('transactions_id_seq'::regclass)"
+"transactions",2,"txid","character varying(150)","YES",NULL
+"transactions",3,"bank_tx_id","character varying(150)","YES",NULL
+"transactions",4,"bank_name","character varying(50)","YES",NULL
+"transactions",5,"chat_id","character varying(100)","YES",NULL
+"transactions",6,"device_id","character varying(100)","YES",NULL
+"transactions",7,"amount","numeric(12,2)","NO",NULL
+"transactions",8,"currency","character varying(10)","NO","'USD'::character varying"
+"transactions",9,"payer_name","character varying(255)","YES",NULL
+"transactions",10,"raw_payload","text","YES",NULL
+"transactions",11,"raw_telegram_message","text","YES",NULL
+"transactions",12,"status","character varying(50)","YES","'PROCESSED'::character varying"
+"transactions",13,"device_ack","boolean","YES","false"
+"transactions",14,"ack_status","character varying(50)","YES",NULL
+"transactions",15,"ack_at","timestamp with time zone","YES",NULL
+"transactions",16,"created_at","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"transactions",17,"raw_text","text","YES",NULL
+"transactions",18,"is_played","boolean","YES","false"
+"transactions",19,"playback_status","character varying(32)","YES","'MQTT_DELIVERED'::character varying"
+"transactions",20,"updated_at","timestamp with time zone","YES","now()"
+"users",1,"id","integer","NO","nextval('users_id_seq'::regclass)"
+"users",2,"phone_number","character varying(50)","NO",NULL
+"users",3,"full_name","character varying(255)","YES",NULL
+"users",4,"password_hash","character varying(255)","NO",NULL
+"users",5,"role","user_role","NO","'USER'::user_role"
+"users",6,"status","user_status","NO","'ACTIVE'::user_status"
+"users",7,"last_login_at","timestamp with time zone","YES",NULL
+"users",8,"created_at","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"users",9,"updated_at","timestamp with time zone","YES","CURRENT_TIMESTAMP"
+"users",10,"is_active","boolean","YES","true"

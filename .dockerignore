@@ -8,5 +8,11 @@ venv/
 frontend/
 node_modules/
 dist/
-*.session
-userbot_state.json
+
+# Local secrets and database backups
+.env.*
+!.env.example
+*_backup.sql
+*.dump
+*.pem
+*.key

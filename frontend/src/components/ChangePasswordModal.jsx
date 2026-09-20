@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Eye, EyeOff, CheckCircle2, AlertCircle, KeyRound, User, ChevronRight } from 'lucide-react';
+import { Lock, Eye, EyeOff, CheckCircle2, AlertCircle, KeyRound } from 'lucide-react';
 import Modal from './Modal';
 import api from '../api';
 import { useToast } from '../context/ToastContext';
