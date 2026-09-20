@@ -8,10 +8,12 @@ services:
     ports:
       - "8001:8000"
     environment:
-      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:fDdiFw_KB2930otN@ost_postgres:5432/postgres}
+      - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:5175,http://127.0.0.1:5175}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?Set a strong JWT_SECRET_KEY}
       - API_SECRET_KEY=${API_SECRET_KEY:-your-api-key}
       - ADMIN_PHONE=${ADMIN_PHONE:-012345678}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-Admin123!}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - ADMIN_NAME=${ADMIN_NAME:-System Administrator}
     restart: always
     networks:

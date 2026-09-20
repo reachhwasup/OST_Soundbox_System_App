@@ -18,13 +18,13 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 # Schemas
 class RegisterSchema(BaseModel):
     phone_number: str = Field(..., min_length=6, max_length=50, description="Phone number for account sign up")
-    password: str = Field(..., min_length=6, description="Account password (min 6 chars)")
+    password: str = Field(..., min_length=6, max_length=1024, description="Account password (min 6 chars)")
     full_name: Optional[str] = Field(None, max_length=255, description="User's full name")
 
 
 class LoginSchema(BaseModel):
-    phone_number: str = Field(..., description="Registered phone number")
-    password: str = Field(..., description="Account password")
+    phone_number: str = Field(..., max_length=50, description="Registered phone number")
+    password: str = Field(..., max_length=1024, description="Account password")
 
 
 class ProfileUpdateSchema(BaseModel):
@@ -33,8 +33,8 @@ class ProfileUpdateSchema(BaseModel):
 
 
 class PasswordChangeSchema(BaseModel):
-    current_password: str
-    new_password: str = Field(..., min_length=6)
+    current_password: str = Field(..., max_length=1024)
+    new_password: str = Field(..., min_length=6, max_length=1024)
 
 
 @router.post("/register")
@@ -94,8 +94,13 @@ async def login(payload: LoginSchema):
         try:
             user = await conn.fetchrow(
                 """
-                SELECT id, phone_number, full_name, password_hash, role, status, COALESCE(is_active, TRUE) AS is_active
-                FROM users WHERE phone_number = $1
+                SELECT u.id, u.phone_number, u.full_name, u.password_hash, u.role, u.status,
+                       COALESCE(u.is_active, TRUE) AS is_active,
+                       u.branch_id, b.branch_name, b.branch_code,
+                       COALESCE(u.permissions, '{"tabs": ["all"], "crud": ["all"]}'::jsonb) AS permissions
+                FROM users u
+                LEFT JOIN branches b ON u.branch_id = b.branch_id
+                WHERE u.phone_number = $1
                 """,
                 clean_phone
             )
@@ -128,15 +133,24 @@ async def login(payload: LoginSchema):
 
         # Check if user has registered store
         store = await conn.fetchrow(
-            "SELECT COALESCE(merchant_id, id::text) AS merchant_id, id, COALESCE(merchant_name, name) AS merchant_name, COALESCE(merchant_name, name) AS name, place, location FROM merchants WHERE user_id = $1 OR owner_phone = $2",
-            user["id"], clean_phone
+            "SELECT COALESCE(merchant_id, id::text) AS merchant_id, id, COALESCE(merchant_name, name) AS merchant_name, COALESCE(merchant_name, name) AS name, place, location FROM merchants WHERE user_id = $1",
+            user["id"]
         )
+
+        perms = user.get("permissions") if "permissions" in user else {"tabs": ["all"], "crud": ["all"]}
+        if isinstance(perms, str):
+            import json
+            try:
+                perms = json.loads(perms)
+            except Exception:
+                perms = {"tabs": ["all"], "crud": ["all"]}
 
         access_token = create_access_token({
             "sub": str(user["id"]),
             "user_id": user["id"],
             "phone_number": user["phone_number"],
-            "role": user["role"]
+            "role": user["role"],
+            "branch_id": user.get("branch_id")
         })
 
         return {
@@ -149,6 +163,10 @@ async def login(payload: LoginSchema):
                 "full_name": user["full_name"],
                 "role": user["role"],
                 "status": user["status"],
+                "branch_id": user.get("branch_id"),
+                "branch_name": user.get("branch_name"),
+                "branch_code": user.get("branch_code"),
+                "permissions": perms,
                 "has_store": store is not None,
                 "store": dict(store) if store else None
             }
@@ -160,16 +178,10 @@ async def get_me(current_user: Dict[str, Any] = Depends(get_current_user)):
     pool = await get_db_pool()
     async with pool.acquire() as conn:
         store = await conn.fetchrow(
-            "SELECT COALESCE(merchant_id, id::text) AS merchant_id, id, COALESCE(merchant_name, name) AS merchant_name, COALESCE(merchant_name, name) AS name, place, location, owner_phone FROM merchants WHERE user_id = $1 OR owner_phone = $2",
-            current_user["id"], current_user["phone_number"]
+            "SELECT COALESCE(merchant_id, id::text) AS merchant_id, id, COALESCE(merchant_name, name) AS merchant_name, COALESCE(merchant_name, name) AS name, place, location, owner_phone FROM merchants WHERE user_id = $1",
+            current_user["id"]
         )
         
-        # Link store to user_id if matched by phone but user_id is null
-        if store and store["id"]:
-            await conn.execute(
-                "UPDATE merchants SET user_id = $1 WHERE id = $2 AND user_id IS NULL",
-                current_user["id"], store["id"]
-            )
 
     return {
         "status": "success",
@@ -213,8 +225,8 @@ async def update_profile(
 
         # Check store info
         store = await conn.fetchrow(
-            "SELECT COALESCE(merchant_id, id::text) AS merchant_id, id, COALESCE(merchant_name, name) AS merchant_name, COALESCE(merchant_name, name) AS name, place, location, owner_phone FROM merchants WHERE user_id = $1 OR owner_phone = $2",
-            current_user["id"], target_phone
+            "SELECT COALESCE(merchant_id, id::text) AS merchant_id, id, COALESCE(merchant_name, name) AS merchant_name, COALESCE(merchant_name, name) AS name, place, location, owner_phone FROM merchants WHERE user_id = $1",
+            current_user["id"]
         )
 
         # Generate refreshed access token

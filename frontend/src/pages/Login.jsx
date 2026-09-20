@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
+import { translateServerMessage } from '../lib/serverMessage';
+import { useToast } from '../context/ToastContext';
 import { Phone, Lock, Eye, EyeOff, LogIn, Sun, Moon, Globe } from 'lucide-react';
 import OstLogo from '../components/OstLogo';
 
@@ -12,18 +14,20 @@ export default function Login({ onSwitchToRegister }) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const { showToast } = useToast();
+
+  // Errors are raised as toasts, matching the rest of the app
+  const fail = (message) => showToast({ type: 'error', title: t('errorLabel', 'Error'), message });
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
     if (!phoneNumber.trim()) {
-      setError(t('enterPhone', 'Please enter your phone number'));
+      fail(t('enterPhone', 'Please enter your phone number'));
       return;
     }
     if (!password) {
-      setError(t('enterPassword', 'Please enter your password'));
+      fail(t('enterPassword', 'Please enter your password'));
       return;
     }
 
@@ -31,7 +35,7 @@ export default function Login({ onSwitchToRegister }) {
       setLoading(true);
       await login(phoneNumber.trim(), password);
     } catch (err) {
-      setError(err.response?.data?.detail || t('loginFailed', 'Login failed. Please check credentials.'));
+      fail(translateServerMessage(err.response?.data?.detail, t) || t('loginFailed', 'Login failed. Please check credentials.'));
     } finally {
       setLoading(false);
     }
@@ -77,12 +81,6 @@ export default function Login({ onSwitchToRegister }) {
         </div>
 
         {/* Error Alert */}
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/50 rounded-xl text-red-600 dark:text-red-400 text-xs sm:text-sm flex items-center gap-2">
-            <span>{error}</span>
-          </div>
-        )}
-
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

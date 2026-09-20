@@ -40,25 +40,6 @@ async def list_suppliers(
     """Retrieves all suppliers with device counts."""
     pool = await get_db_pool()
     async with pool.acquire() as conn:
-        # Ensure suppliers table and devices.supplier_id exist
-        await conn.execute("""
-            CREATE TABLE IF NOT EXISTS suppliers (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(150) NOT NULL UNIQUE,
-                contact_person VARCHAR(150),
-                phone VARCHAR(50),
-                email VARCHAR(150),
-                address TEXT,
-                notes TEXT,
-                is_active BOOLEAN DEFAULT TRUE,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-            );
-            INSERT INTO suppliers (name, is_active)
-            VALUES ('Feishu', TRUE), ('Hemi', TRUE)
-            ON CONFLICT (name) DO NOTHING;
-            ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier_id INT;
-        """)
 
         where_clause = "WHERE s.is_active = TRUE" if active_only else ""
         query = f"""
@@ -66,7 +47,8 @@ async def list_suppliers(
                    s.created_at, s.updated_at,
                    COUNT(d.id)::int AS device_count
             FROM suppliers s
-            LEFT JOIN devices d ON d.supplier_id = s.id
+            LEFT JOIN products pr ON pr.supplier_id = s.id
+            LEFT JOIN devices d ON d.product_id = pr.id
             {where_clause}
             GROUP BY s.id
             ORDER BY s.id ASC
@@ -106,7 +88,8 @@ async def get_supplier(
                    s.created_at, s.updated_at,
                    COUNT(d.id)::int AS device_count
             FROM suppliers s
-            LEFT JOIN devices d ON d.supplier_id = s.id
+            LEFT JOIN products pr ON pr.supplier_id = s.id
+            LEFT JOIN devices d ON d.product_id = pr.id
             WHERE s.id = $1
             GROUP BY s.id
         """, supplier_id)
@@ -275,7 +258,7 @@ async def delete_supplier(
 
         # Check if devices are linked
         device_count = await conn.fetchval(
-            "SELECT COUNT(*) FROM devices WHERE supplier_id = $1",
+            "SELECT COUNT(*) FROM devices d JOIN products pr ON pr.id = d.product_id WHERE pr.supplier_id = $1",
             supplier_id
         )
 

@@ -1,23 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { 
-  Volume2, 
-  Store, 
-  Shield, 
-  X, 
-  ChevronRight,
-  ChevronDown,
-  ChevronLeft,
-  Users,
-  Receipt,
-  ShieldAlert,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Smartphone,
-  Warehouse,
-  Activity
-} from 'lucide-react';
+import { Store, Shield, X, ChevronDown, Users, Receipt, ShieldAlert, PanelLeftClose, PanelLeftOpen, Smartphone, Warehouse, Package, Truck, Building2, Activity } from 'lucide-react';
 import OstLogo from './OstLogo';
 
 export default function Sidebar({ 
@@ -31,7 +15,11 @@ export default function Sidebar({
   const { user } = useAuth();
   const { t, isKhmer } = useLanguage();
   const [internalOpen, setInternalOpen] = useState(false);
-  const [currentSubTab, setCurrentSubTab] = useState(() => localStorage.getItem('soundbox_admin_tab') || 'users');
+  const [currentSubTab, setCurrentSubTab] = useState(() => localStorage.getItem('soundbox_admin_tab') || 'admins');
+  const [isUsersDropdownOpen, setIsUsersDropdownOpen] = useState(() => {
+    const saved = localStorage.getItem('soundbox_admin_tab') || 'admins';
+    return saved === 'admins' || saved === 'users';
+  });
 
   const isOpen = isMobileOpen !== undefined ? isMobileOpen : internalOpen;
   const setIsOpen = setIsMobileOpen || setInternalOpen;
@@ -54,6 +42,9 @@ export default function Sidebar({
     const handleTabSync = (e) => {
       if (e.detail) {
         setCurrentSubTab(e.detail);
+        if (e.detail === 'admins' || e.detail === 'users') {
+          setIsUsersDropdownOpen(true);
+        }
       }
     };
     const handleMerchantTabSync = (e) => {
@@ -163,6 +154,7 @@ export default function Sidebar({
             </button>
           </div>
 
+
           {/* Navigation Menu Links */}
           <nav className="flex-1 p-3 sm:p-3.5 space-y-1.5">
             
@@ -176,22 +168,90 @@ export default function Sidebar({
             {/* Admin Console View Navigation */}
             {isAdmin && (
               <div className="space-y-1">
-                {/* Item 1: Users & Merchants */}
-                <button
-                  type="button"
-                  onClick={() => handleAdminSubTabClick('users')}
-                  title={isKhmer ? 'អ្នកប្រើប្រាស់ & អាជីវករ' : 'Users & Merchants'}
-                  className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
-                    isCollapsed 
-                      ? `h-12 justify-center ${currentSubTab === 'users' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}` 
-                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'users' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
-                  }`}
-                >
-                  <Users className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-emerald-400'}`} />
-                  {!isCollapsed && (
-                    <span className="truncate">{isKhmer ? 'អ្នកប្រើប្រាស់ & អាជីវករ' : 'Users & Merchants'}</span>
-                  )}
-                </button>
+                {/* Item 1: Dropdown User Management (Manage Admins & Manage Users) */}
+                {isCollapsed ? (
+                  <div className="space-y-1">
+                    {/* Collapsed Item: Manage Admins */}
+                    <button
+                      type="button"
+                      onClick={() => handleAdminSubTabClick('admins')}
+                      title={isKhmer ? 'គ្រប់គ្រង Admin' : 'Manage Admins'}
+                      className={`w-full h-11 flex items-center justify-center transition cursor-pointer rounded-xl font-semibold ${
+                        currentSubTab === 'admins'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <Shield className="w-5 h-5" />
+                    </button>
+
+                    {/* Collapsed Item: Manage Users */}
+                    <button
+                      type="button"
+                      onClick={() => handleAdminSubTabClick('users')}
+                      title={isKhmer ? 'គ្រប់គ្រងអ្នកប្រើប្រាស់' : 'Manage Users'}
+                      className={`w-full h-11 flex items-center justify-center transition cursor-pointer rounded-xl font-semibold ${
+                        currentSubTab === 'users'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <Users className="w-5 h-5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setIsUsersDropdownOpen(prev => !prev)}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
+                        (currentSubTab === 'admins' || currentSubTab === 'users') && !isUsersDropdownOpen
+                          ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
+                          : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                      title={isKhmer ? 'គ្រប់គ្រងគណនី' : 'User Management'}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Users className="w-4 h-4 text-emerald-500 shrink-0" />
+                        <span className="truncate">{isKhmer ? 'គ្រប់គ្រងគណនី' : 'User Management'}</span>
+                      </div>
+                      <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isUsersDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {/* Sub-menu options */}
+                    {isUsersDropdownOpen && (
+                      <div className="ml-4 pl-3 py-1 space-y-1 border-l-2 border-slate-200 dark:border-slate-700">
+                        {/* Sub-item 1: Manage Admins */}
+                        <button
+                          type="button"
+                          onClick={() => handleAdminSubTabClick('admins')}
+                          className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                            currentSubTab === 'admins'
+                              ? 'bg-emerald-600 text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+                          }`}
+                        >
+                          <Shield className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">{isKhmer ? 'គ្រប់គ្រង Admin' : 'Manage Admins'}</span>
+                        </button>
+
+                        {/* Sub-item 2: Manage Users */}
+                        <button
+                          type="button"
+                          onClick={() => handleAdminSubTabClick('users')}
+                          className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                            currentSubTab === 'users'
+                              ? 'bg-emerald-600 text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+                          }`}
+                        >
+                          <Users className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">{isKhmer ? 'គ្រប់គ្រងអ្នកប្រើប្រាស់' : 'Manage Users'}</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Item 2: Stores & Locations */}
                 <button
@@ -241,6 +301,58 @@ export default function Sidebar({
                   <Warehouse className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-emerald-400'}`} />
                   {!isCollapsed && (
                     <span className="truncate">{isKhmer ? 'ស្តុកឧបករណ៍ Soundbox' : 'Stock & Inventory'}</span>
+                  )}
+                </button>
+
+
+                {/* Item: Manage Product */}
+                <button
+                  type="button"
+                  onClick={() => handleAdminSubTabClick('products')}
+                  title={isKhmer ? 'គ្រប់គ្រងផលិតផល' : 'Manage Product'}
+                  className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
+                    isCollapsed
+                      ? `h-12 justify-center ${currentSubTab === 'products' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}`
+                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'products' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                  }`}
+                >
+                  <Package className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-emerald-400'}`} />
+                  {!isCollapsed && (
+                    <span className="truncate">{isKhmer ? 'គ្រប់គ្រងផលិតផល' : 'Manage Product'}</span>
+                  )}
+                </button>
+
+                {/* Item: Manage Branch */}
+                <button
+                  type="button"
+                  onClick={() => handleAdminSubTabClick('branches')}
+                  title={isKhmer ? 'គ្រប់គ្រងសាខា' : 'Manage Branch'}
+                  className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
+                    isCollapsed
+                      ? `h-12 justify-center ${currentSubTab === 'branches' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}`
+                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'branches' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                  }`}
+                >
+                  <Building2 className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-emerald-400'}`} />
+                  {!isCollapsed && (
+                    <span className="truncate">{isKhmer ? 'គ្រប់គ្រងសាខា' : 'Manage Branch'}</span>
+                  )}
+                </button>
+
+                {/* Item: Manage Supplier */}
+                <button
+                  type="button"
+                  onClick={() => handleAdminSubTabClick('suppliers')}
+                  title={isKhmer ? 'គ្រប់គ្រងអ្នកផ្គត់ផ្គង់' : 'Manage Supplier'}
+                  className={`w-full flex items-center transition cursor-pointer rounded-xl font-semibold text-xs sm:text-sm ${
+                    isCollapsed
+                      ? `h-12 justify-center ${currentSubTab === 'suppliers' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}`
+                      : `px-3 py-2.5 gap-2.5 ${currentSubTab === 'suppliers' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`
+                  }`}
+                >
+                  <Truck className={`shrink-0 ${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 text-emerald-400'}`} />
+                  {!isCollapsed && (
+                    <span className="truncate">{isKhmer ? 'គ្រប់គ្រងអ្នកផ្គត់ផ្គង់' : 'Manage Supplier'}</span>
                   )}
                 </button>
 

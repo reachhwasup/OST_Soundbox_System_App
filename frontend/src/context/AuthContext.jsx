@@ -1,18 +1,23 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import api from '../api';
+import { readSession, clearSession } from '../lib/authSession';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('user');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [token, setToken] = useState(() => localStorage.getItem('token'));
+  const [initialSession] = useState(() => readSession(localStorage));
+  const [user, setUser] = useState(initialSession.user);
+  const [token, setToken] = useState(initialSession.token);
+  const sessionVersion = useRef(0);
+  const [authError, setAuthError] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const handleUnauthorized = () => {
+      sessionVersion.current += 1;
+      clearSession(localStorage);
+      setAuthError('');
       setUser(null);
       setToken(null);
     };
@@ -21,34 +26,56 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    const version = sessionVersion.current;
+    const isCurrent = () => !cancelled && version === sessionVersion.current;
     const checkAuth = async () => {
+      setLoading(true);
+      setAuthError('');
       if (token) {
         try {
           const res = await api.get('/api/auth/me');
-          if (res.data && res.data.user) {
+          if (!res.data?.user) throw new Error('Invalid session response');
+          if (isCurrent()) {
             setUser(res.data.user);
             localStorage.setItem('user', JSON.stringify(res.data.user));
           }
         } catch (err) {
-          console.error('Failed to fetch user:', err);
+          if (isCurrent()) {
+            if (err.response?.status === 401) {
+              clearSession(localStorage);
+              setUser(null);
+              setToken(null);
+            } else {
+              setAuthError('Unable to verify your session. Check your connection and try again.');
+            }
+          }
         }
       }
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     };
     checkAuth();
-  }, [token]);
+    return () => { cancelled = true; };
+  }, [token, retryCount]);
+
+  const saveSession = ({ access_token, user: userData }) => {
+    sessionVersion.current += 1;
+    localStorage.setItem('token', access_token);
+    localStorage.setItem('user', JSON.stringify(userData));
+    setAuthError('');
+    setLoading(true);
+    setToken(access_token);
+    setUser(userData);
+    setRetryCount(n => n + 1);
+    return userData;
+  };
 
   const login = async (phoneNumber, password) => {
     const res = await api.post('/api/auth/login', {
       phone_number: phoneNumber,
       password: password,
     });
-    const { access_token, user: userData } = res.data;
-    localStorage.setItem('token', access_token);
-    localStorage.setItem('user', JSON.stringify(userData));
-    setToken(access_token);
-    setUser(userData);
-    return userData;
+    return saveSession(res.data);
   };
 
   const register = async (phoneNumber, password, fullName) => {
@@ -57,25 +84,22 @@ export const AuthProvider = ({ children }) => {
       password: password,
       full_name: fullName,
     });
-    const { access_token, user: userData } = res.data;
-    localStorage.setItem('token', access_token);
-    localStorage.setItem('user', JSON.stringify(userData));
-    setToken(access_token);
-    setUser(userData);
-    return userData;
+    return saveSession(res.data);
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    sessionVersion.current += 1;
+    clearSession(localStorage);
+    setAuthError('');
     setToken(null);
     setUser(null);
   };
 
   const refreshUser = async () => {
+    const version = sessionVersion.current;
     try {
       const res = await api.get('/api/auth/me');
-      if (res.data && res.data.user) {
+      if (version === sessionVersion.current && res.data?.user) {
         setUser(res.data.user);
         localStorage.setItem('user', JSON.stringify(res.data.user));
       }
@@ -85,10 +109,12 @@ export const AuthProvider = ({ children }) => {
   };
 
   const updateProfile = async (fullName, phoneNumber) => {
+    const version = sessionVersion.current;
     const res = await api.put('/api/auth/profile', {
       full_name: fullName,
       phone_number: phoneNumber,
     });
+    if (version !== sessionVersion.current) return res.data;
     const { access_token, user: userData } = res.data;
     if (access_token) {
       localStorage.setItem('token', access_token);
@@ -102,7 +128,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, refreshUser, updateProfile }}>
+    <AuthContext.Provider value={{ user, token, loading, authError, retryAuth: () => setRetryCount(n => n + 1), login, register, logout, refreshUser, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

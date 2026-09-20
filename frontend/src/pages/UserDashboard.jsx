@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import api from '../api';
+import { hasScreen } from '../lib/deviceType';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
@@ -10,55 +11,7 @@ import CambodiaLocationSelector from '../components/CambodiaLocationSelector';
 import { findLocationNames, resolveStoreLocationCodes } from '../data/cambodiaLocations';
 import jsQR from 'jsqr';
 
-import { 
-  Store, 
-  MapPin, 
-  Building, 
-  Phone, 
-  Plus, 
-  Edit3, 
-  Trash2,
-  Volume2, 
-  Volume1,
-  VolumeX,
-  Smartphone, 
-  RefreshCw, 
-  CheckCircle2, 
-  DollarSign, 
-  CreditCard,
-  QrCode,
-  Upload,
-  AlertCircle,
-  Layers,
-  Settings,
-  Unlink,
-  Radio,
-  Download,
-  Search,
-  Filter,
-  TrendingUp,
-  ShieldCheck,
-  Zap,
-  Check,
-  Receipt,
-  ExternalLink,
-  Signal,
-  BatteryCharging,
-  Sliders,
-  SlidersHorizontal,
-  BellRing,
-  RotateCcw,
-  Calendar,
-  ChevronRight,
-  Clock,
-  Info,
-  Square,
-  CheckSquare,
-  Battery,
-  Wifi,
-  Columns,
-  Eye
-} from 'lucide-react';
+import { Store, MapPin, Plus, Edit3, Trash2, Volume2, Smartphone, RefreshCw, CheckCircle2, QrCode, Upload, AlertCircle, Unlink, Download, Search, ShieldCheck, Check, Receipt, ExternalLink, Signal, Sliders, RotateCcw, Info, Square, CheckSquare, Battery, Wifi, Columns, Eye } from 'lucide-react';
 
 export default function UserDashboard() {
   const { user, refreshUser } = useAuth();
@@ -710,12 +663,11 @@ export default function UserDashboard() {
       resetRegisterForm();
       setIsRegisterStoreOpen(false);
 
-      const regMsg = `Store '${storeName.trim()}' registered successfully!`;
       showToast({
         type: 'success',
-        title: 'Store Registered',
-        message: regMsg,
-        duration: 5000
+        title: t('storeRegistered', 'Store Registered'),
+        message: `Store '${storeName.trim()}' registered successfully!`,
+        duration: 12000
       });
 
       await fetchStoresData(true);
@@ -1180,28 +1132,6 @@ export default function UserDashboard() {
     e.target.value = '';
   };
 
-  // Calculate Real-Time Store Financial Metrics for Overview
-  const storeMetrics = useMemo(() => {
-    if (!activeStore || !activeStore.recent_transactions) {
-      return { totalUSD: 0, totalKHR: 0, txCount: 0, activeDevices: 0 };
-    }
-    let usd = 0;
-    let khr = 0;
-    activeStore.recent_transactions.forEach(tx => {
-      if (String(tx.currency).toUpperCase() === 'KHR') {
-        khr += Number(tx.amount || 0);
-      } else {
-        usd += Number(tx.amount || 0);
-      }
-    });
-    return {
-      totalUSD: usd,
-      totalKHR: khr,
-      txCount: activeStore.recent_transactions.length,
-      activeDevices: activeStore.devices?.filter(d => String(d.status).toUpperCase() === 'ACTIVE' || String(d.status).toUpperCase() === 'ONLINE').length || 0
-    };
-  }, [activeStore]);
-
   // Filtered Transactions for History Tab & Store Feed
   const filteredTransactions = useMemo(() => {
     const sourceList = merchantTab === 'transactions' ? allUserTransactions : (activeStore?.recent_transactions || []);
@@ -1232,25 +1162,6 @@ export default function UserDashboard() {
       return true;
     });
   }, [merchantTab, allUserTransactions, activeStore, txStoreFilter, txCurrencyFilter, txBankFilter, txSearchTerm]);
-
-  // Overall Financial Aggregation for Transaction History Tab
-  const totalHistoryMetrics = useMemo(() => {
-    let usd = 0;
-    let khr = 0;
-    filteredTransactions.forEach(tx => {
-      if (String(tx.currency).toUpperCase() === 'KHR') {
-        khr += Number(tx.amount || 0);
-      } else {
-        usd += Number(tx.amount || 0);
-      }
-    });
-    return {
-      usd,
-      khr,
-      count: filteredTransactions.length,
-      avgUSD: filteredTransactions.length ? usd / filteredTransactions.length : 0
-    };
-  }, [filteredTransactions]);
 
   if (loading) {
     return (
@@ -1612,11 +1523,11 @@ export default function UserDashboard() {
                                 <td className="py-4 sm:py-4.5 px-5 whitespace-nowrap">
                                   {r.hasDevice ? (
                                     <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1.5 whitespace-nowrap ${
-                                      (r.deviceType === 'Display Soundbox' || String(r.deviceType || '').toLowerCase().includes('display') || String(r.deviceModel || '').toLowerCase().includes('display'))
+                                      hasScreen(r.deviceType, r.deviceModel)
                                         ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
                                         : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
                                     }`}>
-                                      {(r.deviceType === 'Display Soundbox' || String(r.deviceType || '').toLowerCase().includes('display') || String(r.deviceModel || '').toLowerCase().includes('display'))
+                                      {hasScreen(r.deviceType, r.deviceModel)
                                         ? '🖥️ Display'
                                         : '🏷️ Standard'}
                                     </span>

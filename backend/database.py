@@ -9,7 +9,7 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:fDdiFw_KB2930otN@ost_postgres:5432/postgres")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres@localhost:5432/postgres")
 
 
 db_pool: Optional[asyncpg.Pool] = None
@@ -35,6 +35,15 @@ async def get_db_pool() -> asyncpg.Pool:
 async def init_db():
     """Initializes database schema, executes migrations and seeds default admin and demo users."""
     from backend.security import hash_password
+    from backend.schema_migrations import (
+        SALES_VIEW_SQL,
+        STOCK_VIEW_SQL,
+        align_legacy_schema_to_production,
+        migrate_device_types_into_products,
+        migrate_ledger_into_pos_tables,
+        migrate_legacy_sales,
+        run_statements,
+    )
 
     pool = await get_db_pool()
     async with pool.acquire() as conn:
@@ -117,17 +126,17 @@ async def init_db():
                     id SERIAL PRIMARY KEY,
                     merchant_id VARCHAR(100),
                     merchant_name VARCHAR(255),
-                    name VARCHAR(255),
-                    place VARCHAR(150),
+                    name VARCHAR(255) NOT NULL,
+                    place VARCHAR(255),
                     location VARCHAR(255),
                     telegram_chat_id VARCHAR(100),
                     user_id INT REFERENCES users(id) ON DELETE SET NULL,
-                    owner_phone VARCHAR(50),
+                    owner_phone VARCHAR(50) NOT NULL,
                     province VARCHAR(100),
                     district VARCHAR(100),
                     commune VARCHAR(100),
                     village VARCHAR(100),
-                    street VARCHAR(150),
+                    street VARCHAR(255),
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
@@ -142,7 +151,7 @@ async def init_db():
                 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS district VARCHAR(100);
                 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS commune VARCHAR(100);
                 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS village VARCHAR(100);
-                ALTER TABLE merchants ADD COLUMN IF NOT EXISTS street VARCHAR(150);
+                ALTER TABLE merchants ADD COLUMN IF NOT EXISTS street VARCHAR(255);
                 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(100);
 
                 DO $$ BEGIN
@@ -204,315 +213,255 @@ async def init_db():
         except Exception as e:
             logger.warning(f"Step 4 (Suppliers Table) warning: {e}")
 
-        # 5. Devices Table (Multiple Soundbox speakers can share the same Telegram group)
+        # 4b. Branches and the stock action enum (other tables reference them)
+        await run_statements(conn, "Step 4b (Branches)", [
+            """
+            DO $$ BEGIN
+                CREATE TYPE stock_action AS ENUM ('IN', 'OUT', 'REJECT');
+            EXCEPTION WHEN duplicate_object THEN null; END $$;
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS branches (
+                branch_id SERIAL PRIMARY KEY,
+                branch_code VARCHAR(50) NOT NULL UNIQUE,
+                branch_name VARCHAR(150) NOT NULL,
+                location TEXT,
+                created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                is_active BOOLEAN DEFAULT TRUE
+            );
+            """,
+            """
+            INSERT INTO branches (branch_code, branch_name, location)
+            VALUES
+                ('PP-01', 'Phnom Penh Head Office', 'Phnom Penh'),
+                ('KP-01', 'Kampot Branch', 'Kampot'),
+                ('SR-01', 'Siem Reap Branch', 'Siem Reap')
+            ON CONFLICT (branch_code) DO NOTHING;
+            """,
+        ])
+
+        # 4c. Convert a legacy (pre-production-schema) local database to the production schema
         try:
-            await conn.execute("""
-                CREATE TABLE IF NOT EXISTS devices (
-                    id SERIAL PRIMARY KEY,
-                    merchant_id VARCHAR(100),
-                    device_sn VARCHAR(100),
-                    device_model VARCHAR(50) DEFAULT 'Y6B',
-                    device_type VARCHAR(50) DEFAULT 'Display Soundbox',
-                    telegram_chat_id VARCHAR(100),
-                    status device_status DEFAULT 'ACTIVE',
-                    last_heartbeat TIMESTAMP WITH TIME ZONE,
-                    battery VARCHAR(50),
-                    signal VARCHAR(50),
-                    version_4g VARCHAR(255),
-                    version_wifi VARCHAR(255),
-                    last_online TIMESTAMP WITH TIME ZONE,
-                    device_id VARCHAR(100),
-                    chat_id VARCHAR(100),
-                    is_active BOOLEAN DEFAULT TRUE,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                );
-
-                -- Ensure all hardware telemetry & legacy PRD columns exist safely
-                ALTER TABLE devices DROP CONSTRAINT IF EXISTS devices_merchant_id_fkey;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS merchant_id VARCHAR(100);
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_sn VARCHAR(100);
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_type VARCHAR(50) DEFAULT 'Display Soundbox';
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_model VARCHAR(50) DEFAULT 'Y6B';
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(100);
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS status device_status DEFAULT 'ACTIVE';
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS last_heartbeat TIMESTAMP WITH TIME ZONE;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS battery VARCHAR(50);
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS signal VARCHAR(50);
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_4g VARCHAR(255);
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS version_wifi VARCHAR(255);
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS batch_no VARCHAR(100);
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS notes TEXT;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 29.00;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS last_online TIMESTAMP WITH TIME ZONE;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS device_id VARCHAR(100);
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS qr_code TEXT;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
-                ALTER TABLE devices ADD COLUMN IF NOT EXISTS supplier_id INT;
-
-                DO $$ BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1 FROM pg_constraint WHERE conname = 'devices_supplier_id_fkey'
-                    ) AND EXISTS (
-                        SELECT 1 FROM information_schema.tables WHERE table_name = 'suppliers'
-                    ) THEN
-                        ALTER TABLE devices ADD CONSTRAINT devices_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL;
-                    END IF;
-                EXCEPTION WHEN OTHERS THEN null;
-                END $$;
-
-                -- Fallback: assign any remaining unlinked devices to Feishu supplier
-                DO $$ BEGIN
-                    IF EXISTS (SELECT 1 FROM suppliers WHERE name = 'Feishu') THEN
-                        UPDATE devices
-                        SET supplier_id = (SELECT id FROM suppliers WHERE name = 'Feishu' LIMIT 1)
-                        WHERE supplier_id IS NULL;
-                    END IF;
-                EXCEPTION WHEN OTHERS THEN null;
-                END $$;
-
-                ALTER TABLE devices DROP CONSTRAINT IF EXISTS devices_telegram_chat_id_key;
-                CREATE INDEX IF NOT EXISTS idx_devices_telegram_chat_id ON devices(telegram_chat_id);
-                CREATE INDEX IF NOT EXISTS idx_devices_sn ON devices(device_sn);
-                CREATE INDEX IF NOT EXISTS idx_devices_supplier_id ON devices(supplier_id);
-            """)
-            logger.info("Step 5 (Devices Table) initialized successfully.")
+            await align_legacy_schema_to_production(conn)
         except Exception as e:
-            logger.warning(f"Step 5 (Devices Table) warning: {e}")
+            logger.warning(f"Step 4c (Align legacy schema to production) warning: {e}")
 
-        # 6. Sales Table (Device Sales Orders & Warranty Tracking)
-        try:
-            await conn.execute("""
-                CREATE TABLE IF NOT EXISTS sales (
-                    id SERIAL PRIMARY KEY,
-                    device_id INT,
-                    device_sn VARCHAR(100) NOT NULL,
-                    merchant_id INT,
-                    sold_by_user_id INT,
-                    customer_name VARCHAR(150),
-                    customer_phone VARCHAR(50),
-                    price NUMERIC(10, 2) NOT NULL DEFAULT 29.00,
-                    discount_type VARCHAR(20) DEFAULT 'NONE',
-                    discount_percent NUMERIC(5, 2) DEFAULT 0.00,
-                    discount_amount NUMERIC(10, 2) DEFAULT 0.00,
-                    final_price NUMERIC(10, 2) NOT NULL DEFAULT 29.00,
-                    currency VARCHAR(10) DEFAULT 'USD',
-                    warranty_days INT DEFAULT 90,
-                    warranty_start_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    warranty_end_date TIMESTAMP WITH TIME ZONE,
-                    payment_method VARCHAR(50) DEFAULT 'CASH',
-                    status VARCHAR(50) DEFAULT 'COMPLETED',
-                    notes TEXT,
-                    quantity INT NOT NULL DEFAULT 1,
-                    invoice_reference VARCHAR(100),
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                );
-                ALTER TABLE sales ADD COLUMN IF NOT EXISTS quantity INT NOT NULL DEFAULT 1;
-                ALTER TABLE sales ADD COLUMN IF NOT EXISTS invoice_reference VARCHAR(100);
-                CREATE INDEX IF NOT EXISTS idx_sales_device_id ON sales(device_id);
-                CREATE INDEX IF NOT EXISTS idx_sales_device_sn ON sales(device_sn);
-                CREATE INDEX IF NOT EXISTS idx_sales_merchant_id ON sales(merchant_id);
-                CREATE INDEX IF NOT EXISTS idx_sales_sold_by ON sales(sold_by_user_id);
-                CREATE INDEX IF NOT EXISTS idx_sales_created_at ON sales(created_at);
-                CREATE INDEX IF NOT EXISTS idx_sales_invoice_reference ON sales(invoice_reference);
+        # 5. Devices Table (production shape: the serial number is devices.device_id)
+        await run_statements(conn, "Step 5 (Devices Table)", [
+            """
+            CREATE TABLE IF NOT EXISTS devices (
+                id SERIAL PRIMARY KEY,
+                device_id VARCHAR(100),
+                merchant_id INTEGER,
+                supplier_id INTEGER,
+                telegram_chat_id VARCHAR(100),
+                is_active BOOLEAN DEFAULT TRUE,
+                battery VARCHAR(50),
+                signal VARCHAR(50),
+                version_4g VARCHAR(255),
+                version_wifi VARCHAR(255),
+                notes TEXT,
+                last_heartbeat TIMESTAMP WITH TIME ZONE,
+                qr_code TEXT,
+                last_online TIMESTAMP WITH TIME ZONE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            """,
+            "ALTER TABLE devices DROP CONSTRAINT IF EXISTS devices_merchant_id_fkey;",
+            "ALTER TABLE devices DROP CONSTRAINT IF EXISTS devices_telegram_chat_id_key;",
+            # Production columns (some are written by the hardware gateway service)
+            *[f"ALTER TABLE devices ADD COLUMN IF NOT EXISTS {col};" for col in (
+                "device_id VARCHAR(100)", "merchant_id INTEGER", "supplier_id INTEGER",
+                "telegram_chat_id VARCHAR(100)", "is_active BOOLEAN DEFAULT TRUE",
+                "battery VARCHAR(50)", "signal VARCHAR(50)", "version_4g VARCHAR(255)", "version_wifi VARCHAR(255)",
+                "imei VARCHAR(50)", "imsi VARCHAR(50)", "iccid VARCHAR(50)", "volume INTEGER",
+                "vlver VARCHAR(100)", "lang INTEGER", "batt_mv INTEGER", "adc VARCHAR(50)",
+                "ssid VARCHAR(100)", "mac VARCHAR(50)", "notes TEXT",
+                "last_heartbeat TIMESTAMP WITH TIME ZONE", "qr_code TEXT", "last_online TIMESTAMP WITH TIME ZONE",
+                "created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP",
+                "updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP",
+                "firmware_version_4g VARCHAR(64)", "verno VARCHAR(32)", "firmware_version_wifi VARCHAR(64)",
+                "battery_percentage INTEGER", "battery_mv INTEGER", "signal_strength INTEGER",
+                "language VARCHAR(16)", "last_seen_at TIMESTAMP WITH TIME ZONE", "raw_telemetry JSONB",
+            )],
+            # Additions required by this app (no production equivalent)
+            # status / price are added empty (existing rows are backfilled from real data in step 14),
+            # then get a default for new rows
+            "ALTER TABLE devices ADD COLUMN IF NOT EXISTS status device_status;",
+            "ALTER TABLE devices ALTER COLUMN status SET DEFAULT 'ACTIVE';",
+            "ALTER TABLE devices ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2);",
+            "ALTER TABLE devices ALTER COLUMN price SET DEFAULT 29.00;",
+            "ALTER TABLE devices ADD COLUMN IF NOT EXISTS batch_no VARCHAR(100);",
+            "ALTER TABLE devices ADD COLUMN IF NOT EXISTS branch_id INTEGER REFERENCES branches(branch_id);",
+            "CREATE INDEX IF NOT EXISTS idx_devices_device_id ON devices(device_id);",
+            "CREATE INDEX IF NOT EXISTS idx_devices_telegram_chat_id ON devices(telegram_chat_id);",
+            "CREATE INDEX IF NOT EXISTS idx_devices_branch_id ON devices(branch_id);",
+        ])
 
-                -- Ensure any existing active/sold devices are safely registered in sales before dropping columns
-                DO $$
-                BEGIN
-                    IF EXISTS (
-                        SELECT 1 FROM information_schema.columns 
-                        WHERE table_name = 'devices' AND column_name = 'discount_amount'
-                    ) THEN
-                        INSERT INTO sales (device_id, device_sn, merchant_id, price, discount_amount, discount_percent, final_price, warranty_days, warranty_start_date, warranty_end_date, status, created_at)
-                        SELECT d.id, d.device_sn, 
-                               CASE WHEN d.merchant_id::text ~ '^[0-9]+$' THEN d.merchant_id::text::int ELSE NULL END,
-                               COALESCE(d.price, 29.00),
-                               COALESCE(d.discount_amount, 0.00),
-                               COALESCE(d.discount_percent, 0.00),
-                               COALESCE(d.final_price, d.price, 29.00),
-                               COALESCE(d.warranty_days, 90),
-                               COALESCE(d.warranty_start_date, d.created_at, CURRENT_TIMESTAMP),
-                               COALESCE(d.warranty_end_date, COALESCE(d.warranty_start_date, d.created_at, CURRENT_TIMESTAMP) + (COALESCE(d.warranty_days, 90) || ' days')::INTERVAL),
-                               'COMPLETED',
-                               COALESCE(d.warranty_start_date, d.created_at, CURRENT_TIMESTAMP)
-                        FROM devices d
-                        WHERE (d.status::text IN ('ACTIVE', 'PENDING') OR d.merchant_id IS NOT NULL)
-                          AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.device_id = d.id);
-                    END IF;
-                END $$;
+        # 6. Remove long-retired legacy columns and tables
+        await run_statements(conn, "Step 6 (Legacy Cleanup)", [
+            # Legacy `sales` rows are copied into stock_transactions by step 12 (migrate_legacy_sales).
+            # The table itself is dropped manually: backend/migrations/20260916_drop_legacy_sales_table.sql
+            *[f"ALTER TABLE devices DROP COLUMN IF EXISTS {col};" for col in (
+                "discount_amount", "discount_percent", "final_price", "warranty_days", "warranty_start_date",
+                "warranty_end_date", "supplier", "chat_id", "device_name", "store_id", "telegram_bot_token",
+            )],
+            *[f"ALTER TABLE merchants DROP COLUMN IF EXISTS {col};" for col in (
+                "password_hash", "role", "status", "telegram_bot_token",
+            )],
+            "DROP TABLE IF EXISTS stores CASCADE;",
+        ])
 
-                -- Clean and normalize devices schema by removing redundant transaction and duplicate columns
-                ALTER TABLE devices DROP COLUMN IF EXISTS discount_amount;
-                ALTER TABLE devices DROP COLUMN IF EXISTS discount_percent;
-                ALTER TABLE devices DROP COLUMN IF EXISTS final_price;
-                ALTER TABLE devices DROP COLUMN IF EXISTS warranty_days;
-                ALTER TABLE devices DROP COLUMN IF EXISTS warranty_start_date;
-                ALTER TABLE devices DROP COLUMN IF EXISTS warranty_end_date;
-                ALTER TABLE devices DROP COLUMN IF EXISTS supplier;
-                ALTER TABLE devices DROP COLUMN IF EXISTS chat_id;
-                ALTER TABLE devices DROP COLUMN IF EXISTS device_name;
-                ALTER TABLE devices DROP COLUMN IF EXISTS store_id;
-                ALTER TABLE devices DROP COLUMN IF EXISTS telegram_bot_token;
+        # 7. Transactions, Telegram bots and security alerts (production shape: text ids)
+        await run_statements(conn, "Step 7 (Transactions & Security)", [
+            """
+            CREATE TABLE IF NOT EXISTS transactions (
+                id VARCHAR(64) PRIMARY KEY,
+                txid VARCHAR(150),
+                bank_tx_id VARCHAR(150),
+                bank_name VARCHAR(50),
+                chat_id VARCHAR(100),
+                device_id VARCHAR(100),
+                amount NUMERIC(12, 2) NOT NULL,
+                currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+                payer_name VARCHAR(255),
+                raw_payload TEXT,
+                raw_telegram_message TEXT,
+                status VARCHAR(50) DEFAULT 'PROCESSED',
+                device_ack BOOLEAN DEFAULT FALSE,
+                ack_status VARCHAR(50),
+                ack_at TIMESTAMP WITH TIME ZONE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                raw_text TEXT,
+                is_played BOOLEAN DEFAULT FALSE,
+                playback_status VARCHAR(32) DEFAULT 'MQTT_DELIVERED',
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            );
+            """,
+            "CREATE SEQUENCE IF NOT EXISTS transactions_id_seq;",
+            "ALTER TABLE transactions ALTER COLUMN id SET DEFAULT nextval('transactions_id_seq'::regclass);",
+            "ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_device_id_fkey;",
+            *[f"ALTER TABLE transactions ADD COLUMN IF NOT EXISTS {col};" for col in (
+                "txid VARCHAR(150)", "chat_id VARCHAR(100)", "raw_payload TEXT", "device_ack BOOLEAN DEFAULT FALSE",
+                "ack_status VARCHAR(50)", "ack_at TIMESTAMP WITH TIME ZONE", "raw_text TEXT",
+                "is_played BOOLEAN DEFAULT FALSE", "playback_status VARCHAR(32) DEFAULT 'MQTT_DELIVERED'",
+                "updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()",
+            )],
+            "CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at);",
+            "CREATE INDEX IF NOT EXISTS idx_transactions_device_id ON transactions(device_id);",
+            """
+            CREATE TABLE IF NOT EXISTS group_users (
+                id SERIAL PRIMARY KEY,
+                chat_id VARCHAR(50) NOT NULL,
+                user_id VARCHAR(50) NOT NULL,
+                username VARCHAR(100),
+                full_name TEXT,
+                is_authorized BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT unique_chat_user UNIQUE (chat_id, user_id)
+            );
+            """,
+            *[f"ALTER TABLE group_users DROP COLUMN IF EXISTS {col};" for col in ("first_name", "last_name", "is_bot")],
+            """
+            CREATE TABLE IF NOT EXISTS official_bank_bots (
+                bot_id VARCHAR(50) PRIMARY KEY,
+                bot_name VARCHAR(100),
+                bank_name VARCHAR(50),
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            """,
+            """
+            INSERT INTO official_bank_bots (bot_id, bot_name, bank_name, is_active)
+            VALUES
+                ('123456789', 'ababank_bot', 'ABA Bank Bot', TRUE),
+                ('987654321', 'acleda_bot', 'ACLEDA Bank Bot', TRUE)
+            ON CONFLICT (bot_id) DO NOTHING;
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS security_alerts (
+                id BIGSERIAL PRIMARY KEY,
+                device_id VARCHAR(100),
+                merchant_id VARCHAR(100),
+                alert_type VARCHAR(50) NOT NULL,
+                severity VARCHAR(20) DEFAULT 'WARNING',
+                bank_name VARCHAR(50),
+                bank_tx_id VARCHAR(150),
+                amount NUMERIC(12, 2),
+                currency VARCHAR(10) DEFAULT 'USD',
+                sender_user_id VARCHAR(100),
+                sender_name VARCHAR(255),
+                raw_message TEXT,
+                reason TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            """,
+            "ALTER TABLE security_alerts DROP CONSTRAINT IF EXISTS security_alerts_device_id_fkey;",
+            "ALTER TABLE security_alerts DROP CONSTRAINT IF EXISTS security_alerts_merchant_id_fkey;",
+            "CREATE INDEX IF NOT EXISTS idx_security_alerts_merchant ON security_alerts(merchant_id);",
+            "CREATE INDEX IF NOT EXISTS idx_security_alerts_created_at ON security_alerts(created_at DESC);",
+        ])
 
-                -- Remove legacy/unused fields from merchants and group_users
-                ALTER TABLE merchants DROP COLUMN IF EXISTS password_hash;
-                ALTER TABLE merchants DROP COLUMN IF EXISTS role;
-                ALTER TABLE merchants DROP COLUMN IF EXISTS status;
-                ALTER TABLE merchants DROP COLUMN IF EXISTS telegram_bot_token;
-                ALTER TABLE group_users DROP COLUMN IF EXISTS first_name;
-                ALTER TABLE group_users DROP COLUMN IF EXISTS last_name;
-                ALTER TABLE group_users DROP COLUMN IF EXISTS is_bot;
-                DROP TABLE IF EXISTS stores CASCADE;
-            """)
-            logger.info("Step 6 (Sales Table) initialized successfully.")
-        except Exception as e:
-            logger.warning(f"Step 6 (Sales Table) warning: {e}")
-
-        # 7. Transactions Table
-        try:
-            await conn.execute("""
-                CREATE TABLE IF NOT EXISTS transactions (
-                    id BIGSERIAL PRIMARY KEY,
-                    device_id INT,
-                    bank_name VARCHAR(50) NOT NULL,
-                    bank_tx_id VARCHAR(150) NOT NULL,
-                    amount NUMERIC(12, 2) NOT NULL,
-                    currency currency_type NOT NULL DEFAULT 'USD',
-                    payer_name VARCHAR(255),
-                    raw_telegram_message TEXT,
-                    status tx_status DEFAULT 'PROCESSED',
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    CONSTRAINT unique_bank_tx UNIQUE (bank_name, bank_tx_id)
-                );
-                CREATE INDEX IF NOT EXISTS idx_transactions_bank_tx ON transactions(bank_name, bank_tx_id);
-                CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at);
-
-                ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_device_id_fkey;
-                ALTER TABLE transactions ADD COLUMN IF NOT EXISTS txid VARCHAR(150);
-                ALTER TABLE transactions ADD COLUMN IF NOT EXISTS chat_id VARCHAR(100);
-                ALTER TABLE transactions ADD COLUMN IF NOT EXISTS raw_payload TEXT;
-                ALTER TABLE transactions ADD COLUMN IF NOT EXISTS device_ack BOOLEAN DEFAULT FALSE;
-                ALTER TABLE transactions ADD COLUMN IF NOT EXISTS ack_status VARCHAR(50);
-                ALTER TABLE transactions ADD COLUMN IF NOT EXISTS ack_at TIMESTAMP WITH TIME ZONE;
-
-                CREATE TABLE IF NOT EXISTS group_users (
-                    id SERIAL PRIMARY KEY,
-                    chat_id VARCHAR(50) NOT NULL,
-                    user_id VARCHAR(50) NOT NULL,
-                    username VARCHAR(100),
-                    full_name VARCHAR(150),
-                    is_authorized BOOLEAN DEFAULT FALSE,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    CONSTRAINT unique_chat_user UNIQUE (chat_id, user_id)
-                );
-
-                CREATE TABLE IF NOT EXISTS official_bank_bots (
-                    bot_id VARCHAR(50) PRIMARY KEY,
-                    bot_name VARCHAR(100),
-                    bank_name VARCHAR(50),
-                    is_active BOOLEAN DEFAULT TRUE,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                );
-                ALTER TABLE official_bank_bots ADD COLUMN IF NOT EXISTS bot_id VARCHAR(50);
-                ALTER TABLE official_bank_bots ADD COLUMN IF NOT EXISTS bot_name VARCHAR(100);
-                ALTER TABLE official_bank_bots ADD COLUMN IF NOT EXISTS bank_name VARCHAR(50);
-                ALTER TABLE official_bank_bots ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
-
-                CREATE TABLE IF NOT EXISTS security_alerts (
-                    id BIGSERIAL PRIMARY KEY,
-                    device_id INT,
-                    merchant_id INT,
-                    alert_type VARCHAR(50) NOT NULL,
-                    severity VARCHAR(20) DEFAULT 'WARNING',
-                    bank_name VARCHAR(50),
-                    bank_tx_id VARCHAR(150),
-                    amount NUMERIC(12, 2),
-                    currency VARCHAR(10) DEFAULT 'USD',
-                    sender_user_id VARCHAR(100),
-                    sender_name VARCHAR(255),
-                    raw_message TEXT,
-                    reason TEXT,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                );
-                ALTER TABLE security_alerts DROP CONSTRAINT IF EXISTS security_alerts_device_id_fkey;
-                ALTER TABLE security_alerts DROP CONSTRAINT IF EXISTS security_alerts_merchant_id_fkey;
-                ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS device_id VARCHAR(100);
-                ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS merchant_id VARCHAR(100);
-                CREATE INDEX IF NOT EXISTS idx_security_alerts_merchant ON security_alerts(merchant_id);
-                CREATE INDEX IF NOT EXISTS idx_security_alerts_created_at ON security_alerts(created_at DESC);
-
-                INSERT INTO official_bank_bots (bot_id, bot_name, bank_name, is_active) 
-                VALUES 
-                    ('123456789', 'ababank_bot', 'ABA Bank Bot', TRUE),
-                    ('987654321', 'acleda_bot', 'ACLEDA Bank Bot', TRUE)
-                ON CONFLICT (bot_id) DO NOTHING;
-            """)
-            logger.info("Step 7 (Transactions & Security) initialized successfully.")
-        except Exception as e:
-            logger.warning(f"Step 7 (Transactions & Security) warning: {e}")
-
-        # 8. Branches, Products & Stock Transactions Module
-        try:
-            await conn.execute("""
-                DO $$ BEGIN
-                    CREATE TYPE stock_action AS ENUM ('IN', 'OUT', 'REJECT');
-                EXCEPTION WHEN duplicate_object THEN null; END $$;
-
-                CREATE TABLE IF NOT EXISTS branches (
-                    branch_id SERIAL PRIMARY KEY,
-                    branch_code VARCHAR(50) NOT NULL UNIQUE,
-                    branch_name VARCHAR(150) NOT NULL,
-                    location TEXT,
-                    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    is_active BOOLEAN DEFAULT TRUE
-                );
-
-                CREATE TABLE IF NOT EXISTS products (
-                    product_id SERIAL PRIMARY KEY,
-                    item_code VARCHAR(50) NOT NULL UNIQUE,
-                    item_name VARCHAR(150) NOT NULL,
-                    unit VARCHAR(30) NOT NULL,
-                    cost_price NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
-                    selling_price NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
-                    min_stock_level INTEGER DEFAULT 5,
-                    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    warranty_months INTEGER DEFAULT 0,
-                    is_active BOOLEAN DEFAULT TRUE
-                );
-
-                CREATE TABLE IF NOT EXISTS stock_transactions (
-                    transaction_id SERIAL PRIMARY KEY,
-                    branch_id INTEGER REFERENCES branches(branch_id) ON DELETE RESTRICT,
-                    product_id INTEGER REFERENCES products(product_id) ON DELETE RESTRICT,
-                    quantity INTEGER NOT NULL CHECK (quantity > 0),
-                    action_type stock_action NOT NULL,
-                    unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
-                    reference_no VARCHAR(100),
-                    remarks TEXT,
-                    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    discount_percent NUMERIC(5, 2) DEFAULT 0.00,
-                    discount_amount NUMERIC(12, 2) DEFAULT 0.00,
-                    serial_number VARCHAR(100),
-                    warranty_expired_date DATE
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_stock_trans_action ON stock_transactions(action_type);
-                CREATE INDEX IF NOT EXISTS idx_stock_trans_branch ON stock_transactions(branch_id);
-                CREATE INDEX IF NOT EXISTS idx_stock_trans_date ON stock_transactions(created_at);
-                CREATE INDEX IF NOT EXISTS idx_stock_trans_product ON stock_transactions(product_id);
-                CREATE INDEX IF NOT EXISTS idx_stock_trans_serial ON stock_transactions(serial_number);
-            """)
-            logger.info("Step 8 (Branches & Stock Transactions) initialized successfully.")
-        except Exception as e:
-            logger.warning(f"Step 8 (Branches & Stock Transactions) warning: {e}")
+        # 8. Products (production shape). The stock_transactions ledger is retired: stock lives in
+        #    inventory_serials and sales in pos_invoices / pos_invoice_items.
+        await run_statements(conn, "Step 8 (Products)", [
+            """
+            CREATE TABLE IF NOT EXISTS products (
+                id BIGSERIAL PRIMARY KEY,
+                sku VARCHAR(50) NOT NULL UNIQUE,
+                name VARCHAR(100),
+                base_price NUMERIC(10, 2) NOT NULL,
+                default_warranty_months INTEGER DEFAULT 3,
+                device_model VARCHAR(120),
+                supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                is_order INTEGER
+            );
+            """,
+            # Cost from the supplier. base_price is the selling price, so the two never share a column.
+            "ALTER TABLE products ADD COLUMN IF NOT EXISTS purchase_price NUMERIC(10, 2);",
+            # Retired: selling_price is now base_price; unit / cost_price are pre-production leftovers
+            "DROP VIEW IF EXISTS v_branch_product_stock;",
+            *[f"ALTER TABLE products DROP COLUMN IF EXISTS {col};" for col in ("selling_price", "unit", "cost_price")],
+            # Addition required by this app: reorder level for low-stock warnings
+            "ALTER TABLE products ADD COLUMN IF NOT EXISTS min_stock_level INTEGER DEFAULT 5;",
+            "ALTER TABLE products ALTER COLUMN min_stock_level SET DEFAULT 5;",
+            # Hardware details moved here when device_types was retired (step 11)
+            "ALTER TABLE products ADD COLUMN IF NOT EXISTS device_model VARCHAR(120);",
+            # Widening only: production uses 120, older local databases were created at 50.
+            # The stock view reads this column, so it is dropped first and rebuilt by step 13.
+            "DROP VIEW IF EXISTS v_branch_product_stock;",
+            "ALTER TABLE products ALTER COLUMN device_model TYPE VARCHAR(120);",
+            "ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL;",
+            "CREATE INDEX IF NOT EXISTS idx_products_supplier_id ON products(supplier_id);",
+            # Addition required by this app: the product a device is (replaces devices.device_type_id)
+            "ALTER TABLE devices ADD COLUMN IF NOT EXISTS product_id BIGINT REFERENCES products(id) ON DELETE SET NULL;",
+            "CREATE INDEX IF NOT EXISTS idx_devices_product_id ON devices(product_id);",
+            # device_model is a placeholder: production's hardware model codes are not in this repo
+            """
+            INSERT INTO products (sku, name, base_price, default_warranty_months, device_model, supplier_id, is_active, is_order)
+            SELECT v.sku, v.name, v.base_price, 3, v.device_model, s.id, TRUE, v.is_order
+            FROM (VALUES
+                ('SCR-LED-W4G', 'Soundbox LED Screen (Wifi + 4G only)', 39.99, 'SCR-LED-W4G', 'Hemi', 1),
+                ('SCR-NLED-W4G', 'Soundbox None LED Screen (Wifi + 4G only)', 29.99, 'SCR-NLED-W4G', 'Feishu', 2),
+                ('SCR-NLED-4GO', 'Soundbox None LED Screen (4G only)', 24.99, 'SCR-NLED-4GO', 'Feishu', 3)
+            ) AS v(sku, name, base_price, device_model, supplier_name, is_order)
+            LEFT JOIN suppliers s ON s.name = v.supplier_name
+            WHERE NOT EXISTS (SELECT 1 FROM products);
+            """,
+            # Additions required by this app: branch scoping and permissions
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS branch_id INTEGER REFERENCES branches(branch_id);",
+            """ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions JSONB DEFAULT '{"tabs": ["all"], "crud": ["all"]}'::jsonb;""",
+        ])
 
         # 9. Seed Default Administrator Account (Configurable via environment)
         try:
             admin_phone = os.getenv("ADMIN_PHONE", "012345678").strip()
-            admin_pass_raw = os.getenv("ADMIN_PASSWORD", "Admin123!")
+            admin_pass_raw = os.getenv("ADMIN_PASSWORD", "")
             admin_name = os.getenv("ADMIN_NAME", "System Administrator").strip()
 
             if admin_phone and admin_pass_raw:
@@ -520,12 +469,147 @@ async def init_db():
                 await conn.execute("""
                     INSERT INTO users (phone_number, full_name, password_hash, role, status)
                     VALUES ($1, $2, $3, 'ADMIN', 'ACTIVE')
-                    ON CONFLICT (phone_number) DO UPDATE
-                    SET role = 'ADMIN', status = 'ACTIVE'
+                    ON CONFLICT (phone_number) DO NOTHING
                 """, admin_phone, admin_name, admin_pass)
 
             logger.info("Step 9 (Admin Seed) initialized successfully.")
         except Exception as e:
             logger.warning(f"Step 9 (Admin Seed) warning: {e}")
+
+        # 10. PRD compatibility tables
+        await run_statements(conn, "Step 10 (PRD Compatibility Tables)", [
+            """
+            CREATE TABLE IF NOT EXISTS discounts (
+                id BIGSERIAL PRIMARY KEY,
+                code VARCHAR(50) NOT NULL UNIQUE,
+                discount_type VARCHAR(20) NOT NULL,
+                discount_value NUMERIC(10, 2) NOT NULL,
+                is_active BOOLEAN DEFAULT TRUE
+            );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS inventory_serials (
+                id BIGSERIAL PRIMARY KEY,
+                product_id BIGINT REFERENCES products(id) ON DELETE SET NULL,
+                serial_number VARCHAR(100) NOT NULL UNIQUE,
+                status VARCHAR(20) DEFAULT 'IN_STOCK',
+                warehouse_location VARCHAR(50),
+                received_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                purchase_price NUMERIC(10, 2) DEFAULT 0.00,
+                branch_id INTEGER REFERENCES branches(branch_id) ON DELETE SET NULL
+            );
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_inv_serials_branch ON inventory_serials(branch_id);",
+            "CREATE INDEX IF NOT EXISTS idx_inv_serials_product ON inventory_serials(product_id);",
+            "CREATE INDEX IF NOT EXISTS idx_inv_serials_status ON inventory_serials(status);",
+            """
+            CREATE TABLE IF NOT EXISTS inventory_logs (
+                id BIGSERIAL PRIMARY KEY,
+                inventory_serial_id BIGINT REFERENCES inventory_serials(id) ON DELETE SET NULL,
+                previous_status VARCHAR(20),
+                new_status VARCHAR(20),
+                changed_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+                changed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                notes TEXT,
+                branch_id INTEGER REFERENCES branches(branch_id) ON DELETE SET NULL
+            );
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_inv_logs_serial ON inventory_logs(inventory_serial_id);",
+            "CREATE INDEX IF NOT EXISTS idx_inv_logs_branch ON inventory_logs(branch_id);",
+            """
+            CREATE TABLE IF NOT EXISTS pos_invoices (
+                id BIGSERIAL PRIMARY KEY,
+                receipt_no VARCHAR(50) NOT NULL UNIQUE,
+                subtotal NUMERIC(10, 2) NOT NULL,
+                total_discount NUMERIC(10, 2) DEFAULT 0.00,
+                grand_total NUMERIC(10, 2) NOT NULL,
+                payment_method VARCHAR(20) NOT NULL,
+                cashier_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+                sale_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                branch_id INTEGER NOT NULL REFERENCES branches(branch_id) ON DELETE RESTRICT
+            );
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_pos_invoices_branch ON pos_invoices(branch_id);",
+            "CREATE INDEX IF NOT EXISTS idx_pos_invoices_cashier ON pos_invoices(cashier_id);",
+            "CREATE INDEX IF NOT EXISTS idx_pos_invoices_date ON pos_invoices(sale_date);",
+            """
+            CREATE TABLE IF NOT EXISTS pos_invoice_items (
+                id BIGSERIAL PRIMARY KEY,
+                invoice_id BIGINT REFERENCES pos_invoices(id) ON DELETE CASCADE,
+                product_id BIGINT REFERENCES products(id) ON DELETE SET NULL,
+                inventory_serial_id BIGINT REFERENCES inventory_serials(id) ON DELETE SET NULL,
+                original_price NUMERIC(10, 2) NOT NULL,
+                discount_id BIGINT REFERENCES discounts(id) ON DELETE SET NULL,
+                discount_amount NUMERIC(10, 2) DEFAULT 0.00,
+                final_price NUMERIC(10, 2) NOT NULL,
+                warranty_start_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                warranty_end_date TIMESTAMP WITH TIME ZONE NOT NULL,
+                warranty_status VARCHAR(20) DEFAULT 'ACTIVE'
+            );
+            """,
+            # Additions required by this app: the customer a sale belongs to, and a typed percentage
+            "ALTER TABLE pos_invoices ADD COLUMN IF NOT EXISTS customer_name VARCHAR(150);",
+            "ALTER TABLE pos_invoices ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(50);",
+            "ALTER TABLE pos_invoice_items ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(5, 2) DEFAULT 0.00;",
+            "ALTER TABLE pos_invoice_items ADD COLUMN IF NOT EXISTS serial_number VARCHAR(100);",
+            "CREATE INDEX IF NOT EXISTS idx_pos_items_serial_number ON pos_invoice_items(serial_number);",
+            "CREATE INDEX IF NOT EXISTS idx_pos_items_invoice ON pos_invoice_items(invoice_id);",
+            "CREATE INDEX IF NOT EXISTS idx_pos_items_serial ON pos_invoice_items(inventory_serial_id);",
+        ])
+
+        # Reusable manual discount types; existing promotions retain their fixed values.
+        from pathlib import Path
+        await conn.execute((Path(__file__).parent / "migrations" / "20260920_custom_discount_types.sql").read_text())
+        await conn.execute((Path(__file__).parent / "migrations" / "20260920_remove_store_subdomains.sql").read_text())
+
+        # 11. One-time: fold the retired device_types table into products and point devices at products
+        try:
+            await migrate_device_types_into_products(conn)
+        except Exception as e:
+            logger.warning(f"Step 11 (Device types into products) warning: {e}")
+
+        # 12a. Copy legacy `sales` rows into stock_transactions (runs only while the legacy table exists)
+        try:
+            await migrate_legacy_sales(conn)
+        except Exception as e:
+            logger.warning(f"Step 12a (Legacy sales migration) warning: {e}")
+
+        # 12b. One-time: move the stock_transactions ledger into the POS tables and inventory_serials
+        try:
+            await migrate_ledger_into_pos_tables(conn)
+        except Exception as e:
+            logger.warning(f"Step 12b (Ledger into POS tables) warning: {e}")
+
+        # 13. Warehouse stock view (dropped first so column changes never block it)
+        await run_statements(conn, "Step 13 (Stock & Sales Views)", [
+            "DROP VIEW IF EXISTS v_branch_product_stock;",
+            STOCK_VIEW_SQL,
+            "DROP VIEW IF EXISTS v_sales;",
+            SALES_VIEW_SQL,
+        ])
+
+        # 14. Fill device status / price for rows that existed before those columns were added
+        await run_statements(conn, "Step 14 (Device status backfill)", [
+            """
+            UPDATE devices d SET status = 'IN_STOCK'
+            WHERE d.status IS NULL
+              AND EXISTS (SELECT 1 FROM v_branch_product_stock v WHERE v.serial_number = d.device_id);
+            """,
+            "UPDATE devices SET status = 'ACTIVE' WHERE status IS NULL AND merchant_id IS NOT NULL;",
+            # Sold but not linked to a store yet: waiting for registration
+            """
+            UPDATE devices d SET status = 'PENDING'
+            WHERE d.status IS NULL
+              AND EXISTS (SELECT 1 FROM inventory_serials inv
+                          WHERE inv.serial_number = d.device_id AND inv.status = 'SOLD');
+            """,
+            """
+            UPDATE devices d SET price = p.base_price
+            FROM inventory_serials inv
+            JOIN products p ON p.id = inv.product_id
+            WHERE d.price IS NULL AND inv.serial_number = d.device_id;
+            """,
+        ])
 
         logger.info("Database schema and migrations check completed.")

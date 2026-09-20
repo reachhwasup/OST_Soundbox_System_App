@@ -1,92 +1,61 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import api from '../api';
+import { hasScreen } from '../lib/deviceType';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
 import Modal from '../components/Modal';
 import FieldQRScanner from '../components/FieldQRScanner';
+import StockPage from '../features/stock/StockPage';
+import ProductsPage from '../features/catalog/ProductsPage';
+import SuppliersPage from '../features/catalog/SuppliersPage';
+import BranchesPage from '../features/catalog/BranchesPage';
 import jsQR from 'jsqr';
-import { 
-  Users, 
-  Store, 
-  Volume2, 
-  ShieldCheck, 
-  Search, 
-  Filter, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Key, 
-  UserCheck, 
-  UserX, 
-  RefreshCw, 
-  CheckCircle2, 
-  Phone, 
-  MapPin, 
+import {
+  Store,
+  Volume2,
+  ShieldCheck,
+  Plus,
+  Edit,
+  Trash2,
+  Key,
+  UserCheck,
+  UserX,
+  RefreshCw,
+  CheckCircle2,
+  Phone,
+  MapPin,
   Building,
   Navigation,
   Compass,
   Home,
-  RotateCcw,
-  Layers,
   Copy,
   Eye,
-  Info,
   ChevronRight,
   ChevronLeft,
   Activity,
   ShieldAlert,
-  FileText,
   AlertTriangle,
-  AlertOctagon,
   Terminal,
   Receipt,
-  CheckCircle,
-  Clock,
-  CheckCheck,
-  XCircle,
-  ArrowUpRight,
-  Wifi,
   Battery,
-  BatteryCharging,
   Signal,
-  Radio,
-  Download,
-  Columns,
   Send,
   Square,
   CheckSquare,
-  Sliders,
   SlidersHorizontal,
-  Cpu,
   Power,
   Volume1,
-  VolumeX,
   Sparkles,
-  Zap,
-  Package,
   PackagePlus,
-  Wrench,
-  Undo2,
-  ArrowLeftRight,
-  Warehouse,
-  Boxes,
   DollarSign,
-  Unlink,
   Smartphone,
-  Shield,
   Tag,
   Percent,
-  Calendar,
-  ShoppingBag,
   QrCode,
-  Camera,
   Upload,
   User,
-  PhoneCall,
-  ArrowUpDown,
-  ChevronDown,
-  ChevronUp
+  MoreVertical
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -115,7 +84,7 @@ export default function AdminDashboard() {
   }, []);
 
   // Main Data States
-  const [stats, setStats] = useState(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [users, setUsers] = useState([]);
   const [stores, setStores] = useState([]);
   const [devices, setDevices] = useState([]);
@@ -157,7 +126,6 @@ export default function AdminDashboard() {
   // Table Selection States across all tabs
   const [userSelectedIds, setUserSelectedIds] = useState([]);
   const [storeSelectedIds, setStoreSelectedIds] = useState([]);
-  const [stockSelectedIds, setStockSelectedIds] = useState([]);
   const [userActSelectedIds, setUserActSelectedIds] = useState([]);
   const [adminActSelectedIds, setAdminActSelectedIds] = useState([]);
 
@@ -171,6 +139,26 @@ export default function AdminDashboard() {
   const [userPage, setUserPage] = useState(1);
   const [userPageSize, setUserPageSize] = useState(10);
   const [userGoToPage, setUserGoToPage] = useState('');
+  const [openActionDropdownId, setOpenActionDropdownId] = useState(null);
+  const [activeDropdownRect, setActiveDropdownRect] = useState(null);
+
+  const handleToggleDropdown = (id, e) => {
+    e.stopPropagation();
+    if (openActionDropdownId === id) {
+      setOpenActionDropdownId(null);
+      setActiveDropdownRect(null);
+    } else {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const openUp = rect.bottom + 230 > window.innerHeight;
+      setActiveDropdownRect({
+        top: rect.bottom + 4,
+        bottom: window.innerHeight - rect.top + 4,
+        right: Math.max(16, window.innerWidth - rect.right),
+        openUp
+      });
+      setOpenActionDropdownId(id);
+    }
+  };
 
   // Store & Branch Pagination
   const [storePage, setStorePage] = useState(1);
@@ -178,15 +166,17 @@ export default function AdminDashboard() {
   const [storeGoToPage, setStoreGoToPage] = useState('');
 
   // Stock & Inventory Filter & Pagination States
-  const [stockSearchTerm, setStockSearchTerm] = useState('');
-  const [stockTypeFilter, setStockTypeFilter] = useState('ALL');
-  const [stockSupplierFilter, setStockSupplierFilter] = useState('ALL');
-  const [stockPriceFilter, setStockPriceFilter] = useState('ALL');
-  const [stockDateFilter, setStockDateFilter] = useState('');
-  const [stockSortBy, setStockSortBy] = useState('NEWEST'); // 'NEWEST' | 'OLDEST' | 'SN_ASC' | 'SN_DESC' | 'PRICE_DESC' | 'PRICE_ASC'
-  const [stockPage, setStockPage] = useState(1);
-  const [stockPageSize, setStockPageSize] = useState(10);
-  const [stockGoToPage, setStockGoToPage] = useState('');
+  const [stockBranchFilter, setStockBranchFilter] = useState('ALL');
+  const [stockCanViewCost, setStockCanViewCost] = useState(true);
+
+  // Products and Branches States
+  const [branchesList, setBranchesList] = useState([]);
+  const [productsList, setProductsList] = useState([]);
+  const [productStock, setProductStock] = useState([]);
+  const [intakeSupplierId, setIntakeSupplierId] = useState('');
+  const [intakeBasePrice, setIntakeBasePrice] = useState('');
+  const [intakeProductId, setIntakeProductId] = useState('');
+  const [intakeBranchId, setIntakeBranchId] = useState('');
 
   // User Activity & Admin Activity Logs Pagination
   const [userActPage, setUserActPage] = useState(1);
@@ -210,13 +200,8 @@ export default function AdminDashboard() {
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [stockModalTab, setStockModalTab] = useState('BULK'); // 'BULK' | 'SINGLE'
   const [bulkSnInput, setBulkSnInput] = useState('');
-  const [bulkModel, setBulkModel] = useState('Y6B');
   const [singleSnInput, setSingleSnInput] = useState('');
-  const [singleType, setSingleType] = useState('Display Soundbox');
-  const [singleSupplier, setSingleSupplier] = useState('Feishu');
   const [singleStoreId, setSingleStoreId] = useState('');
-  const [singleNotes, setSingleNotes] = useState('');
-  const [singlePrice, setSinglePrice] = useState('39.00');
   const [stockSubmitting, setStockSubmitting] = useState(false);
   const [isStockSnScanning, setIsStockSnScanning] = useState(false);
   const stockFileInputRef = useRef(null);
@@ -226,18 +211,9 @@ export default function AdminDashboard() {
     { id: 1, name: 'Feishu', device_count: 0 },
     { id: 2, name: 'Hemi', device_count: 0 }
   ]);
-  const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
-  const [supplierFormName, setSupplierFormName] = useState('');
-  const [supplierFormContact, setSupplierFormContact] = useState('');
-  const [supplierFormPhone, setSupplierFormPhone] = useState('');
-  const [supplierFormEmail, setSupplierFormEmail] = useState('');
-  const [editingSupplierId, setEditingSupplierId] = useState(null);
-  const [supplierSubmitting, setSupplierSubmitting] = useState(false);
 
   // Sales Orders & History State
   const [salesList, setSalesList] = useState([]);
-  const [salesTotalCount, setSalesTotalCount] = useState(0);
-  const [salesTotalRevenue, setSalesTotalRevenue] = useState(0);
   const [salesSearchTerm, setSalesSearchTerm] = useState('');
   const [salesLoading, setSalesLoading] = useState(false);
   const [salesPage, setSalesPage] = useState(1);
@@ -277,32 +253,8 @@ export default function AdminDashboard() {
     operation: true
   });
 
-  // Column Visibility Customizer for Manage Stock
-  const [isStockColumnsModalOpen, setIsStockColumnsModalOpen] = useState(false);
-  const [visibleStockColumns, setVisibleStockColumns] = useState({
-    deviceId: true,
-    deviceType: true,
-    supplier: true,
-    price: true,
-    intakeDate: true,
-    notes: true,
-    operation: true
-  });
-
   // Mobile & Tablet Collapsible Filter Toggles
-  const [isStockFiltersExpanded, setIsStockFiltersExpanded] = useState(false);
   const [isDevFiltersExpanded, setIsDevFiltersExpanded] = useState(false);
-
-  const activeStockFilterCount = useMemo(() => {
-    let count = 0;
-    if (stockSearchTerm.trim()) count++;
-    if (stockTypeFilter && stockTypeFilter !== 'ALL') count++;
-    if (stockSupplierFilter && stockSupplierFilter !== 'ALL') count++;
-    if (stockPriceFilter && stockPriceFilter !== 'ALL') count++;
-    if (stockDateFilter.trim()) count++;
-    if (stockSortBy !== 'NEWEST') count++;
-    return count;
-  }, [stockSearchTerm, stockTypeFilter, stockSupplierFilter, stockPriceFilter, stockDateFilter, stockSortBy]);
 
   const activeDevFilterCount = useMemo(() => {
     let count = 0;
@@ -316,10 +268,24 @@ export default function AdminDashboard() {
   }, [devFilterId, devFilterType, devFilterStatus, devFilterMerchant, devFilterWarranty, devFilterDate]);
 
   // User Management Modals state
+  // User Management Modals state
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  const [isEditUserOpen, setIsEditUserOpen] = useState(false);
+  const [isUserDetailsOpen, setIsUserDetailsOpen] = useState(false);
+  const [userDetailsData, setUserDetailsData] = useState(null);
+  const [loadingUserDetails, setLoadingUserDetails] = useState(false);
   const [isResetPassOpen, setIsResetPassOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+
+  // Edit user form states
+  const [editUserId, setEditUserId] = useState(null);
+  const [editUserPhone, setEditUserPhone] = useState('');
+  const [editUserName, setEditUserName] = useState('');
+  const [editUserRole, setEditUserRole] = useState('USER');
+  const [editUserStatus, setEditUserStatus] = useState('ACTIVE');
+  const [editUserBranchId, setEditUserBranchId] = useState('');
+  const [editIsAllBranches, setEditIsAllBranches] = useState(true);
 
   // Store Details Modal state
   const [isStoreDetailsOpen, setIsStoreDetailsOpen] = useState(false);
@@ -334,8 +300,9 @@ export default function AdminDashboard() {
   const [isDeleteDeviceOpen, setIsDeleteDeviceOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [editDeviceSn, setEditDeviceSn] = useState('');
+  const [editProductId, setEditProductId] = useState('');
   const [editDeviceType, setEditDeviceType] = useState('Display Soundbox');
-  const [editSupplier, setEditSupplier] = useState('Feishu');
+  const [editSupplier, setEditSupplier] = useState('');
   const [editDeviceTelegram, setEditDeviceTelegram] = useState('');
   const [editDeviceMerchantId, setEditDeviceMerchantId] = useState('');
   const [editDeviceStatus, setEditDeviceStatus] = useState('ACTIVE');
@@ -350,23 +317,24 @@ export default function AdminDashboard() {
   // Sell from Stock & Deploy workflow states
   const [isSellStockOpen, setIsSellStockOpen] = useState(false);
   const [sellTargetDevice, setSellTargetDevice] = useState(null);
-  const [sellStoreId, setSellStoreId] = useState('');
+  const [sellTargets, setSellTargets] = useState([]);
+  const [sellProgress, setSellProgress] = useState(null);
   const [sellDiscountType, setSellDiscountType] = useState('NONE');
-  const [sellDiscountPercent, setSellDiscountPercent] = useState(0);
-  const [sellDiscountAmount, setSellDiscountAmount] = useState(0);
-  const [sellWarrantyDays, setSellWarrantyDays] = useState(90);
-  const [sellWarrantyStartDate, setSellWarrantyStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [sellQuantity, setSellQuantity] = useState(1);
-  const [sellInvoiceRef, setSellInvoiceRef] = useState('');
+  const [sellDiscountPercent, setSellDiscountPercent] = useState('10');
+  const [sellDiscountAmount, setSellDiscountAmount] = useState('5');
+  const [sellBasePrices, setSellBasePrices] = useState({});
+
   const [sellPaymentMethod, setSellPaymentMethod] = useState('QR_SCAN'); // Default: QR Code else Cash
   const [sellSubmitting, setSellSubmitting] = useState(false);
 
-  // Form states for Create User
+  // Form states for Create Administrator
   const [newPhone, setNewPhone] = useState('');
   const [newName, setNewName] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [newRole, setNewRole] = useState('USER');
   const [newStatus, setNewStatus] = useState('ACTIVE');
+  const [newUserBranchId, setNewUserBranchId] = useState('');
+  const [isAllBranches, setIsAllBranches] = useState(true);
+  const [userBranchFilter, setUserBranchFilter] = useState('ALL');
   const [submitting, setSubmitting] = useState(false);
 
   // Form states for Reset Password
@@ -379,22 +347,26 @@ export default function AdminDashboard() {
       const searchParam = encodeURIComponent(searchTerm.trim());
       const roleParam = encodeURIComponent(roleFilter.trim());
       const statusParam = encodeURIComponent(statusFilter.trim());
+      const userBranchQuery = (userBranchFilter && userBranchFilter !== 'ALL')
+        ? `&branch_id=${userBranchFilter === 'HQ' ? 0 : userBranchFilter}`
+        : '';
+
+      const stockBranchQuery = (!currentAdmin?.branch_id && stockBranchFilter !== 'ALL') ? `?branch_id=${stockBranchFilter}` : '';
 
       const results = await Promise.allSettled([
-        api.get('/api/admin/stats'),
-        api.get(`/api/admin/users?search=${searchParam}&role=${roleParam}&status=${statusParam}`),
+        api.get(`/api/admin/users?search=${searchParam}&role=${roleParam}&status=${statusParam}${userBranchQuery}`),
         api.get('/api/admin/stores'),
         api.get('/api/devices/'),
         api.get(`/api/admin/logs?search=${searchParam}&log_type=${logTypeFilter}&limit=100`),
         api.get('/api/suppliers'),
-        api.get('/api/sales?limit=100')
+        api.get('/api/sales?limit=100'),
+        api.get('/api/branches/'),
+        api.get('/api/products/'),
+        api.get(`/api/products/stock/summary${stockBranchQuery}`)
       ]);
 
-      const [statsRes, usersRes, storesRes, devicesRes, logsRes, suppliersRes, salesRes] = results;
+      const [usersRes, storesRes, devicesRes, logsRes, suppliersRes, salesRes, branchesRes, productsRes, stockRes] = results;
 
-      if (statsRes.status === 'fulfilled' && statsRes.value?.data?.stats) {
-        setStats(statsRes.value.data.stats);
-      }
       if (usersRes.status === 'fulfilled' && usersRes.value?.data?.users) {
         setUsers(usersRes.value.data.users);
       }
@@ -412,14 +384,23 @@ export default function AdminDashboard() {
       }
       if (salesRes?.status === 'fulfilled' && salesRes.value?.data?.status === 'success') {
         setSalesList(salesRes.value.data.data || []);
-        setSalesTotalCount(salesRes.value.data.total || 0);
-        setSalesTotalRevenue(salesRes.value.data.total_revenue || 0);
+      }
+      if (branchesRes?.status === 'fulfilled' && branchesRes.value?.data?.data) {
+        setBranchesList(branchesRes.value.data.data);
+      }
+      if (productsRes?.status === 'fulfilled' && productsRes.value?.data?.data) {
+        setProductsList(productsRes.value.data.data);
+      }
+      if (stockRes?.status === 'fulfilled' && Array.isArray(stockRes.value?.data?.data)) {
+        setProductStock(stockRes.value.data.data);
+        setStockCanViewCost(stockRes.value.data.can_view_cost !== false);
       }
     } catch (err) {
       console.error(err);
       const msg = err.response?.data?.detail || 'Failed to fetch administrative data.';
       setError(msg);
     } finally {
+      setHasLoaded(true);
       setLoading(false);
     }
   };
@@ -429,87 +410,7 @@ export default function AdminDashboard() {
       fetchAllData();
     }, 150);
     return () => clearTimeout(timer);
-  }, [searchTerm, roleFilter, statusFilter, logTypeFilter]);
-
-  const hasActiveFilters = Boolean(searchTerm || roleFilter || statusFilter);
-
-  const handleClearFilters = () => {
-    setSearchTerm('');
-    setRoleFilter('');
-    setStatusFilter('');
-  };
-
-  // Supplier Management Handlers
-  const handleOpenNewSupplierModal = () => {
-    setSupplierFormName('');
-    setSupplierFormContact('');
-    setSupplierFormPhone('');
-    setSupplierFormEmail('');
-    setEditingSupplierId(null);
-    setIsSupplierModalOpen(true);
-  };
-
-  const handleOpenEditSupplierModal = (supp) => {
-    setEditingSupplierId(supp.id);
-    setSupplierFormName(supp.name || '');
-    setSupplierFormContact(supp.contact_person || '');
-    setSupplierFormPhone(supp.phone || '');
-    setSupplierFormEmail(supp.email || '');
-    setIsSupplierModalOpen(true);
-  };
-
-  const handleSaveSupplier = async (e) => {
-    e.preventDefault();
-    if (!supplierFormName.trim()) {
-      showToast({ type: 'error', title: 'Error', message: 'Supplier name is required.' });
-      return;
-    }
-    setSupplierSubmitting(true);
-    try {
-      if (editingSupplierId) {
-        await api.put(`/api/suppliers/${editingSupplierId}`, {
-          name: supplierFormName.trim(),
-          contact_person: supplierFormContact.trim() || null,
-          phone: supplierFormPhone.trim() || null,
-          email: supplierFormEmail.trim() || null
-        });
-        showToast({ type: 'update', title: 'Supplier Updated', message: t('supplierUpdated', 'Supplier updated successfully.') });
-      } else {
-        await api.post('/api/suppliers', {
-          name: supplierFormName.trim(),
-          contact_person: supplierFormContact.trim() || null,
-          phone: supplierFormPhone.trim() || null,
-          email: supplierFormEmail.trim() || null
-        });
-        showToast({ type: 'add', title: 'Supplier Created', message: t('supplierCreated', 'Supplier created successfully.') });
-      }
-      setSupplierFormName('');
-      setSupplierFormContact('');
-      setSupplierFormPhone('');
-      setSupplierFormEmail('');
-      setEditingSupplierId(null);
-      const sRes = await api.get('/api/suppliers');
-      if (sRes.data?.data) setSuppliersList(sRes.data.data);
-      fetchAllData();
-    } catch (err) {
-      showToast({ type: 'error', title: 'Error', message: err.response?.data?.detail || 'Failed to save supplier.' });
-    } finally {
-      setSupplierSubmitting(false);
-    }
-  };
-
-  const handleDeleteSupplier = async (supp) => {
-    if (!window.confirm(`Are you sure you want to delete or deactivate supplier '${supp.name}'?`)) return;
-    try {
-      const res = await api.delete(`/api/suppliers/${supp.id}`);
-      showToast({ type: 'unlink', title: 'Supplier Removed', message: res.data?.message || t('supplierDeleted', 'Supplier deleted successfully.') });
-      const sRes = await api.get('/api/suppliers');
-      if (sRes.data?.data) setSuppliersList(sRes.data.data);
-      fetchAllData();
-    } catch (err) {
-      showToast({ type: 'error', title: 'Error', message: err.response?.data?.detail || 'Failed to delete supplier.' });
-    }
-  };
+  }, [searchTerm, roleFilter, statusFilter, logTypeFilter, stockBranchFilter, userBranchFilter]);
 
   // Sales Orders Fetcher
   const fetchSales = async (search = '') => {
@@ -519,8 +420,6 @@ export default function AdminDashboard() {
       const res = await api.get(`/api/sales${q}`);
       if (res.data?.status === 'success') {
         setSalesList(res.data.data || []);
-        setSalesTotalCount(res.data.total || 0);
-        setSalesTotalRevenue(res.data.total_revenue || 0);
       }
     } catch (err) {
       console.error('Failed to fetch sales orders:', err);
@@ -534,7 +433,7 @@ export default function AdminDashboard() {
     setSalesPage(1);
   }, [salesSearchTerm, salesStatusFilter, salesSupplierFilter, salesSortBy]);
 
-  // Handle Add User
+  // Handle Create Admin Account
   const handleAddUser = async (e) => {
     e.preventDefault();
     if (!newPhone.trim() || !newName.trim() || !newPassword) {
@@ -545,27 +444,30 @@ export default function AdminDashboard() {
     setSubmitting(true);
     setError('');
     try {
+      const targetBranchId = isAllBranches ? null : (newUserBranchId ? Number(newUserBranchId) : null);
       await api.post('/api/admin/users', {
         phone_number: newPhone.trim(),
         full_name: newName.trim(),
         password: newPassword,
-        role: newRole,
-        status: newStatus
+        role: 'ADMIN',
+        status: newStatus,
+        branch_id: targetBranchId
       });
       setIsAddUserOpen(false);
       setNewPhone('');
       setNewName('');
       setNewPassword('');
-      const usrMsg = 'User account created successfully.';
+      setNewUserBranchId('');
+      setIsAllBranches(true);
       showToast({
         type: 'success',
-        title: 'User Created',
-        message: usrMsg,
+        title: 'Administrator Created',
+        message: `Administrator '${newName.trim()}' created successfully.`,
         duration: 5000
       });
       fetchAllData();
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to create user.';
+      const msg = err.response?.data?.detail || 'Failed to create administrator.';
       setError(msg);
       showToast({
         type: 'error',
@@ -578,7 +480,90 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleCreateUser = handleAddUser;
+  // Open Edit User Modal (Admin accounts only)
+  const openEditUserModal = (u) => {
+    if (u.role !== 'ADMIN') {
+      showToast({
+        type: 'error',
+        title: 'Action Restricted',
+        message: 'Administrators cannot edit user information. Standard users manage their own profile.',
+        duration: 5000
+      });
+      return;
+    }
+    setSelectedUser(u);
+    setEditUserId(u.id);
+    setEditUserPhone(u.phone_number || '');
+    setEditUserName(u.full_name || '');
+    setEditUserRole('ADMIN');
+    setEditUserStatus(u.status || 'ACTIVE');
+    const hasBranch = Boolean(u.branch_id);
+    setEditIsAllBranches(!hasBranch);
+    setEditUserBranchId(hasBranch ? String(u.branch_id) : '');
+    setIsEditUserOpen(true);
+  };
+
+  // Handle Update User
+  const handleUpdateUser = async (e) => {
+    e.preventDefault();
+    if (!editUserName.trim() || !editUserPhone.trim()) {
+      setError('Please fill in both name and phone number.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError('');
+    try {
+      const targetBranchId = (editUserRole === 'ADMIN')
+        ? (editIsAllBranches ? 0 : (editUserBranchId ? Number(editUserBranchId) : 0))
+        : null;
+
+      await api.put(`/api/admin/users/${editUserId}`, {
+        full_name: editUserName.trim(),
+        phone_number: editUserPhone.trim(),
+        status: editUserStatus,
+        branch_id: targetBranchId,
+        role: editUserRole
+      });
+
+      setIsEditUserOpen(false);
+      showToast({
+        type: 'update',
+        title: 'User Updated',
+        message: `Account '${editUserName.trim()}' updated successfully.`,
+        duration: 5000
+      });
+      fetchAllData();
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Failed to update user account.';
+      setError(msg);
+      showToast({
+        type: 'error',
+        title: 'Update Failed',
+        message: msg,
+        duration: 5000
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Open User Details Modal
+  const openUserDetailsModal = async (u) => {
+    setSelectedUser(u);
+    setIsUserDetailsOpen(true);
+    setLoadingUserDetails(true);
+    setUserDetailsData(null);
+    try {
+      const res = await api.get(`/api/admin/users/${u.id}/details`);
+      setUserDetailsData(res.data?.user || u);
+    } catch (err) {
+      console.error('Failed to load user details:', err);
+      setUserDetailsData(u);
+    } finally {
+      setLoadingUserDetails(false);
+    }
+  };
 
   // Handle Status Toggle (Quick Active <-> Suspended)
   const handleToggleStatus = async (u) => {
@@ -621,7 +606,7 @@ export default function AdminDashboard() {
   const handleResetPassword = async (e) => {
     e.preventDefault();
     if (!selectedUser || resetPasswordVal.length < 6) {
-      setError('Password must be at least 6 characters.');
+      setError(t('passwordMinLength', 'Password must be at least 6 characters.'));
       return;
     }
     setSubmitting(true);
@@ -739,8 +724,9 @@ export default function AdminDashboard() {
   const openEditDeviceModal = (d) => {
     setSelectedDevice(d);
     setEditDeviceSn(d.device_sn || '');
+    setEditProductId(d.product_id != null ? String(d.product_id) : '');
     setEditDeviceType(d.device_type || 'Display Soundbox');
-    setEditSupplier(d.supplier || 'Feishu');
+    setEditSupplier(d.supplier || '');
     setEditDeviceTelegram(d.telegram_chat_id || '');
     setEditDeviceStatus(d.status || 'ACTIVE');
     setEditDevicePrice(d.price ? String(d.price) : '39.00');
@@ -768,65 +754,93 @@ export default function AdminDashboard() {
     setIsEditDeviceOpen(true);
   };
 
+  const sellPriceKey = (unit) => String(unit.id ?? unit.device_sn ?? unit.device_id ?? unit.serial_number);
+
   // Open Sell from Stock Modal
-  const openSellStockModal = (device) => {
-    setSellTargetDevice(device);
+  const openSellStockModal = (deviceOrDevices) => {
+    const list = (Array.isArray(deviceOrDevices) ? deviceOrDevices : [deviceOrDevices]).filter(Boolean);
+    if (list.length === 0) return;
+    setSellTargets(list);
+    setSellTargetDevice(list[0]);
+    setSellProgress(null);
     setSellDiscountType('NONE');
-    setSellDiscountPercent(0);
-    setSellDiscountAmount(0);
-    setSellWarrantyDays(90);
-    setSellWarrantyStartDate(new Date().toISOString().split('T')[0]);
-    setSellQuantity(1);
-    setSellInvoiceRef('');
+    setSellDiscountPercent('10');
+    setSellDiscountAmount('5');
+    setSellBasePrices(Object.fromEntries(list.map(unit => [sellPriceKey(unit), String(unit.price ?? (unit.device_type === 'Display Soundbox' ? 39 : 29))])));
     setSellPaymentMethod('QR_SCAN');
     setIsSellStockOpen(true);
   };
-  const openSellModal = openSellStockModal;
 
-  // Confirm Sale & Deploy
+  // Warranty months of the product being sold (falls back to the system default)
+
+  // Price of one unit, and the discount applied to it (a percentage, or a fixed amount per unit)
+  const sellUnitPrice = (unit) =>
+    Math.max(0, Number(sellBasePrices[sellPriceKey(unit)] ?? unit?.price ?? 0) || 0);
+  const sellUnitDiscount = (unit) => {
+    const base = sellUnitPrice(unit);
+    if (sellDiscountType === 'PERCENT') return Math.round((Math.min(base, ((Number(sellDiscountPercent) || 0) / 100.0) * base) + Number.EPSILON) * 100) / 100;
+    if (sellDiscountType === 'AMOUNT') return Math.min(base, Number(sellDiscountAmount) || 0);
+    return 0;
+  };
+
+  const sellTotals = useMemo(() => {
+    const units = sellTargets.length > 0 ? sellTargets : (sellTargetDevice ? [sellTargetDevice] : []);
+    const subtotal = units.reduce((sum, u) => sum + sellUnitPrice(u), 0);
+    const discount = units.reduce((sum, u) => sum + sellUnitDiscount(u), 0);
+    return { count: units.length, subtotal, discount, total: Math.max(0, subtotal - discount) };
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [sellTargets, sellTargetDevice, sellBasePrices, sellDiscountType, sellDiscountPercent, sellDiscountAmount]);
+
+  // Confirm Sale & Deploy. Sells every selected unit, one sale record each.
   const handleConfirmSellAndProceedToPairing = async (e) => {
     e.preventDefault();
-    if (!sellTargetDevice) return;
+    const units = sellTargets.length > 0 ? sellTargets : (sellTargetDevice ? [sellTargetDevice] : []);
+    if (units.length === 0) return;
     setSellSubmitting(true);
+    setSellProgress({ done: 0, total: units.length });
 
-    const basePrice = Number(sellTargetDevice.price) || (sellTargetDevice.device_type === 'Display Soundbox' ? 39.00 : 29.00);
-    let discAmt = 0;
-    let discPct = 0;
-    if (sellDiscountType === 'PERCENT') {
-      discPct = Number(sellDiscountPercent) || 0;
-      discAmt = (discPct / 100.0) * basePrice;
-    } else if (sellDiscountType === 'AMOUNT') {
-      discAmt = Number(sellDiscountAmount) || 0;
-      discPct = 0;
+    const sold = [];
+    const failed = [];
+
+    for (const unit of units) {
+      const sn = unit.device_sn || unit.device_id || unit.serial_number;
+      const basePrice = sellUnitPrice(unit);
+      const discAmt = sellUnitDiscount(unit);
+      const discPct = sellDiscountType === 'PERCENT' ? (Number(sellDiscountPercent) || 0) : 0;
+      try {
+        await api.post('/api/sales', {
+          device_id: unit.id,
+          device_sn: sn,
+          merchant_id: null,
+          price: basePrice,
+          discount_type: sellDiscountType,
+          discount_percent: discPct,
+          discount_amount: discAmt,
+          final_price: Math.max(0, basePrice - discAmt),
+          // null tells the API to use the product's warranty (products.default_warranty_months)
+          warranty_days: null,
+          quantity: 1,
+          target_status: 'PENDING',
+          payment_method: sellPaymentMethod,
+          notes: `Sold via Admin Dashboard (${sellPaymentMethod === 'QR_SCAN' ? 'QR Scan / KHQR' : 'Cash'})`
+        });
+        sold.push(sn);
+      } catch (err) {
+        failed.push({ sn, detail: err.response?.data?.detail || 'Sale failed.' });
+      }
+      setSellProgress({ done: sold.length + failed.length, total: units.length });
     }
-    const finalPrice = Math.max(0, basePrice - discAmt);
-    const sn = sellTargetDevice.device_sn || sellTargetDevice.device_id;
 
-    try {
-      await api.post('/api/sales', {
-        device_id: sellTargetDevice.id,
-        device_sn: sn,
-        merchant_id: null,
-        price: basePrice,
-        discount_type: sellDiscountType,
-        discount_percent: discPct,
-        discount_amount: discAmt,
-        final_price: finalPrice,
-        warranty_days: Number(sellWarrantyDays) || 90,
-        warranty_start_date: sellWarrantyStartDate ? new Date(sellWarrantyStartDate).toISOString() : new Date().toISOString(),
-        quantity: Number(sellQuantity) || 1,
-        invoice_reference: sellInvoiceRef.trim() || null,
-        target_status: 'PENDING',
-        payment_method: sellPaymentMethod,
-        notes: `Sold via Admin Dashboard (${sellPaymentMethod === 'QR_SCAN' ? 'QR Scan / KHQR' : 'Cash'})`
-      });
+    setSellSubmitting(false);
+    setSellProgress(null);
 
+    if (sold.length > 0) {
       setIsSellStockOpen(false);
       await fetchAllData();
       await fetchSales();
 
-      // Switch to Manage Devices tab and focus on this sold unit
-      setDevFilterId(sn || '');
+      // Switch to Manage Devices and focus the sold unit (a single sale filters by its serial)
+      setDevFilterId(sold.length === 1 ? (sold[0] || '') : '');
       setDevFilterType('ALL');
       setDevFilterStatus('');
       setDevFilterMerchant('');
@@ -838,16 +852,24 @@ export default function AdminDashboard() {
       showToast({
         type: 'success',
         title: isKhmer ? 'បានលក់ឧបករណ៍ដោយជោគជ័យ' : 'Device Sold & Moved to Manage Devices',
-        message: isKhmer 
-          ? `ឧបករណ៍ ${sn} ត្រូវបានផ្លាស់ទីទៅកាន់ Manage Devices ដោយស្ថិតក្នុងស្ថានភាព៖ រង់ចាំការចុះឈ្មោះ (រង់ចាំអតិថិជនស្កេនភ្ជាប់តាម App)` 
-          : `Device ${sn} moved to Manage Devices with status 'Waiting for Registration'. Waiting for user to link in app.`,
+        message: sold.length === 1
+          ? (isKhmer
+              ? `ឧបករណ៍ ${sold[0]} ត្រូវបានផ្លាស់ទីទៅកាន់ Manage Devices ដោយស្ថិតក្នុងស្ថានភាព៖ រង់ចាំការចុះឈ្មោះ (រង់ចាំអតិថិជនស្កេនភ្ជាប់តាម App)`
+              : `Device ${sold[0]} moved to Manage Devices with status 'Waiting for Registration'. Waiting for user to link in app.`)
+          : `${sold.length} devices moved to Manage Devices with status 'Waiting for Registration'.`,
         duration: 5000
       });
-    } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to process device sale.';
-      showToast({ type: 'error', title: 'Sale Failed', message: msg });
-    } finally {
-      setSellSubmitting(false);
+    }
+
+    if (failed.length > 0) {
+      showToast({
+        type: 'error',
+        title: 'Sale Failed',
+        message: failed.length === 1
+          ? `${failed[0].sn}: ${failed[0].detail}`
+          : `${failed.length} of ${units.length} devices could not be sold: ${failed.slice(0, 3).map((f) => f.sn).join(', ')}${failed.length > 3 ? '…' : ''}`,
+        duration: 6000
+      });
     }
   };
 
@@ -873,9 +895,7 @@ export default function AdminDashboard() {
     try {
       await api.put(`/api/devices/${selectedDevice.id}`, {
         device_sn: editDeviceSn.trim(),
-        device_type: editDeviceType.trim() || 'Display Soundbox',
-        device_model: editDeviceType.trim() || 'Display Soundbox',
-        supplier: editSupplier || 'Feishu',
+        product_id: editProductId ? Number(editProductId) : null,
         telegram_chat_id: editDeviceTelegram.trim() || null,
         status: editDeviceStatus,
         price: basePrice,
@@ -945,9 +965,64 @@ export default function AdminDashboard() {
     }
   };
 
+  // Dynamic Status Options calculated from current tab's users and active branch filter
+  const dynamicStatusOptions = useMemo(() => {
+    let tabUsers = users.filter(u => adminTab === 'admins' ? u.role === 'ADMIN' : u.role === 'USER');
+    if (userBranchFilter && userBranchFilter !== 'ALL') {
+      if (userBranchFilter === 'HQ') {
+        tabUsers = tabUsers.filter(u => !u.branch_id);
+      } else {
+        tabUsers = tabUsers.filter(u => String(u.branch_id) === String(userBranchFilter));
+      }
+    }
+    const totalCount = tabUsers.length;
+    const activeCount = tabUsers.filter(u => u.status === 'ACTIVE').length;
+    const suspendedCount = tabUsers.filter(u => u.status !== 'ACTIVE').length;
+
+    return {
+      totalCount,
+      activeCount,
+      suspendedCount
+    };
+  }, [users, adminTab, userBranchFilter]);
+
+  // Dynamic Branch Options calculated from current tab's users, active status filter, and registered branches
+  const dynamicBranchOptions = useMemo(() => {
+    let tabUsers = users.filter(u => adminTab === 'admins' ? u.role === 'ADMIN' : u.role === 'USER');
+    if (statusFilter) {
+      tabUsers = tabUsers.filter(u => statusFilter === 'ACTIVE' ? u.status === 'ACTIVE' : u.status !== 'ACTIVE');
+    }
+    const totalCount = tabUsers.length;
+    const hqCount = tabUsers.filter(u => !u.branch_id).length;
+
+    const list = branchesList.map(b => {
+      const bId = String(b.id || b.branch_id);
+      const count = tabUsers.filter(u => String(u.branch_id) === bId).length;
+      return {
+        id: bId,
+        name: b.branch_name,
+        code: b.branch_code,
+        count
+      };
+    });
+
+    return {
+      totalCount,
+      hqCount,
+      branches: list
+    };
+  }, [users, adminTab, branchesList, statusFilter]);
+
   // Filtered Users Logic
   const filteredUsers = useMemo(() => {
     return users.filter(u => {
+      // Tab-specific role partitioning:
+      if (adminTab === 'admins') {
+        if (u.role !== 'ADMIN') return false;
+      } else if (adminTab === 'users') {
+        if (u.role !== 'USER') return false;
+      }
+
       if (searchTerm.trim()) {
         const q = searchTerm.trim().toLowerCase();
         const phoneMatch = String(u.phone_number || '').toLowerCase().includes(q);
@@ -957,14 +1032,21 @@ export default function AdminDashboard() {
       }
       if (roleFilter && u.role !== roleFilter) return false;
       if (statusFilter && u.status !== statusFilter) return false;
+      if (userBranchFilter && userBranchFilter !== 'ALL') {
+        if (userBranchFilter === 'HQ') {
+          if (u.branch_id !== null && u.branch_id !== undefined && u.branch_id !== '') return false;
+        } else {
+          if (String(u.branch_id) !== String(userBranchFilter)) return false;
+        }
+      }
       return true;
     });
-  }, [users, searchTerm, roleFilter, statusFilter]);
+  }, [users, adminTab, searchTerm, roleFilter, statusFilter, userBranchFilter]);
 
   // Reset page numerations when search or filter states change
   useEffect(() => {
     setUserPage(1);
-  }, [searchTerm, roleFilter, statusFilter]);
+  }, [adminTab, searchTerm, roleFilter, statusFilter, userBranchFilter]);
 
   useEffect(() => {
     setStorePage(1);
@@ -978,9 +1060,38 @@ export default function AdminDashboard() {
     setAdminActPage(1);
   }, [adminActivitySearch, adminActivityCategoryFilter]);
 
+  // Close action menu when clicking outside, scrolling, or pressing Escape
   useEffect(() => {
-    setStockPage(1);
-  }, [stockSearchTerm, stockTypeFilter, stockSupplierFilter, stockPriceFilter, stockDateFilter, stockSortBy]);
+    const handleOutsideClick = (e) => {
+      if (!e.target.closest('.action-menu-container') && !e.target.closest('.action-menu-dropdown')) {
+        setOpenActionDropdownId(null);
+        setActiveDropdownRect(null);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setOpenActionDropdownId(null);
+        setActiveDropdownRect(null);
+      }
+    };
+    const handleScrollOrResize = () => {
+      setOpenActionDropdownId(null);
+      setActiveDropdownRect(null);
+    };
+
+    if (openActionDropdownId !== null) {
+      document.addEventListener('mousedown', handleOutsideClick);
+      document.addEventListener('keydown', handleKeyDown);
+      window.addEventListener('scroll', handleScrollOrResize, true);
+      window.addEventListener('resize', handleScrollOrResize);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [openActionDropdownId]);
 
   // Available Provinces for Stores Filter
   // Available Provinces for Stores Filter
@@ -1188,118 +1299,6 @@ export default function AdminDashboard() {
     });
   }, [devices, devFilterId, devFilterType, devFilterStatus, devFilterMerchant, devFilterWarranty, devFilterDate]);
 
-  // Warehouse Stock Devices Filtering Logic
-  const filteredStockDevices = useMemo(() => {
-    const list = devices.filter(d => {
-      // Must be unassigned and strictly in warehouse stock (not pending/sold or active)
-      if (d.merchant_id) return false;
-      const st = String(d.status || '').toUpperCase();
-      if (st === 'PENDING' || st === 'ACTIVE') return false;
-
-      if (stockSearchTerm.trim()) {
-        const q = stockSearchTerm.toLowerCase().trim();
-        const sn = String(d.device_sn || d.device_id || '').toLowerCase();
-        const dtype = String(d.device_type || '').toLowerCase();
-        const supp = String(d.supplier || 'feishu').toLowerCase();
-        const notes = String(d.notes || '').toLowerCase();
-        if (!sn.includes(q) && !dtype.includes(q) && !notes.includes(q) && !supp.includes(q)) {
-          return false;
-        }
-      }
-
-      if (stockTypeFilter !== 'ALL') {
-        const targetType = stockTypeFilter.toLowerCase();
-        const dType = String(d.device_type || '').toLowerCase();
-        if (!dType.includes(targetType.includes('display') ? 'display' : 'standard')) {
-          return false;
-        }
-      }
-
-      if (stockSupplierFilter !== 'ALL') {
-        const targetSupp = stockSupplierFilter.toLowerCase();
-        const dSupp = String(d.supplier || 'Feishu').toLowerCase();
-        if (dSupp !== targetSupp) {
-          return false;
-        }
-      }
-
-      if (stockPriceFilter !== 'ALL') {
-        if (Math.round(Number(d.price || 29)) !== Math.round(Number(stockPriceFilter))) {
-          return false;
-        }
-      }
-
-      if (stockDateFilter.trim()) {
-        const dateStr = String(d.created_at || '');
-        if (!dateStr.includes(stockDateFilter.trim())) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-
-    // Sorting Logic
-    return list.sort((a, b) => {
-      if (stockSortBy === 'OLDEST') {
-        return (new Date(a.created_at || 0) - new Date(b.created_at || 0)) || (a.id - b.id);
-      }
-      if (stockSortBy === 'SN_ASC') {
-        return String(a.device_sn || a.device_id || '').localeCompare(String(b.device_sn || b.device_id || ''));
-      }
-      if (stockSortBy === 'SN_DESC') {
-        return String(b.device_sn || b.device_id || '').localeCompare(String(a.device_sn || a.device_id || ''));
-      }
-      if (stockSortBy === 'PRICE_DESC') {
-        return (Number(b.price || 0) - Number(a.price || 0)) || (b.id - a.id);
-      }
-      if (stockSortBy === 'PRICE_ASC') {
-        return (Number(a.price || 0) - Number(b.price || 0)) || (a.id - b.id);
-      }
-      // Default: NEWEST
-      return (new Date(b.created_at || 0) - new Date(a.created_at || 0)) || (b.id - a.id);
-    });
-  }, [devices, stockSearchTerm, stockTypeFilter, stockSupplierFilter, stockPriceFilter, stockDateFilter, stockSortBy]);
-
-  // Reset Stock Filters
-  const handleResetStockFilters = () => {
-    setStockSearchTerm('');
-    setStockTypeFilter('ALL');
-    setStockSupplierFilter('ALL');
-    setStockPriceFilter('ALL');
-    setStockDateFilter('');
-    setStockSortBy('NEWEST');
-    setStockPage(1);
-  };
-
-  // Stock Export CSV
-  const handleExportStockCSV = () => {
-    if (filteredStockDevices.length === 0) {
-      showToast({ type: 'warning', title: 'No Data', message: 'No warehouse stock records to export.' });
-      return;
-    }
-    const headers = ['Device SN', 'Device Type', 'Supplier', 'Unit Price ($)', 'Notes', '4G Version', 'WiFi Version', 'Registration Date'];
-    const rows = filteredStockDevices.map(d => [
-      `"${d.device_sn || ''}"`,
-      `"${d.device_type || 'Display Soundbox'}"`,
-      `"${d.supplier || 'Feishu'}"`,
-      Number(d.price || 29).toFixed(2),
-      `"${(d.notes || '').replace(/"/g, '""')}"`,
-      `"${d.version_4g || ''}"`,
-      `"${d.version_wifi || ''}"`,
-      `"${d.created_at || ''}"`
-    ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `warehouse_stock_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast({ type: 'success', title: 'Export Successful', message: `Exported ${filteredStockDevices.length} stock records.` });
-  };
-
   // Sales Export CSV
   const handleExportSalesCSV = () => {
     if (filteredSalesList.length === 0) {
@@ -1313,7 +1312,7 @@ export default function AdminDashboard() {
       `"${s.created_at ? new Date(s.created_at).toISOString().slice(0, 10) : ''}"`,
       `"${s.device_sn || ''}"`,
       `"${s.device_type || 'Soundbox'}"`,
-      `"${s.supplier_name || 'Feishu'}"`,
+      `"${s.supplier || s.supplier_name || ''}"`,
       `"${(s.store_name || s.customer_name || 'Direct Sale').replace(/"/g, '""')}"`,
       `"${s.customer_phone || s.merchant_phone || ''}"`,
       `"${s.sold_by_name || 'Admin'}"`,
@@ -1508,13 +1507,6 @@ export default function AdminDashboard() {
     return filteredDevices.slice(start, start + devPageSize);
   }, [filteredDevices, devPage, devPageSize]);
 
-  // Paginated Stock Items (Warehouse)
-  const totalStockPages = Math.max(1, Math.ceil(filteredStockDevices.length / stockPageSize));
-  const paginatedStockDevices = useMemo(() => {
-    const start = (stockPage - 1) * stockPageSize;
-    return filteredStockDevices.slice(start, start + stockPageSize);
-  }, [filteredStockDevices, stockPage, stockPageSize]);
-
   // Paginated Sales Orders Logic
   const filteredSalesList = useMemo(() => {
     let result = [...salesList];
@@ -1707,78 +1699,140 @@ export default function AdminDashboard() {
     );
   };
 
-  // Handle Bulk Import Stock
-  const handleBulkImportStock = async (e) => {
-    e.preventDefault();
-    const rawLines = bulkSnInput
-      .split(/[\n,;]+/)
-      .map(s => s.trim())
-      .filter(Boolean);
+  // --- Add Stock form helpers (product + branch based) ---
+  const parseSerialList = (raw) => Array.from(new Set(
+    String(raw || '').split(/[\s,;]+/).map(s => s.trim()).filter(Boolean)
+  ));
 
-    if (rawLines.length === 0) {
-      showToast({ type: 'error', title: 'Serial Numbers Required', message: 'Please enter or scan at least one serial number.' });
+  const intakeSerials = useMemo(
+    () => (stockModalTab === 'BULK' ? parseSerialList(bulkSnInput) : parseSerialList(singleSnInput).slice(0, 1)),
+    [stockModalTab, bulkSnInput, singleSnInput]
+  );
+  const intakeDuplicateCount = useMemo(() => {
+    if (stockModalTab !== 'BULK') return 0;
+    const all = String(bulkSnInput || '').split(/[\s,;]+/).map(s => s.trim()).filter(Boolean);
+    return all.length - new Set(all).size;
+  }, [stockModalTab, bulkSnInput]);
+
+  // Suppliers that actually have products, plus a slot for products with no supplier
+  const intakeSupplierOptions = useMemo(() => {
+    const options = suppliersList
+      .filter(sup => productsList.some(p => String(p.supplier_id) === String(sup.id)))
+      .map(sup => ({ id: String(sup.id), name: sup.name }));
+    if (productsList.some(p => !p.supplier_id)) {
+      options.push({ id: 'NONE', name: isKhmer ? 'គ្មានអ្នកផ្គត់ផ្គង់' : 'No supplier' });
+    }
+    return options;
+  }, [suppliersList, productsList, isKhmer]);
+
+  // The product list narrows to the chosen supplier
+  const intakeProductOptions = useMemo(() => {
+    if (!intakeSupplierId) return [];
+    return productsList.filter(p => (intakeSupplierId === 'NONE'
+      ? !p.supplier_id
+      : String(p.supplier_id) === String(intakeSupplierId)));
+  }, [productsList, intakeSupplierId]);
+
+  const intakeProduct = useMemo(
+    () => intakeProductOptions.find(p => String(p.id) === String(intakeProductId)) || null,
+    [intakeProductOptions, intakeProductId]
+  );
+
+  // Choosing a supplier picks its first product, so the form is never left half set
+  useEffect(() => {
+    if (!intakeSupplierId) {
+      setIntakeProductId('');
       return;
     }
+    setIntakeProductId(prev => (intakeProductOptions.some(p => String(p.id) === String(prev))
+      ? prev
+      : (intakeProductOptions[0] ? String(intakeProductOptions[0].id) : '')));
+  }, [intakeSupplierId, intakeProductOptions]);
+  const intakeTargetBranchId = currentAdmin?.branch_id ? String(currentAdmin.branch_id) : String(intakeBranchId || '');
+  const intakeTargetBranch = branchesList.find(b => String(b.id ?? b.branch_id) === intakeTargetBranchId) || null;
 
-    setStockSubmitting(true);
-    try {
-      const res = await api.post('/api/devices/bulk-import', {
-        serial_numbers: rawLines,
-        device_model: bulkModel,
-        notes: bulkNotes,
-        price: Number(bulkPrice) || 29.00
-      });
-      showToast({
-        type: 'success',
-        title: 'Stock Imported',
-        message: res.data.message || `Imported ${res.data.imported_count} devices into warehouse stock.`,
-        duration: 5000
-      });
-      setIsStockModalOpen(false);
-      setBulkSnInput('');
-      setBulkNotes('');
-      fetchAllData();
-    } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to import stock.';
-      showToast({ type: 'error', title: 'Import Failed', message: msg, duration: 5000 });
-    } finally {
-      setStockSubmitting(false);
+  // The batch's selling price starts from the product's base price
+  useEffect(() => {
+    setIntakeBasePrice(intakeProduct?.base_price != null ? Number(intakeProduct.base_price).toFixed(2) : '');
+  }, [intakeProduct]);
+
+  // Current available quantity for the chosen product at the chosen branch.
+  // null when the loaded stock list cannot answer (SuperAdmin viewing a different branch filter).
+  // The summary table is scoped to one branch only for branch admins or a SuperAdmin with a branch filter.
+  const intakeCurrentQty = useMemo(() => {
+    if (!intakeProduct || !intakeTargetBranchId) return null;
+    if (!currentAdmin?.branch_id && String(stockBranchFilter) !== intakeTargetBranchId) return null;
+    const row = (productStock || []).find(r => String(r.product_id) === String(intakeProduct.id));
+    return row ? Number(row.available_quantity || 0) : 0;
+  }, [intakeProduct, intakeTargetBranchId, productStock, stockBranchFilter, currentAdmin?.branch_id]);
+
+  const openStockIntakeModal = () => {
+    const current = productsList.find(p => String(p.id) === String(intakeProductId));
+    if (!current) {
+      const first = productsList[0];
+      setIntakeSupplierId(first ? (first.supplier_id ? String(first.supplier_id) : 'NONE') : '');
+    } else if (!intakeSupplierId) {
+      setIntakeSupplierId(current.supplier_id ? String(current.supplier_id) : 'NONE');
     }
+    if (!currentAdmin?.branch_id && !intakeBranchId && stockBranchFilter !== 'ALL') {
+      setIntakeBranchId(String(stockBranchFilter));
+    }
+    setIsStockSnScanning(false);
+    setIsStockModalOpen(true);
   };
 
-  // Handle Single Device Intake
-  const handleSingleIntakeStock = async (e) => {
+  // Handle Device Intake (Single or Bulk) with Product & Branch scoping
+  const handleIntakeStock = async (e) => {
     e.preventDefault();
-    if (!singleSnInput.trim()) {
-      showToast({ type: 'error', title: 'SN Required', message: 'Please enter the device serial number.' });
+    const sns = intakeSerials;
+
+    if (sns.length === 0) {
+      showToast({ type: 'error', title: 'SN Required', message: 'Please enter or scan at least one serial number.' });
+      return;
+    }
+    if (!intakeSupplierId) {
+      showToast({ type: 'error', title: 'Supplier Required', message: 'Please select a supplier first.' });
+      return;
+    }
+    if (!intakeProduct) {
+      showToast({ type: 'error', title: 'Product Required', message: 'Please select a product.' });
+      return;
+    }
+    if (intakeBasePrice !== '' && (!Number.isFinite(Number(intakeBasePrice)) || Number(intakeBasePrice) < 0)) {
+      showToast({ type: 'error', title: 'Invalid Base Price', message: 'Base price must be a number of 0 or more.' });
+      return;
+    }
+    if (!intakeTargetBranchId) {
+      showToast({ type: 'error', title: 'Branch Required', message: 'Please select a destination branch.' });
       return;
     }
 
     setStockSubmitting(true);
     try {
-      const res = await api.post('/api/devices/intake', {
-        device_sn: singleSnInput.trim(),
-        device_type: singleType || "Display Soundbox",
-        supplier: singleSupplier || "Feishu",
-        notes: singleNotes,
-        price: Number(singlePrice) || (singleType === 'Display Soundbox' ? 39.00 : 29.00),
-        merchant_id: singleStoreId ? Number(singleStoreId) : null
-      });
+      const payload = {
+        serial_numbers: sns,
+        product_id: Number(intakeProduct.id),
+        branch_id: Number(intakeTargetBranchId),
+        // Base price is the selling price for this batch; the cost comes from the product
+        unit_price: intakeBasePrice === '' ? null : Number(intakeBasePrice),
+        cost_price: null,
+        notes: null
+      };
+
+      const res = await api.post('/api/products/stock/intake', payload);
       showToast({
         type: 'success',
-        title: 'Device Intake Completed',
-        message: res.data.message || `Soundbox ${singleSnInput} added to stock.`,
+        title: 'Stock Intake Completed',
+        message: res.data.message || `Successfully added ${sns.length} unit(s) of ${intakeProduct.product_name}.`,
         duration: 5000
       });
       setIsStockModalOpen(false);
       setIsStockSnScanning(false);
       setSingleSnInput('');
-      setSingleSupplier('Feishu');
-      setSingleStoreId('');
-      setSingleNotes('');
+      setBulkSnInput('');
       fetchAllData();
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to intake device.';
+      const msg = err.response?.data?.detail || 'Failed to intake devices into stock.';
       showToast({ type: 'error', title: 'Intake Failed', message: msg, duration: 5000 });
     } finally {
       setStockSubmitting(false);
@@ -1824,46 +1878,6 @@ export default function AdminDashboard() {
     };
     reader.readAsDataURL(file);
     e.target.value = '';
-  };
-
-  // Handle Return Device to Warehouse Stock
-  const handleReturnDeviceToStock = async (device) => {
-    if (!window.confirm(`Are you sure you want to unlink device '${device.device_sn}' from its store and return it to warehouse stock?`)) {
-      return;
-    }
-    try {
-      const res = await api.post(`/api/devices/${device.id}/return-to-stock`);
-      showToast({
-        type: 'success',
-        title: 'Returned to Stock',
-        message: res.data.message || `Device '${device.device_sn}' is now unassigned in warehouse stock.`,
-        duration: 5000
-      });
-      fetchAllData();
-    } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to return device to stock.';
-      showToast({ type: 'error', title: 'Action Failed', message: msg, duration: 5000 });
-    }
-  };
-
-  // Handle Mark Device for Maintenance / Repair
-  const handleSendDeviceToMaintenance = async (device) => {
-    if (!window.confirm(`Mark device '${device.device_sn}' as under maintenance / repair?`)) {
-      return;
-    }
-    try {
-      const res = await api.post(`/api/devices/${device.id}/maintenance`);
-      showToast({
-        type: 'success',
-        title: 'Sent to Maintenance',
-        message: res.data.message || `Device '${device.device_sn}' is now in maintenance.`,
-        duration: 5000
-      });
-      fetchAllData();
-    } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to mark device maintenance.';
-      showToast({ type: 'error', title: 'Action Failed', message: msg, duration: 5000 });
-    }
   };
 
   // Reset Cloud Speaker Filters
@@ -1944,17 +1958,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const toggleStockSelection = (id) => {
-    setStockSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  };
-  const toggleSelectAllStock = () => {
-    if (stockSelectedIds.length === paginatedStockDevices.length && paginatedStockDevices.length > 0) {
-      setStockSelectedIds([]);
-    } else {
-      setStockSelectedIds(paginatedStockDevices.map(d => d.id || d.device_sn));
-    }
-  };
-
   const toggleUserActSelection = (id) => {
     setUserActSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
@@ -2018,7 +2021,7 @@ export default function AdminDashboard() {
       const res = await api.post('/api/devices/batch-command', {
         device_ids: devSelectedIds,
         command_type: batchCommandType,
-        volume: batchVolume
+        volume: batchCommandVolume
       });
       setIsBatchCommandOpen(false);
       showToast({
@@ -2066,38 +2069,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // Export User Payment Logs as CSV
-  const handleExportCSV = () => {
-    const listToExport = logs.filter(l => l.log_category === 'TRANSACTION');
-    if (!listToExport || listToExport.length === 0) {
-      showToast({ type: 'error', title: 'No Data', message: 'No user payment logs to export.' });
-      return;
-    }
-    const headers = ['Bank / Gateway', 'Amount', 'Currency', 'Customer / Payer', 'Bank Reference TxID', 'Store Name', 'Soundbox SN', 'Status', 'Date Time'];
-    const rows = listToExport.map(tx => [
-      tx.bank_name || 'Bakong',
-      tx.amount || 0,
-      tx.currency || 'USD',
-      `"${(tx.payer_name || 'Customer').replace(/"/g, '""')}"`,
-      tx.txid || tx.id || '',
-      `"${(tx.store_name || '').replace(/"/g, '""')}"`,
-      tx.device_sn || '',
-      tx.status || 'PROCESSED',
-      tx.created_at ? new Date(tx.created_at).toLocaleString() : ''
-    ]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `OST_User_Payment_Logs_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast({ type: 'success', title: 'Export Complete', message: `Exported ${listToExport.length} user payment log records.` });
-  };
-
-  if (loading && !stats) {
+  if (loading && !hasLoaded) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 flex items-center justify-center">
         <div className="text-center">
@@ -2119,20 +2091,28 @@ export default function AdminDashboard() {
               {t('admin', 'Admin Portal')}
             </span>
             <span className="text-[11px] sm:text-xs text-slate-400">
-              {adminTab === 'users' ? t('userAccountsRoles', 'User Accounts & Roles') :
+              {adminTab === 'admins' ? t('manageAdmins', 'Manage Admins') :
+               adminTab === 'users' ? t('manageUsers', 'Manage Users') :
                adminTab === 'stores' ? t('storeMerchantBranches', 'Store & Merchant Branches') :
                adminTab === 'devices' ? t('deployedSoundboxFleet', 'Deployed Soundbox Fleet & Telemetry') :
                adminTab === 'inventory' ? t('warehouseStockBreadcrumb', 'Warehouse Stock & Inventory') :
+               adminTab === 'products' ? t('manageProductBreadcrumb', 'Product Catalog') :
+               adminTab === 'suppliers' ? t('manageSupplierBreadcrumb', 'Suppliers & Device Types') :
+               adminTab === 'branches' ? t('manageBranchBreadcrumb', 'Branches & Warehouses') :
                adminTab === 'sales' || adminTab === 'sales_history' ? t('salesHistoryBreadcrumb', 'Device Sales & Order Ledger') :
                adminTab === 'user_activity' || adminTab === 'user_logs' || adminTab === 'logs' ? t('userActivityTitle', 'User Activity') :
                t('adminActivityTitle', 'Admin Activity')}
             </span>
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1">
-            {adminTab === 'users' ? t('userMerchantAccounts', 'User & Merchant Accounts') :
+            {adminTab === 'admins' ? t('manageAdmins', 'Manage Admins') :
+             adminTab === 'users' ? t('manageUsers', 'Manage Users') :
              adminTab === 'stores' ? t('storesMerchantLocations', 'Stores & Merchant Locations') :
              adminTab === 'devices' ? t('manageDevicesTitle', 'Manage Devices (Deployed Soundboxes)') :
              adminTab === 'inventory' ? t('stockInventory', 'Stock & Inventory (Warehouse)') :
+             adminTab === 'products' ? t('manageProductTitle', 'Manage Product') :
+             adminTab === 'suppliers' ? t('manageSupplierTitle', 'Manage Supplier') :
+             adminTab === 'branches' ? t('manageBranchTitle', 'Manage Branch') :
              adminTab === 'sales' || adminTab === 'sales_history' ? t('salesHistoryTitle', 'Sale History & Revenue') :
              adminTab === 'user_activity' || adminTab === 'user_logs' || adminTab === 'logs' ? t('userActivityTitle', 'User Activity') :
              t('adminActivityTitle', 'Admin Activity')}
@@ -2144,47 +2124,29 @@ export default function AdminDashboard() {
           disabled={loading}
           className="px-3.5 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/80 transition flex items-center justify-center gap-2 self-stretch sm:self-auto shadow-2xs cursor-pointer"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          {t('refresh', 'Refresh Data')}
+          {loading ? 'Refreshing...' : t('refresh', 'Refresh Data')}
         </button>
       </div>
 
-      {/* KPI Stats Cards - Dedicated to Users tab only */}
-      {stats && adminTab === 'users' && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3.5">
-          <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-            <div className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('totalUsers', 'Total Users')}</div>
-            <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1">{stats.total_users}</div>
-          </div>
-          <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-            <div className="text-[10px] sm:text-xs font-semibold text-emerald-600 uppercase tracking-wider">{t('active', 'Active Users')}</div>
-            <div className="text-xl sm:text-2xl font-bold text-emerald-600 mt-1">{stats.active_users}</div>
-          </div>
-          <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-            <div className="text-[10px] sm:text-xs font-semibold text-rose-600 uppercase tracking-wider">{t('inactive', 'Suspended')}</div>
-            <div className="text-xl sm:text-2xl font-bold text-rose-600 mt-1">{stats.suspended_users}</div>
-          </div>
-          <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-            <div className="text-[10px] sm:text-xs font-semibold text-purple-600 uppercase tracking-wider">{t('admin', 'Admins')}</div>
-            <div className="text-xl sm:text-2xl font-bold text-purple-600 mt-1">{stats.admin_count}</div>
-          </div>
-          <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-            <div className="text-[10px] sm:text-xs font-semibold text-blue-600 uppercase tracking-wider">{t('totalStores', 'Stores Total')}</div>
-            <div className="text-xl sm:text-2xl font-bold text-blue-600 mt-1">{stats.total_stores}</div>
-          </div>
-        </div>
-      )}
-
-      {/* Universal Search & Filter Controls (For Users and Logs) */}
-      {adminTab === 'users' && (
+      {/* Universal Search & Filter Controls (For Admins and Users) */}
+      {(adminTab === 'admins' || adminTab === 'users') && (
         <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200 dark:border-slate-800 p-3 sm:p-4">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
+          {adminTab === 'admins' && (
+            <div className="mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">{isKhmer ? 'បញ្ជីអ្នកគ្រប់គ្រង' : 'Admin directory'}</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{isKhmer ? 'គ្រប់គ្រងគណនី សាខា និងសិទ្ធិចូលប្រើ។' : 'Manage administrator accounts, branch assignments and access.'}</p>
+            </div>
+          )}
+          <div className={adminTab === 'admins' ? 'flex flex-col xl:flex-row items-stretch xl:items-center gap-3' : 'flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3'}>
             
             {/* Search */}
             <div className="relative flex-1">
               <input
+                aria-label={adminTab === 'admins' ? t('searchAdminsPlaceholder', 'Search admins') : t('searchPlaceholder', 'Search users')}
                 type="text"
-                placeholder={t('searchPlaceholder', 'Search by name, phone number, store or location...')}
+                placeholder={adminTab === 'admins'
+                  ? t('searchAdminsPlaceholder', 'Search admin by name or phone number...')
+                  : t('searchPlaceholder', 'Search by name, phone number, store or location...')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-base sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -2194,52 +2156,81 @@ export default function AdminDashboard() {
             {/* Filters and Actions */}
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
               
-              {adminTab === 'users' && (
-                <>
-                  <select
-                    value={roleFilter}
-                    onChange={(e) => setRoleFilter(e.target.value)}
-                    className="flex-1 sm:flex-none px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer"
-                  >
-                    <option value="">{t('allRoles', 'All Roles')}</option>
-                    <option value="ADMIN">{t('admin', 'Admin')}</option>
-                    <option value="USER">{t('merchant', 'User')}</option>
-                  </select>
-
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="flex-1 sm:flex-none px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer"
-                  >
-                    <option value="">{t('allStatuses', 'All Statuses')}</option>
-                    <option value="ACTIVE">{t('active', 'Active')}</option>
-                    <option value="SUSPENDED">{t('inactive', 'Suspended')}</option>
-                  </select>
-                </>
+              {/* Dynamic Branch Filter: Available for SuperAdmin across both Admins and Users */}
+              {!currentAdmin?.branch_id && (
+                <select
+                  value={userBranchFilter}
+                  onChange={(e) => setUserBranchFilter(e.target.value)}
+                  className="flex-1 sm:flex-none px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
+                  aria-label={t('branch', 'Branch')}
+                  title="Filter by Branch"
+                >
+                  <option value="ALL">
+                    {t('allBranches', 'All Branches')} ({dynamicBranchOptions.totalCount})
+                  </option>
+                  {adminTab === 'admins' && dynamicBranchOptions.hqCount > 0 && (
+                    <option value="HQ">
+                      {t('allBranchesSuperAdmin', 'All Branches')} (HQ) ({dynamicBranchOptions.hqCount})
+                    </option>
+                  )}
+                  {dynamicBranchOptions.branches.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} ({b.count})
+                    </option>
+                  ))}
+                </select>
               )}
 
-              {(roleFilter || statusFilter || searchTerm) && (
+              {/* Dynamic Status Filter */}
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="flex-1 sm:flex-none px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
+                aria-label={t('status', 'Status')}
+                title="Filter by Status"
+              >
+                <option value="">
+                  {t('allStatuses', 'All Statuses')} ({dynamicStatusOptions.totalCount})
+                </option>
+                <option value="ACTIVE">
+                  {t('active', 'Active')} ({dynamicStatusOptions.activeCount})
+                </option>
+                <option value="SUSPENDED">
+                  {t('inactive', 'Suspended')} ({dynamicStatusOptions.suspendedCount})
+                </option>
+              </select>
+
+              {(statusFilter || (userBranchFilter && userBranchFilter !== 'ALL') || searchTerm) && (
                 <button
                   type="button"
                   onClick={() => {
-                    setRoleFilter('');
                     setStatusFilter('');
+                    setUserBranchFilter('ALL');
                     setSearchTerm('');
                   }}
-                  className="px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 rounded-xl transition flex items-center gap-1 cursor-pointer"
-                  title="Clear Filters"
+                  className="px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 rounded-xl transition cursor-pointer shadow-2xs"
+                  title={t('clearFilters', 'Clear Filters')}
                 >
-                  {t('close', 'Clear')}
+                  {t('clearFilters', 'Clear Filters')}
                 </button>
               )}
 
-              {/* Action Button: Add User */}
-              {adminTab === 'users' && (
+              {/* Action Button: Add Admin (Only for Manage Admins tab) */}
+              {adminTab === 'admins' && (
                 <button
-                  onClick={() => setIsAddUserOpen(true)}
+                  onClick={() => {
+                    setIsAllBranches(!currentAdmin?.branch_id);
+                    setNewUserBranchId(currentAdmin?.branch_id ? String(currentAdmin.branch_id) : '');
+                    setNewPhone('');
+                    setNewName('');
+                    setNewPassword('');
+                    setNewStatus('ACTIVE');
+                    setIsAddUserOpen(true);
+                  }}
                   className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold rounded-xl transition flex items-center justify-center gap-1.5 shadow-2xs whitespace-nowrap cursor-pointer"
                 >
-                  {t('addNewUser', 'Add User')}
+                  <Plus className="w-4 h-4" />
+                  {t('addAdmin', 'Add Admin')}
                 </button>
               )}
             </div>
@@ -2248,12 +2239,12 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* TAB 1: USER MANAGEMENT */}
-      {adminTab === 'users' && (
+      {/* TAB 1: USER MANAGEMENT (MANAGE ADMINS & MANAGE USERS) */}
+      {(adminTab === 'admins' || adminTab === 'users') && (
         <div className="space-y-3">
           
           {/* Mobile User Cards (< md) */}
-          <div className="md:hidden space-y-3">
+          <div className={adminTab === 'admins' ? "md:hidden grid grid-cols-1 sm:grid-cols-2 gap-3" : "md:hidden space-y-3"}>
             {paginatedUsers.length > 0 ? (
               paginatedUsers.map((u) => (
                 <div key={u.id} className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200 dark:border-slate-800 p-4 space-y-3">
@@ -2276,89 +2267,178 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                          u.role === 'ADMIN'
-                            ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300'
-                            : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                        }`}
-                      >
-                        {u.role}
-                      </span>
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                          u.status === 'ACTIVE'
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                            : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                        }`}
-                      >
-                        {u.status}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Store & Activity */}
-                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl text-xs space-y-1">
-                    <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-                      {u.store_count > 0 ? (
-                        <span>
-                          {u.store?.name} 
-                          {u.store_count > 1 && ` (+${u.store_count - 1} more)`}
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                            u.status === 'ACTIVE'
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                              : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                          }`}
+                        >
+                          {u.status}
                         </span>
-                      ) : (
-                        <span className="text-slate-400">No store registered</span>
+                      </div>
+                      {u.role === 'ADMIN' && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                          {u.branch_name || t('allBranchesSuperAdmin', 'All Branches')}
+                        </span>
                       )}
                     </div>
-                    {u.store?.location && (
-                      <div className="text-[11px] text-slate-400 pl-5">
-                        {u.store.location}
-                      </div>
-                    )}
                   </div>
 
-                  {/* Mobile Actions Bar */}
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-1.5">
-                    {u.id !== currentAdmin?.id && (
-                      <button
-                        type="button"
-                        onClick={() => handleToggleStatus(u)}
-                        className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 ${
-                          u.status === 'ACTIVE' 
-                            ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
-                            : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
-                        }`}
-                      >
-                        <span>{u.status === 'ACTIVE' ? 'Suspend' : 'Activate'}</span>
-                      </button>
-                    )}
+                  {/* Store Info for Merchants */}
+                  {adminTab === 'users' && (
+                    <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl text-xs space-y-1">
+                      <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
+                        {u.store_count > 0 ? (
+                          <span>
+                            {u.store?.name}
+                            {u.store_count > 1 && ` (+${u.store_count - 1} more)`}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">No store registered</span>
+                        )}
+                      </div>
+                      {u.store?.location && (
+                        <div className="text-[11px] text-slate-400 pl-5">
+                          {u.store.location}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
+                  {/* Last Login Info on Mobile */}
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 px-0.5">
+                    <span>{t('lastLogin', 'Last Login')}:</span>
+                    <span className="font-medium text-slate-600 dark:text-slate-300">
+                      {u.last_login_at
+                        ? new Date(u.last_login_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })
+                        : t('never', 'Never')}
+                    </span>
+                  </div>
+
+                  {/* Mobile Actions Bar: View Details + Three Dots Menu */}
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                     <button
                       type="button"
-                      onClick={() => openResetPassModal(u)}
-                      className="px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-xs font-semibold flex items-center gap-1"
-                      title="Reset Password"
+                      onClick={() => openUserDetailsModal(u)}
+                      className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                      title={t('viewDetails', 'View Details')}
                     >
-                      <span>Password</span>
+                      <Eye className="w-3.5 h-3.5 text-slate-500" />
+                      <span>{t('viewDetails', 'View Details')}</span>
                     </button>
 
-                    {u.id !== currentAdmin?.id && (
+                    {/* Three-dots Menu Trigger on Mobile */}
+                    <div className="relative action-menu-container">
                       <button
                         type="button"
-                        onClick={() => openDeleteModal(u)}
-                        className="px-2.5 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/30 text-rose-600 text-xs font-semibold flex items-center gap-1"
-                        title="Delete User"
+                        onClick={(e) => handleToggleDropdown(u.id, e)}
+                        className={`p-1.5 rounded-lg border transition cursor-pointer flex items-center justify-center ${
+                          openActionDropdownId === u.id
+                            ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700 shadow-xs'
+                            : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700/80 shadow-2xs'
+                        }`}
+                        title="Actions"
                       >
-                        <span>{t('delete', 'Delete')}</span>
+                        <MoreVertical className="w-4 h-4" />
                       </button>
-                    )}
+
+                      {openActionDropdownId === u.id && activeDropdownRect && (
+                        <div
+                          style={{
+                            position: 'fixed',
+                            top: activeDropdownRect.openUp ? 'auto' : `${activeDropdownRect.top}px`,
+                            bottom: activeDropdownRect.openUp ? `${activeDropdownRect.bottom}px` : 'auto',
+                            right: `${activeDropdownRect.right}px`,
+                            zIndex: 9999
+                          }}
+                          className="action-menu-dropdown w-48 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-1.5 animate-in fade-in zoom-in-95 duration-100"
+                        >
+                          {/* Edit Admin (only for admin accounts) */}
+                          {adminTab === 'admins' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenActionDropdownId(null);
+                                setActiveDropdownRect(null);
+                                openEditUserModal(u);
+                              }}
+                              className="w-full px-3 py-2 text-left text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/60 flex items-center gap-2.5 transition cursor-pointer"
+                            >
+                              <Edit className="w-4 h-4 text-indigo-500 shrink-0" />
+                              <span>{t('editAdmin', 'Edit Admin')}</span>
+                            </button>
+                          )}
+
+                          {/* Suspend / Activate Account */}
+                          {u.id !== currentAdmin?.id && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenActionDropdownId(null);
+                                setActiveDropdownRect(null);
+                                handleToggleStatus(u);
+                              }}
+                              className="w-full px-3 py-2 text-left text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/60 flex items-center gap-2.5 transition cursor-pointer"
+                            >
+                              {u.status === 'ACTIVE' ? (
+                                <>
+                                  <UserX className="w-4 h-4 text-amber-500 shrink-0" />
+                                  <span>{t('suspendAccount', 'Suspend Account')}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <UserCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                                  <span>{t('activateAccount', 'Activate Account')}</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+
+                          {/* Reset Password */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenActionDropdownId(null);
+                              setActiveDropdownRect(null);
+                              openResetPassModal(u);
+                            }}
+                            className="w-full px-3 py-2 text-left text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/60 flex items-center gap-2.5 transition cursor-pointer"
+                          >
+                            <Key className="w-4 h-4 text-blue-500 shrink-0" />
+                            <span>{t('resetPassword', 'Reset Password')}</span>
+                          </button>
+
+                          {/* Delete Account (if not self) */}
+                          {u.id !== currentAdmin?.id && (
+                            <>
+                              <div className="my-1 border-t border-slate-100 dark:border-slate-700/80" />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenActionDropdownId(null);
+                                  setActiveDropdownRect(null);
+                                  openDeleteModal(u);
+                                }}
+                                className="w-full px-3 py-2 text-left text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2.5 transition cursor-pointer"
+                              >
+                                <Trash2 className="w-4 h-4 text-rose-500 shrink-0" />
+                                <span>{t('deleteAccount', 'Delete Account')}</span>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                 </div>
               ))
             ) : (
               <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 text-center text-slate-400 text-sm border border-slate-200 dark:border-slate-800">
-                No users found matching your search.
+                No accounts found matching your search.
               </div>
             )}
           </div>
@@ -2379,15 +2459,23 @@ export default function AdminDashboard() {
 
           {/* Desktop User Table (>= md) */}
           <div className="hidden md:block mt-6 mb-4 bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
-            <div className="overflow-x-auto p-6 sm:p-8 pb-4">
+            {adminTab === 'admins' && (
+              <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-white">{t('manageAdmins', 'Manage Admins')} <span className="ml-2 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-xs text-slate-500 dark:text-slate-400">{filteredUsers.length}</span></h2>
+                {userSelectedIds.length > 0 && <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">{userSelectedIds.length} {isKhmer ? 'បានជ្រើសរើស' : 'selected'}</span>}
+              </div>
+            )}
+            <div className={adminTab === 'admins' ? 'overflow-x-auto' : 'overflow-x-auto p-6 sm:p-8 pb-4'}>
               <table className="w-full text-left text-sm min-w-[680px]">
                 <thead>
 
-                  <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    <th className="py-4 px-4 w-12 text-center">
+                  <tr className={`border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 dark:text-slate-400 ${adminTab === 'admins' ? 'bg-slate-50/80 dark:bg-slate-800/50' : 'uppercase tracking-wider'}`}>
+                    <th className="py-3.5 px-4 w-12 text-center">
                       <button
                         type="button"
                         onClick={toggleSelectAllUsers}
+                        aria-label={isKhmer ? 'ជ្រើសរើសទាំងអស់' : 'Select all accounts on this page'}
+                        aria-pressed={paginatedUsers.length > 0 && paginatedUsers.every(u => userSelectedIds.includes(u.id))}
                         className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
                       >
                         {userSelectedIds.length === paginatedUsers.length && paginatedUsers.length > 0 ? (
@@ -2397,18 +2485,21 @@ export default function AdminDashboard() {
                         )}
                       </button>
                     </th>
-                    <th className="py-4 px-5 font-semibold">{t('phoneNumber', 'Phone Number')}</th>
-                    <th className="py-4 px-5 font-semibold">{t('fullName', 'Full Name')}</th>
-                    <th className="py-4 px-5 font-semibold">{t('role', 'Role')}</th>
-                    <th className="py-4 px-5 font-semibold">{t('status', 'Status')}</th>
-                    <th className="py-4 px-5 font-semibold">{t('storeBranches', 'Owned Stores')}</th>
-                    <th className="py-4 px-5 font-semibold">{t('time', 'Last Login')}</th>
-                    <th className="py-4 px-5 font-semibold text-right">{t('actions', 'Actions')}</th>
+                    <th className="px-4 py-3 text-left">{t('phoneNumber', 'Phone Number')}</th>
+                    <th className="px-4 py-3 text-left">{t('fullName', 'Full Name')}</th>
+                    {adminTab === 'admins' ? (
+                      <th className="px-4 py-3 text-left">{t('branch', 'Branch')}</th>
+                    ) : (
+                      <th className="px-4 py-3 text-left">{t('storeBranches', 'Owned Stores')}</th>
+                    )}
+                    <th className="px-4 py-3 text-center">{t('status', 'Status')}</th>
+                    <th className="px-4 py-3 text-left">{t('lastLogin', 'Last Login')}</th>
+                    <th className="px-4 py-3 text-right">{t('actions', 'Actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {paginatedUsers.length > 0 ? (
-                    paginatedUsers.map((u) => (
+                    paginatedUsers.map((u, userIdx) => (
                       <tr 
                         key={u.id} 
                         className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition ${
@@ -2416,10 +2507,12 @@ export default function AdminDashboard() {
                         }`}
                       >
                         {/* Selection Checkbox */}
-                        <td className="py-3.5 text-center">
+                        <td className="py-3 px-4 w-12 text-center align-middle">
                           <button
                             type="button"
                             onClick={() => toggleUserSelection(u.id)}
+                            aria-label={`${isKhmer ? 'ជ្រើសរើស' : 'Select'} ${u.full_name || u.phone_number}`}
+                            aria-pressed={userSelectedIds.includes(u.id)}
                             className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
                           >
                             {userSelectedIds.includes(u.id) ? (
@@ -2430,9 +2523,14 @@ export default function AdminDashboard() {
                           </button>
                         </td>
                         
-                        {/* Emphasized User Phone Number */}
-                        <td className="py-3.5">
-                          <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+                        {/* Emphasized User Phone Number (Clickable to View Details) */}
+                        <td className="py-3 px-4 text-left align-middle">
+                          <button
+                            type="button"
+                            onClick={() => openUserDetailsModal(u)}
+                            className="inline-flex items-center gap-2 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 rounded-lg transition cursor-pointer text-left shadow-2xs"
+                            title={t('viewDetails', 'View Details')}
+                          >
                             <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">
                               {u.phone_number}
                             </span>
@@ -2441,26 +2539,42 @@ export default function AdminDashboard() {
                                 You
                               </span>
                             )}
-                          </div>
+                          </button>
                         </td>
 
-                        <td className="py-3.5 text-slate-700 dark:text-slate-300 font-semibold">
+                        <td className="py-3 px-4 text-left align-middle text-slate-700 dark:text-slate-300 font-semibold">
                           {u.full_name || '—'}
                         </td>
 
-                        <td className="py-3.5">
-                          <span
-                            className={`text-xs font-bold px-2 py-0.5 rounded-full uppercase ${
-                              u.role === 'ADMIN'
-                                ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300'
-                                : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                            }`}
-                          >
-                            {u.role}
-                          </span>
-                        </td>
+                        {adminTab === 'admins' ? (
+                          <td className="py-3 px-4 text-left align-middle">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 whitespace-nowrap">
+                              {u.branch_name || t('allBranchesSuperAdmin', 'All Branches')}
+                            </span>
+                          </td>
+                        ) : (
+                          <td className="py-3 px-4 text-left align-middle">
+                            {u.store_count > 0 ? (
+                              <div className="space-y-0.5">
+                                <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                  <span>{u.store?.name}</span>
+                                  {u.store_count > 1 && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                                      +{u.store_count - 1} more
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-slate-400">
+                                  {u.store?.location || u.store?.place || '—'}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-slate-400">No store registered</span>
+                            )}
+                          </td>
+                        )}
 
-                        <td className="py-3.5">
+                        <td className="py-3 px-4 text-center align-middle">
                           <span
                             className={`text-xs font-bold px-2 py-0.5 rounded-full uppercase ${
                               u.status === 'ACTIVE'
@@ -2472,67 +2586,138 @@ export default function AdminDashboard() {
                         </span>
                       </td>
 
-                      {/* Stores Column */}
-                      <td className="py-3.5">
-                        {u.store_count > 0 ? (
-                          <div className="space-y-0.5">
-                            <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                              <span>{u.store?.name}</span>
-                              {u.store_count > 1 && (
-                                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-                                  +{u.store_count - 1} more
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[11px] text-slate-400">
-                              {u.store?.location || u.store?.place || '—'}
-                            </div>
-                          </div>
+                      <td className="py-3 px-4 text-left align-middle text-xs whitespace-nowrap">
+                        {u.last_login_at ? (
+                          <span className="text-slate-600 dark:text-slate-300 font-medium">
+                            {new Date(u.last_login_at).toLocaleString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: true
+                            })}
+                          </span>
                         ) : (
-                          <span className="text-xs text-slate-400">No store registered</span>
+                          <span className="text-slate-400 italic">{t('never', 'Never')}</span>
                         )}
                       </td>
 
-                      <td className="py-3.5 text-xs text-slate-400">
-                        {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString() : 'Never'}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right">
+                      <td className="py-3 px-4 text-right align-middle">
                         <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
-                          {u.id !== currentAdmin?.id && (
-                            <button
-                              type="button"
-                              onClick={() => handleToggleStatus(u)}
-                              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs ${
-                                u.status === 'ACTIVE' 
-                                  ? 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                                  : 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                              }`}
-                              title={u.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
-                            >
-                              <span>{u.status === 'ACTIVE' ? 'Suspend' : 'Activate'}</span>
-                            </button>
-                          )}
-
+                          {/* One button outside: View */}
                           <button
                             type="button"
-                            onClick={() => openResetPassModal(u)}
-                            className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                            title="Reset Password"
+                            onClick={() => openUserDetailsModal(u)}
+                            className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                            title={t('viewDetails', 'View Details')}
                           >
-                            <span>Password</span>
+                            <Eye className="w-3.5 h-3.5 text-slate-500" />
+                            <span>{t('view', 'View')}</span>
                           </button>
 
-                          {u.id !== currentAdmin?.id && (
+                          {/* Three Dots Menu for more actions */}
+                          <div className="relative inline-block text-left action-menu-container">
                             <button
                               type="button"
-                              onClick={() => openDeleteModal(u)}
-                              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                              title="Delete User"
+                              onClick={(e) => handleToggleDropdown(u.id, e)}
+                              className={`p-1.5 rounded-lg border transition cursor-pointer flex items-center justify-center ${
+                                openActionDropdownId === u.id
+                                  ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700 shadow-xs'
+                                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700/80 shadow-2xs'
+                              }`}
+                              title={t('actions', 'Actions')}
                             >
-                              <span>{t('delete', 'Delete')}</span>
+                              <MoreVertical className="w-4 h-4" />
                             </button>
-                          )}
+
+                            {openActionDropdownId === u.id && activeDropdownRect && (
+                              <div
+                                style={{
+                                  position: 'fixed',
+                                  top: activeDropdownRect.openUp ? 'auto' : `${activeDropdownRect.top}px`,
+                                  bottom: activeDropdownRect.openUp ? `${activeDropdownRect.bottom}px` : 'auto',
+                                  right: `${activeDropdownRect.right}px`,
+                                  zIndex: 9999
+                                }}
+                                className="action-menu-dropdown w-48 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-1.5 animate-in fade-in zoom-in-95 duration-100"
+                              >
+                                {/* Edit Admin (only for admin accounts) */}
+                                {adminTab === 'admins' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenActionDropdownId(null);
+                                      setActiveDropdownRect(null);
+                                      openEditUserModal(u);
+                                    }}
+                                    className="w-full px-3 py-2 text-left text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/60 flex items-center gap-2.5 transition cursor-pointer"
+                                  >
+                                    <Edit className="w-4 h-4 text-indigo-500 shrink-0" />
+                                    <span>{t('editAdmin', 'Edit Admin')}</span>
+                                  </button>
+                                )}
+
+                                {/* Suspend / Activate Account */}
+                                {u.id !== currentAdmin?.id && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenActionDropdownId(null);
+                                      setActiveDropdownRect(null);
+                                      handleToggleStatus(u);
+                                    }}
+                                    className="w-full px-3 py-2 text-left text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/60 flex items-center gap-2.5 transition cursor-pointer"
+                                  >
+                                    {u.status === 'ACTIVE' ? (
+                                      <>
+                                        <UserX className="w-4 h-4 text-amber-500 shrink-0" />
+                                        <span>{t('suspendAccount', 'Suspend Account')}</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <UserCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                                        <span>{t('activateAccount', 'Activate Account')}</span>
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+
+                                {/* Reset Password */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenActionDropdownId(null);
+                                    setActiveDropdownRect(null);
+                                    openResetPassModal(u);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/60 flex items-center gap-2.5 transition cursor-pointer"
+                                >
+                                  <Key className="w-4 h-4 text-blue-500 shrink-0" />
+                                  <span>{t('resetPassword', 'Reset Password')}</span>
+                                </button>
+
+                                {/* Delete Account (if not self) */}
+                                {u.id !== currentAdmin?.id && (
+                                  <>
+                                    <div className="my-1 border-t border-slate-100 dark:border-slate-700/80" />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenActionDropdownId(null);
+                                        setActiveDropdownRect(null);
+                                        openDeleteModal(u);
+                                      }}
+                                      className="w-full px-3 py-2 text-left text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2.5 transition cursor-pointer"
+                                    >
+                                      <Trash2 className="w-4 h-4 text-rose-500 shrink-0" />
+                                      <span>{t('deleteAccount', 'Delete Account')}</span>
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
 
@@ -2541,7 +2726,7 @@ export default function AdminDashboard() {
                 ) : (
                   <tr>
                     <td colSpan={7} className="py-8 text-center text-slate-400 text-sm">
-                      No users found matching your search and filter criteria.
+                      No accounts found matching your search and filter criteria.
                     </td>
                   </tr>
                 )}
@@ -2568,68 +2753,20 @@ export default function AdminDashboard() {
       {adminTab === 'stores' && (
         <div className="space-y-4">
 
-          {/* Top Stores KPI Summary Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-2xs space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{t('totalStores', 'Total Stores')}</span>
-                <div className="p-1.5 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 rounded-lg">
-                  <Store className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                {stores.length}
-              </div>
-              <span className="text-[11px] text-slate-400">Registered merchant locations</span>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-2xs space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{t('activeStoresWithDevice', 'Stores with Soundbox')}</span>
-                <div className="p-1.5 bg-blue-50 dark:bg-blue-950/60 text-blue-600 rounded-lg">
-                  <Smartphone className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-blue-600 dark:text-blue-400 font-mono tracking-tight">
-                {stores.filter(s => (s.device_count || 0) > 0).length}
-              </div>
-              <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">Equipped with speaker</span>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-2xs space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{t('unlinkedStoresCount', 'Unlinked Stores')}</span>
-                <div className="p-1.5 bg-amber-50 dark:bg-amber-950/60 text-amber-600 rounded-lg">
-                  <AlertTriangle className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-amber-600 dark:text-amber-400 font-mono tracking-tight">
-                {stores.filter(s => !s.device_count || s.device_count === 0).length}
-              </div>
-              <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">Ready for device pairing</span>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-2xs space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{t('activeProvincesCount', 'Provinces Covered')}</span>
-                <div className="p-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 rounded-lg">
-                  <MapPin className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-tight">
-                {availableProvinces.length}
-              </div>
-              <span className="text-[11px] text-slate-400">Nationwide cities & provinces</span>
-            </div>
-          </div>
-
           {/* Stores Search & Filter Toolbar */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-white">{isKhmer ? 'ស្វែងរកហាង' : 'Find a store'}</h2>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{isKhmer ? 'ស្វែងរកតាមឈ្មោះ ម្ចាស់ហាង ឬទីតាំង។' : 'Search by name, owner or location.'}</p>
+              </div>
+              <span className="rounded-full bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">{filteredStores.length} {isKhmer ? 'ហាង' : 'stores'}</span>
+            </div>
             {/* Filter Grid Row 1: Search, Province, District, Commune */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               
               {/* 1. Store Search Input */}
-              <div>
+              <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                   {t('searchStorePlaceholder', 'Search store, owner, phone...')}
                 </label>
@@ -2783,16 +2920,25 @@ export default function AdminDashboard() {
           </div>
           
           {/* Mobile Store Cards (< md) */}
-          <div className="md:hidden space-y-3">
+          <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
             {paginatedStores.length > 0 ? (
               paginatedStores.map((s) => (
                 <div 
                   key={s.id}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                      event.preventDefault();
+                      setSelectedStoreForDetails(s);
+                      setIsStoreDetailsOpen(true);
+                    }
+                  }}
                   onClick={() => {
                     setSelectedStoreForDetails(s);
                     setIsStoreDetailsOpen(true);
                   }}
-                  className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-slate-200 dark:border-slate-800 p-4 space-y-3 cursor-pointer"
+                  className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-4 space-y-3 cursor-pointer hover:border-emerald-300 dark:hover:border-emerald-800 transition-colors focus-visible:outline-2 focus-visible:outline-emerald-500"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2.5">
@@ -2877,8 +3023,8 @@ export default function AdminDashboard() {
           </div>
 
           {/* Desktop Store Table (>= md) */}
-          <div className="hidden md:block mt-6 mb-4 bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-6">
-            <div className="flex items-center justify-between mb-2">
+          <div className="hidden md:block mt-6 mb-4 bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
               <div>
                 <h3 className="text-base font-semibold text-slate-900 dark:text-white">{t('storeManagement', 'Stores & Locations')}</h3>
                 <p className="text-xs text-slate-400 mt-0.5">
@@ -2891,8 +3037,8 @@ export default function AdminDashboard() {
               <table className="w-full text-left text-sm min-w-[620px]">
                 <thead>
 
-                  <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    <th className="py-4 px-4 w-12 text-center">
+                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    <th className="py-3.5 px-4 w-12 text-center">
                       <button
                         type="button"
                         onClick={toggleSelectAllStores}
@@ -2905,12 +3051,12 @@ export default function AdminDashboard() {
                         )}
                       </button>
                     </th>
-                    <th className="py-4 px-5 font-semibold">{t('storeName', 'Store Name')}</th>
-                    <th className="py-4 px-5 font-semibold">{t('owner', 'Merchant / Owner')}</th>
-                    <th className="py-4 px-5 font-semibold">{t('location', 'Location (Province / District)')}</th>
-                    <th className="py-4 px-5 font-semibold">{t('telegramChatId', 'Telegram ID')}</th>
-                    <th className="py-4 px-5 font-semibold">{t('connectedSoundboxes', 'Soundboxes')}</th>
-                    <th className="py-4 px-5 font-semibold text-right">{t('actions', 'Details')}</th>
+                    <th className="px-4 py-3 text-left">{t('storeName', 'Store Name')}</th>
+                    <th className="px-4 py-3 text-left">{t('owner', 'Merchant / Owner')}</th>
+                    <th className="px-4 py-3 text-left">{t('location', 'Location (Province / District)')}</th>
+                    <th className="px-4 py-3 text-left">{t('telegramChatId', 'Telegram ID')}</th>
+                    <th className="px-4 py-3 text-center">{t('connectedSoundboxes', 'Soundboxes')}</th>
+                    <th className="px-4 py-3 text-right">{t('actions', 'Details')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -2927,7 +3073,7 @@ export default function AdminDashboard() {
                         }`}
                       >
                         {/* Selection Checkbox */}
-                        <td className="py-4 sm:py-4.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                        <td className="py-3 px-4 w-12 text-center align-middle" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
                             onClick={() => toggleStoreSelection(s.merchant_id || s.id)}
@@ -2942,7 +3088,7 @@ export default function AdminDashboard() {
                         </td>
                         
                         {/* Store Name */}
-                        <td className="py-4 sm:py-4.5 px-5">
+                        <td className="py-3 px-4 text-left align-middle">
                           <div>
                             <div className="font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">
                               {s.merchant_name || s.name}
@@ -2954,7 +3100,7 @@ export default function AdminDashboard() {
                         </td>
 
                         {/* Owner Info */}
-                        <td className="py-3.5">
+                        <td className="py-3 px-4 text-left align-middle">
                           <div className="space-y-0.5">
                             <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs sm:text-sm">
                               {s.owner_name || '—'}
@@ -2966,7 +3112,7 @@ export default function AdminDashboard() {
                         </td>
 
                         {/* Main Location Summary */}
-                        <td className="py-3.5">
+                        <td className="py-3 px-4 text-left align-middle">
                           <div className="space-y-0.5">
                             <div className="inline-flex items-center gap-1.5 font-semibold text-slate-900 dark:text-slate-100 text-xs sm:text-sm">
                               <span>{s.province || s.location || '—'}</span>
@@ -2980,7 +3126,7 @@ export default function AdminDashboard() {
                         </td>
 
                         {/* Telegram ID */}
-                        <td className="py-3.5 px-5">
+                        <td className="py-3 px-4 text-left align-middle">
                           {s.telegram_chat_id ? (
                             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 whitespace-nowrap">
                               <span>{s.telegram_chat_id.startsWith('@') ? s.telegram_chat_id : `@${s.telegram_chat_id}`}</span>
@@ -2991,7 +3137,7 @@ export default function AdminDashboard() {
                         </td>
 
                         {/* Soundbox Count */}
-                        <td className="py-3.5">
+                        <td className="py-3 px-4 text-center align-middle">
                           <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
                             s.device_count > 0 
                               ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' 
@@ -3002,7 +3148,7 @@ export default function AdminDashboard() {
                         </td>
 
                         {/* View Details Action Button */}
-                        <td className="py-3.5 text-right">
+                        <td className="py-3 px-4 text-right align-middle">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -3020,7 +3166,7 @@ export default function AdminDashboard() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-400 text-sm">
+                      <td colSpan={7} className="py-8 text-center text-slate-400 text-sm">
                         No stores found matching your search.
                       </td>
                     </tr>
@@ -3048,50 +3194,22 @@ export default function AdminDashboard() {
       {adminTab === 'devices' && (
         <div className="space-y-4">
 
-          {/* 0. Deployed Devices KPI Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="text-[10px] sm:text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
-                <CheckCircle className="w-3.5 h-3.5" />
-                <span>{t('deployedSoundboxes', 'Deployed Soundboxes')}</span>
-              </div>
-              <div className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
-                {devices.filter(d => d.merchant_id || String(d.status).toUpperCase() === 'PENDING').length}
-              </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">{t('activeInMerchantStores', 'Active in Merchant Stores')}</div>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="text-[10px] sm:text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Radio className="w-3.5 h-3.5" />
-                <span>{t('onlineConnected', 'Online & Connected')}</span>
-              </div>
-              <div className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
-                {devices.filter(d => d.merchant_id && (String(d.status).toUpperCase() === 'ONLINE' || String(d.status).toUpperCase() === 'ACTIVE')).length}
-              </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">{t('liveTelemetryAvailable', 'Live Telemetry Available')}</div>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="text-[10px] sm:text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Volume2 className="w-3.5 h-3.5" />
-                <span>{t('offlineUnits', 'Offline Units')}</span>
-              </div>
-              <div className="text-xl sm:text-2xl font-bold text-slate-700 dark:text-slate-300 mt-1">
-                {devices.filter(d => d.merchant_id && String(d.status).toUpperCase() === 'OFFLINE').length}
-              </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">{t('disconnectedStandby', 'Disconnected / Standby')}</div>
-            </div>
-          </div>
-          
           {/* 1. Cloud Speaker Search & Filter Bar */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-3.5">
             
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-white">{isKhmer ? 'ស្វែងរកឧបករណ៍' : 'Find a device'}</h2>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{isKhmer ? 'ពិនិត្យស្ថានភាព ហាង និងការធានា។' : 'Check connectivity, store assignment and warranty.'}</p>
+              </div>
+              <span className="rounded-full bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">{filteredDevices.length} {isKhmer ? 'ឧបករណ៍' : 'devices'}</span>
+            </div>
             {/* Top Row: Primary Search + Mobile/Tablet Filter Toggle */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
               <div className="relative flex-1">
                 <input
                   type="text"
+                  aria-label={t('pleaseEnterDeviceId', 'Search by Device SN / ID')}
                   value={devFilterId}
                   onChange={(e) => { setDevFilterId(e.target.value); setDevPage(1); }}
                   placeholder={t('pleaseEnterDeviceId', 'Search by Device SN / ID...')}
@@ -3100,6 +3218,7 @@ export default function AdminDashboard() {
                 {devFilterId && (
                   <button
                     type="button"
+                    aria-label={isKhmer ? 'សម្អាតការស្វែងរក' : 'Clear device search'}
                     onClick={() => { setDevFilterId(''); setDevPage(1); }}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer font-bold text-sm"
                   >
@@ -3112,6 +3231,8 @@ export default function AdminDashboard() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
+                  aria-expanded={isDevFiltersExpanded}
+                  aria-controls="device-filters"
                   onClick={() => setIsDevFiltersExpanded(!isDevFiltersExpanded)}
                   className={`lg:hidden flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl text-xs font-semibold border transition flex items-center justify-center gap-2 cursor-pointer touch-manipulation ${
                     isDevFiltersExpanded || activeDevFilterCount > 0
@@ -3141,21 +3262,20 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={handleExportDevicesCSV}
-                  className="hidden sm:flex px-3.5 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer items-center gap-1.5 shadow-2xs shrink-0 touch-manipulation"
+                  className="hidden sm:flex px-3.5 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer items-center justify-center shadow-2xs shrink-0 touch-manipulation"
                   title="Export CSV"
                 >
-                  <Download className="w-3.5 h-3.5" />
                   <span>{t('exportCsv', 'Export')}</span>
                 </button>
               </div>
             </div>
 
             {/* Secondary Filter Grid: Always visible on desktop (lg:grid), collapsible on mobile & tablet */}
-            <div className={`${isDevFiltersExpanded ? 'grid' : 'hidden lg:grid'} grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 pt-2 border-t border-slate-100 dark:border-slate-800/80`}>
-              {/* Device Type */}
+            <div id="device-filters" className={`${isDevFiltersExpanded ? 'grid' : 'hidden lg:grid'} grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 pt-2 border-t border-slate-100 dark:border-slate-800/80`}>
+              {/* Product */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('deviceType', 'Device Type')}
+                  {t('stockProduct', 'Product')}
                 </label>
                 <select
                   value={devFilterType}
@@ -3234,9 +3354,13 @@ export default function AdminDashboard() {
           {/* 2. Action Toolbar & Batch Operations */}
           <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
             <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400 mr-1" aria-live="polite">
+                {devSelectedIds.length > 0 ? `${devSelectedIds.length} ${isKhmer ? 'បានជ្រើសរើស' : 'selected'}` : (isKhmer ? 'ជ្រើសរើសឧបករណ៍ដើម្បីផ្ញើពាក្យបញ្ជា' : 'Select devices to send commands')}
+              </span>
               {/* Batch Remote Command */}
               <button
                 type="button"
+                disabled={devSelectedIds.length === 0}
                 onClick={() => {
                   if (devSelectedIds.length === 0) {
                     showToast({ type: 'error', title: 'Selection Needed', message: 'Please select at least one device from the table.' });
@@ -3244,7 +3368,7 @@ export default function AdminDashboard() {
                   }
                   setIsBatchCommandOpen(true);
                 }}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-2 transition cursor-pointer"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-2 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <span>{t('batchSendCommands', 'Batch Send Commands')}</span>
                 {devSelectedIds.length > 0 && (
@@ -3271,8 +3395,8 @@ export default function AdminDashboard() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs min-w-[1100px]">
                 <thead>
-                  <tr className="bg-slate-50/75 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-semibold select-none whitespace-nowrap">
-                    <th className="py-4 px-4 w-12 text-center">
+                  <tr className="bg-slate-50/75 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 dark:text-slate-400 select-none whitespace-nowrap">
+                    <th className="py-3.5 px-4 w-12 text-center">
                       <button
                         type="button"
                         onClick={toggleSelectAllDevices}
@@ -3285,19 +3409,19 @@ export default function AdminDashboard() {
                         )}
                       </button>
                     </th>
-                    {visibleColumns.deviceId && <th className="py-4 px-4 font-semibold min-w-[160px]">{t('deviceId', 'Device SN')}</th>}
-                    {visibleColumns.deviceType && <th className="py-4 px-4 font-semibold min-w-[190px]">{t('deviceType', 'Device Type')}</th>}
-                    {visibleColumns.supplier && <th className="py-4 px-4 font-semibold min-w-[120px]">{t('supplier', 'Supplier')}</th>}
-                    {visibleColumns.merchantId && <th className="py-4 px-4 font-semibold min-w-[180px]">{t('merchantStore', 'Assigned Store')}</th>}
-                    {visibleColumns.status && <th className="py-4 px-4 font-semibold text-center min-w-[110px]">{t('status', 'Status')}</th>}
-                    {visibleColumns.price && <th className="py-4 px-4 font-semibold text-center min-w-[110px]">{t('price', 'Price')}</th>}
-                    {visibleColumns.warranty && <th className="py-4 px-4 font-semibold text-center min-w-[140px]">{t('warranty', 'Warranty')}</th>}
-                    {visibleColumns.battery && <th className="py-4 px-4 font-semibold text-center min-w-[95px]">{t('battery', 'Battery')}</th>}
-                    {visibleColumns.signal && <th className="py-4 px-4 font-semibold text-center min-w-[95px]">{t('signal', 'Signal')}</th>}
-                    {visibleColumns.version4g && <th className="py-4 px-4 font-semibold min-w-[150px]">{t('version4G', '4G Version')}</th>}
-                    {visibleColumns.versionWifi && <th className="py-4 px-4 font-semibold min-w-[150px]">{t('versionWifi', 'WiFi Version')}</th>}
-                    {visibleColumns.lastTime && <th className="py-4 px-4 font-semibold min-w-[140px]">{t('lastTime', 'Last Time')}</th>}
-                    {visibleColumns.operation && <th className="py-4 px-5 font-semibold text-center min-w-[160px]">{t('operation', 'Operation')}</th>}
+                    {visibleColumns.deviceId && <th className="px-4 py-3 text-left min-w-[160px]">{t('deviceId', 'Device SN')}</th>}
+                    {visibleColumns.deviceType && <th className="px-4 py-3 text-left min-w-[190px]">{t('stockProduct', 'Product')}</th>}
+                    {visibleColumns.supplier && <th className="px-4 py-3 text-left min-w-[120px]">{t('supplier', 'Supplier')}</th>}
+                    {visibleColumns.merchantId && <th className="px-4 py-3 text-left min-w-[180px]">{t('merchantStore', 'Assigned Store')}</th>}
+                    {visibleColumns.status && <th className="px-4 py-3 text-left min-w-[110px]">{t('status', 'Status')}</th>}
+                    {visibleColumns.price && <th className="px-4 py-3 text-right min-w-[110px]">{t('price', 'Price')}</th>}
+                    {visibleColumns.warranty && <th className="px-4 py-3 text-right min-w-[140px]">{t('warranty', 'Warranty')}</th>}
+                    {visibleColumns.battery && <th className="px-4 py-3 text-right min-w-[95px]">{t('battery', 'Battery')}</th>}
+                    {visibleColumns.signal && <th className="px-4 py-3 text-right min-w-[95px]">{t('signal', 'Signal')}</th>}
+                    {visibleColumns.version4g && <th className="px-4 py-3 text-left min-w-[150px]">{t('version4G', '4G Version')}</th>}
+                    {visibleColumns.versionWifi && <th className="px-4 py-3 text-left min-w-[150px]">{t('versionWifi', 'WiFi Version')}</th>}
+                    {visibleColumns.lastTime && <th className="px-4 py-3 text-left min-w-[140px]">{t('lastTime', 'Last Time')}</th>}
+                    {visibleColumns.operation && <th className="px-4 py-3 text-right min-w-[160px]">{t('operation', 'Operation')}</th>}
                   </tr>
                 </thead>
 
@@ -3315,7 +3439,7 @@ export default function AdminDashboard() {
                           }`}
                         >
                           {/* Selection Checkbox */}
-                          <td className="py-3.5 px-4 text-center">
+                          <td className="py-3 px-4 w-12 text-center align-middle">
                             <button
                               type="button"
                               onClick={() => toggleDeviceSelection(d.id || d.device_id || d.device_sn)}
@@ -3331,54 +3455,45 @@ export default function AdminDashboard() {
 
                           {/* Device ID */}
                           {visibleColumns.deviceId && (
-                            <td className="py-3.5 px-3 font-mono font-bold text-slate-900 dark:text-white">
+                            <td className="py-3 px-4 text-left align-middle font-mono font-bold text-slate-900 dark:text-white">
                               {d.device_id || d.device_sn || d.id}
                             </td>
                           )}
 
                           {/* Device Type */}
                           {visibleColumns.deviceType && (
-                            <td className="py-3.5 px-3">
-                              <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1.5 whitespace-nowrap ${
-                                (d.device_type === 'Display Soundbox' || String(d.device_type || '').toLowerCase().includes('display') || String(d.device_type || '').toLowerCase().includes('screen'))
-                                  ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
-                                  : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                              }`}>
-                                {(d.device_type === 'Display Soundbox' || String(d.device_type || '').toLowerCase().includes('display') || String(d.device_type || '').toLowerCase().includes('screen'))
-                                  ? 'Display (Screen QR)'
-                                  : 'Standard (Printed QR)'}
-                              </span>
+                            <td className="py-3 px-4 text-left align-middle">
+                              <div className="flex flex-col">
+                                <span className="text-slate-800 dark:text-slate-200 truncate max-w-[18rem]" title={d.device_type || ''}>
+                                  {d.device_type || '-'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
+                                  {[d.device_model, hasScreen(d.device_type, d.device_model) ? 'Screen QR' : 'Printed QR'].filter(Boolean).join(' · ')}
+                                </span>
+                              </div>
                             </td>
                           )}
 
                           {/* Supplier */}
                           {visibleColumns.supplier && (
-                            <td className="py-3.5 px-3">
-                              <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1 whitespace-nowrap ${
-                                (d.supplier || 'Feishu').toLowerCase() === 'hemi'
-                                  ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                                  : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
-                              }`}>
-                                {(d.supplier || 'Feishu').toLowerCase() === 'hemi' ? 'Hemi' : 'Feishu'}
-                              </span>
+                            <td className="py-3 px-4 text-left align-middle text-slate-600 dark:text-slate-300">
+                              {d.supplier || <span className="text-slate-400">-</span>}
                             </td>
                           )}
 
                           {/* Merchant ID / Store */}
                           {visibleColumns.merchantId && (
-                            <td className="py-3.5 px-3 text-slate-600 dark:text-slate-300">
+                            <td className="py-3 px-4 text-left align-middle text-slate-600 dark:text-slate-300">
                               {d.store_name ? (
                                 <div className="flex flex-col">
-                                  <span className="font-semibold text-slate-900 dark:text-white">{d.store_name}</span>
-                                  {d.merchant_id && <span className="text-[10px] text-slate-400 font-mono">Store ID: #{d.merchant_id}</span>}
+                                  <span className="font-semibold text-slate-900 dark:text-white truncate max-w-[16rem]">{d.store_name}</span>
+                                  {d.merchant_id && <span className="text-[10px] text-slate-400 font-mono">#{d.merchant_id}</span>}
                                 </div>
-                              ) : String(d.status).toUpperCase() === 'PENDING' ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-2.5 py-1 rounded-md border border-purple-200/60 dark:border-purple-800/40 whitespace-nowrap">
-                                  <span>{t('awaitingStoreLink', 'Awaiting Store Link')}</span>
-                                </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-200/60 dark:border-amber-800/40">
-                                  Warehouse Stock
+                                <span className="text-slate-400 dark:text-slate-500">
+                                  {String(d.status).toUpperCase() === 'PENDING'
+                                    ? t('awaitingStoreLink', 'Awaiting Store Link')
+                                    : t('warehouseStock', 'Warehouse Stock')}
                                 </span>
                               )}
                             </td>
@@ -3386,7 +3501,7 @@ export default function AdminDashboard() {
 
                           {/* Status */}
                           {visibleColumns.status && (
-                            <td className="py-3.5 px-3 text-center">
+                            <td className="py-3 px-4 text-left align-middle">
                               {String(d.status || '').toUpperCase() === 'PENDING' ? (
                                 <span className="inline-flex items-center justify-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800 whitespace-nowrap">
                                   <span>{t('waitingForRegistration', 'Waiting for Registration')}</span>
@@ -3409,35 +3524,20 @@ export default function AdminDashboard() {
 
                           {/* Unit Price & Discount */}
                           {visibleColumns.price && (
-                            <td className="py-3.5 px-3 text-center font-mono whitespace-nowrap">
-                              {Number(d.discount_amount) > 0 || Number(d.discount_percent) > 0 ? (
-                                <div className="inline-flex flex-col items-center">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">
-                                      ${Number(d.final_price || d.price).toFixed(2)}
-                                    </span>
-                                    <span className="text-[10px] text-slate-400 line-through">
-                                      ${Number(d.price || 29).toFixed(2)}
-                                    </span>
-                                  </div>
-                                  <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/60 px-1.5 py-0.2 rounded-md mt-0.5">
-                                    {Number(d.discount_percent) > 0 ? `${d.discount_percent}% OFF` : `-$${Number(d.discount_amount).toFixed(2)} OFF`}
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">
-                                  ${Number(d.price || 29).toFixed(2)}
-                                </span>
-                              )}
+                            <td className="py-3 px-4 text-right align-middle font-mono whitespace-nowrap">
+                              {/* The final price only: what the customer actually paid */}
+                              <span className="font-bold text-xs text-slate-800 dark:text-slate-200">
+                                ${Number(d.final_price != null ? d.final_price : (d.price || 0)).toFixed(2)}
+                              </span>
                             </td>
                           )}
 
                           {/* Warranty 90-Day Live Countdown */}
                           {visibleColumns.warranty && (
-                            <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                            <td className="py-3 px-4 text-right align-middle whitespace-nowrap">
                               {(() => {
                                 const wInfo = calculateWarrantyCountdown(d);
-                                if (!d.merchant_id || wInfo.status === 'NO_WARRANTY') {
+                                if (wInfo.status === 'NO_WARRANTY') {
                                   return <span className="text-slate-400 text-[11px]">—</span>;
                                 }
                                 if (wInfo.status === 'EXPIRED') {
@@ -3467,7 +3567,7 @@ export default function AdminDashboard() {
 
                           {/* Battery */}
                           {visibleColumns.battery && (
-                            <td className="py-3.5 px-3 text-center">
+                            <td className="py-3 px-4 text-right align-middle">
                               {String(d.status || '').toUpperCase() === 'ACTIVE' || String(d.status || '').toUpperCase() === 'ONLINE' ? (
                                 <span className="inline-flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
                                   {d.battery || '100%'}
@@ -3480,7 +3580,7 @@ export default function AdminDashboard() {
 
                           {/* Signal */}
                           {visibleColumns.signal && (
-                            <td className="py-3.5 px-3 text-center">
+                            <td className="py-3 px-4 text-right align-middle">
                               <span className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
                                 String(d.signal || '').toLowerCase().includes('excel')
                                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
@@ -3493,29 +3593,29 @@ export default function AdminDashboard() {
 
                           {/* 4G Version */}
                           {visibleColumns.version4g && (
-                            <td className="py-3.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-400 max-w-[140px] truncate" title={d.version_4g}>
+                            <td className="py-3 px-4 text-left align-middle font-mono text-[11px] text-slate-600 dark:text-slate-400 max-w-[140px] truncate" title={d.version_4g}>
                               {d.version_4g || 'Y6_LCD_1605...'}
                             </td>
                           )}
 
                           {/* WiFi Version */}
                           {visibleColumns.versionWifi && (
-                            <td className="py-3.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-400 max-w-[140px] truncate" title={d.version_wifi}>
+                            <td className="py-3 px-4 text-left align-middle font-mono text-[11px] text-slate-600 dark:text-slate-400 max-w-[140px] truncate" title={d.version_wifi}>
                               {d.version_wifi || 'esp32c2x_2M...'}
                             </td>
                           )}
 
                           {/* Last Time */}
                           {visibleColumns.lastTime && (
-                            <td className="py-3.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                            <td className="py-3 px-4 text-left align-middle font-mono text-[11px] text-slate-600 dark:text-slate-400 whitespace-nowrap">
                               {d.last_time || (d.created_at ? new Date(d.created_at).toLocaleString() : '2026-08-31 21:17:25')}
                             </td>
                           )}
 
                           {/* Operations */}
                           {visibleColumns.operation && (
-                            <td className="py-3.5 px-4 text-center">
-                              <div className="flex items-center justify-center whitespace-nowrap">
+                            <td className="py-3 px-4 text-right align-middle">
+                              <div className="flex items-center justify-end whitespace-nowrap">
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -3535,7 +3635,7 @@ export default function AdminDashboard() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={12} className="py-12 text-center text-slate-400 text-sm">
+                      <td colSpan={14} className="py-12 text-center text-slate-400 text-sm">
                         {t('noDevicesFound', 'No soundbox devices match the specified filters.')}
                       </td>
                     </tr>
@@ -3681,494 +3781,42 @@ export default function AdminDashboard() {
       {/* TAB 3B: SOUNDBOX STOCK & WAREHOUSE INVENTORY             */}
       {/* ======================================================== */}
       {adminTab === 'inventory' && (
-        <div className="space-y-4">
+        <StockPage
+          productStock={productStock}
+          setProductStock={setProductStock}
+          canViewCost={stockCanViewCost}
+          branchFilter={stockBranchFilter}
+          setBranchFilter={setStockBranchFilter}
+          devices={devices}
+          branches={branchesList}
+          currentAdmin={currentAdmin}
+          onAddStock={openStockIntakeModal}
+          onSell={openSellStockModal}
+          onEdit={openEditDeviceModal}
+          onDelete={openDeleteDeviceModal}
+          renderPagination={renderPaginationNumeration}
+        />
+      )}
 
-          {/* 0. Warehouse Stock KPI Summary Cards */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            <div className="bg-white dark:bg-slate-900 p-2.5 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="text-[9px] sm:text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1 truncate">
-                <Warehouse className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                <span className="truncate">{t('warehouseStock', 'Warehouse Stock')}</span>
-              </div>
-              <div className="text-lg sm:text-2xl font-bold text-amber-600 dark:text-amber-400 mt-0.5 sm:mt-1">
-                {devices.filter(d => !d.merchant_id && String(d.status || '').toUpperCase() !== 'PENDING' && String(d.status || '').toUpperCase() !== 'ACTIVE').length}
-              </div>
-              <div className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate">{t('unassignedAndReady', 'Unassigned & Ready')}</div>
-            </div>
+      {/* ======================================================== */}
+      {/* TAB 3C: PRODUCT CATALOG                                  */}
+      {/* ======================================================== */}
+      {adminTab === 'products' && (
+        <ProductsPage onChanged={fetchAllData} />
+      )}
 
-            <div className="bg-white dark:bg-slate-900 p-2.5 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="text-[9px] sm:text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1 truncate">
-                <Boxes className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                <span className="truncate">{t('availableUnits', 'Available Units')}</span>
-              </div>
-              <div className="text-lg sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-0.5 sm:mt-1">
-                {devices.filter(d => !d.merchant_id && String(d.status || '').toUpperCase() !== 'PENDING' && String(d.status || '').toUpperCase() !== 'ACTIVE').length}
-              </div>
-              <div className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate">{t('readyForDeployment', 'Ready for Deployment')}</div>
-            </div>
+      {/* ======================================================== */}
+      {/* TAB 3D: SUPPLIERS & DEVICE TYPES                         */}
+      {/* ======================================================== */}
+      {adminTab === 'suppliers' && (
+        <SuppliersPage onChanged={fetchAllData} />
+      )}
 
-            <div className="bg-white dark:bg-slate-900 p-2.5 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="text-[9px] sm:text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1 truncate">
-                <Volume2 className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">{t('totalFleetUnits', 'Total Fleet Units')}</span>
-              </div>
-              <div className="text-lg sm:text-2xl font-bold text-blue-600 dark:text-blue-400 mt-0.5 sm:mt-1">
-                {devices.length}
-              </div>
-              <div className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate">{t('allSoundboxes', 'All Soundboxes')}</div>
-            </div>
-          </div>
-
-          {/* 1. Warehouse Stock Search & Filter Toolbar */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-3.5">
-            
-            {/* Top Row: Primary Search + Quick Actions + Filter Toggle */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={stockSearchTerm}
-                  onChange={(e) => setStockSearchTerm(e.target.value)}
-                  placeholder={t('searchStockPlaceholder', 'Search Serial Number, Location, or Notes...')}
-                  className="w-full px-4 py-2.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition"
-                />
-                {stockSearchTerm && (
-                  <button
-                    type="button"
-                    onClick={() => setStockSearchTerm('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer font-bold text-sm"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-
-              {/* Action Buttons & Filter Toggle */}
-              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsStockModalOpen(true)}
-                  className="flex-1 sm:flex-initial px-3 sm:px-3.5 py-2 sm:py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 transition cursor-pointer touch-manipulation whitespace-nowrap"
-                >
-                  <span>{t('addStockDevice', '+ Add Stock')}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleOpenNewSupplierModal}
-                  className="px-2.5 sm:px-3.5 py-2 sm:py-2.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-2xs shrink-0 cursor-pointer touch-manipulation whitespace-nowrap"
-                  title="Manage Suppliers"
-                >
-                  <span>{t('suppliers', 'Suppliers')}</span>
-                  <span className="px-1.5 py-0.2 bg-indigo-200/80 dark:bg-indigo-800 text-indigo-800 dark:text-indigo-200 text-[10px] font-bold rounded-full">
-                    {suppliersList.length}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIsStockFiltersExpanded(!isStockFiltersExpanded)}
-                  className={`px-2.5 sm:px-3.5 py-2 sm:py-2.5 rounded-xl text-xs font-semibold border transition flex items-center justify-center gap-1.5 cursor-pointer touch-manipulation whitespace-nowrap ${
-                    isStockFiltersExpanded || activeStockFilterCount > 0
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
-                      : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                  }`}
-                >
-                  <span>Filters</span>
-                  {activeStockFilterCount > 0 && (
-                    <span className="px-1.5 py-0.2 bg-emerald-600 text-white text-[10px] font-bold rounded-full">
-                      {activeStockFilterCount}
-                    </span>
-                  )}
-                </button>
-
-                {activeStockFilterCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleResetStockFilters}
-                    className="px-2.5 py-2 sm:py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1 shrink-0 touch-manipulation"
-                    title="Reset Filters"
-                  >
-                    <span>{t('reset', 'Reset')}</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleExportStockCSV}
-                  className="hidden sm:flex px-3.5 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer items-center gap-1.5 shadow-2xs shrink-0 touch-manipulation"
-                  title="Export CSV"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>{t('exportCsv', 'Export')}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIsStockColumnsModalOpen(true)}
-                  className="hidden sm:flex px-3.5 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer items-center gap-1.5 shadow-2xs shrink-0"
-                  title="Columns"
-                >
-                  <span>{t('columns', 'Columns')}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Secondary Filter Grid: Always visible on desktop (lg:grid), collapsible on mobile & tablet */}
-            <div className={`${isStockFiltersExpanded ? 'grid' : 'hidden lg:grid'} grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2 border-t border-slate-100 dark:border-slate-800/80`}>
-              {/* Device Type */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('deviceType', 'Device Type')}
-                </label>
-                <select
-                  value={stockTypeFilter}
-                  onChange={(e) => setStockTypeFilter(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
-                >
-                  <option value="ALL">{t('allDeviceTypes', 'All Device Types')}</option>
-                  <option value="Display Soundbox">{t('displaySoundboxOpt', 'Display Soundbox (Screen QR)')}</option>
-                  <option value="Standard Soundbox">{t('standardSoundboxOpt', 'Standard Soundbox (Printed QR)')}</option>
-                </select>
-              </div>
-
-              {/* Supplier Filter */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('supplier', 'Supplier')}
-                </label>
-                <select
-                  value={stockSupplierFilter}
-                  onChange={(e) => setStockSupplierFilter(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer font-medium"
-                >
-                  <option value="ALL">{isKhmer ? 'គ្រប់អ្នកផ្គត់ផ្គង់ (All Suppliers)' : 'All Suppliers'}</option>
-                  {suppliersList.map((s) => (
-                    <option key={s.id} value={s.name}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Price Tier */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('priceTier', 'Price Tier')}
-                </label>
-                <select
-                  value={stockPriceFilter}
-                  onChange={(e) => setStockPriceFilter(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
-                >
-                  <option value="ALL">{t('allPrices', 'All Price Tiers')}</option>
-                  <option value="29">$29.00 (Standard Audio)</option>
-                  <option value="39">$39.00 (Display Screen)</option>
-                </select>
-              </div>
-
-              {/* Registration Date */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('registrationDate', 'Registration Date')}
-                </label>
-                <input
-                  type="date"
-                  value={stockDateFilter}
-                  onChange={(e) => setStockDateFilter(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer"
-                />
-              </div>
-
-              {/* Sort By */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('sortBy', 'Sort By')}
-                </label>
-                <select
-                  value={stockSortBy}
-                  onChange={(e) => setStockSortBy(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition cursor-pointer font-medium"
-                >
-                  <option value="NEWEST">{t('sortNewest', 'Newest Registered')}</option>
-                  <option value="OLDEST">{t('sortOldest', 'Oldest Registered')}</option>
-                  <option value="SN_ASC">{t('sortSnAsc', 'Serial Number (A → Z)')}</option>
-                  <option value="SN_DESC">{t('sortSnDesc', 'Serial Number (Z → A)')}</option>
-                  <option value="PRICE_DESC">{t('sortPriceDesc', 'Price (Highest First)')}</option>
-                  <option value="PRICE_ASC">{t('sortPriceAsc', 'Price (Lowest First)')}</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* 2. Warehouse Stock Table Card (Desktop >= lg) */}
-          <div className="hidden lg:block mt-6 mb-4 bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs min-w-[760px]">
-                <thead>
-                  <tr className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 text-xs font-semibold select-none whitespace-nowrap">
-                    <th className="py-4 px-4 w-12 text-center">
-                      <button
-                        type="button"
-                        onClick={toggleSelectAllStock}
-                        className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
-                      >
-                        {stockSelectedIds.length === paginatedStockDevices.length && paginatedStockDevices.length > 0 ? (
-                          <CheckSquare className="w-4 h-4 text-emerald-600" />
-                        ) : (
-                          <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                        )}
-                      </button>
-                    </th>
-                    {visibleStockColumns.deviceId && <th className="py-4 px-5 font-semibold min-w-[160px]">{t('deviceId', 'Device SN')}</th>}
-                    {visibleStockColumns.deviceType && <th className="py-4 px-5 font-semibold min-w-[190px]">{t('deviceType', 'Device Type')}</th>}
-                    {visibleStockColumns.supplier && <th className="py-4 px-4 font-semibold min-w-[120px]">{t('supplier', 'Supplier')}</th>}
-                    {visibleStockColumns.price && <th className="py-4 px-5 font-semibold text-center min-w-[95px]">{t('price', 'Price')}</th>}
-                    {visibleStockColumns.intakeDate && <th className="py-4 px-5 font-semibold min-w-[130px]">{t('registrationDate', 'Registration Date')}</th>}
-                    {visibleStockColumns.notes && <th className="py-4 px-5 font-semibold min-w-[200px]">{t('warehouseNotes', 'Warehouse Notes')}</th>}
-                    {visibleStockColumns.operation && <th className="py-4 px-5 font-semibold text-center min-w-[100px]">{t('operation', 'Operation')}</th>}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-                  {paginatedStockDevices.length > 0 ? (
-                    paginatedStockDevices.map((d) => (
-                      <tr 
-                        key={d.id} 
-                        className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition group whitespace-nowrap ${
-                          stockSelectedIds.includes(d.id || d.device_sn) ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : ''
-                        }`}
-                      >
-                        {/* Selection Checkbox */}
-                        <td className="py-3.5 px-3.5 text-center">
-                          <button
-                            type="button"
-                            onClick={() => toggleStockSelection(d.id || d.device_sn)}
-                            className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
-                          >
-                            {stockSelectedIds.includes(d.id || d.device_sn) ? (
-                              <CheckSquare className="w-4 h-4 text-emerald-600" />
-                            ) : (
-                              <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                            )}
-                          </button>
-                        </td>
-                        {/* Device ID (SN) */}
-                        {visibleStockColumns.deviceId && (
-                          <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white">
-                            <span>{d.device_sn || d.device_id}</span>
-                          </td>
-                        )}
-
-                        {/* Device Type */}
-                        {visibleStockColumns.deviceType && (
-                          <td className="py-3.5 px-3">
-                            <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1.5 whitespace-nowrap ${
-                              (d.device_type === 'Display Soundbox' || String(d.device_type || '').toLowerCase().includes('display') || String(d.device_type || '').toLowerCase().includes('screen'))
-                                ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
-                                : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                            }`}>
-                              {(d.device_type === 'Display Soundbox' || String(d.device_type || '').toLowerCase().includes('display') || String(d.device_type || '').toLowerCase().includes('screen'))
-                                ? t('displayScreenQr', 'Display (Screen QR)')
-                                : t('standardPrintedQr', 'Standard (Printed QR)')}
-                            </span>
-                          </td>
-                        )}
-
-                        {/* Supplier */}
-                        {visibleStockColumns.supplier && (
-                          <td className="py-3.5 px-4 font-semibold text-xs">
-                            <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1 whitespace-nowrap ${
-                              (d.supplier || 'Feishu').toLowerCase() === 'hemi'
-                                ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                                : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
-                            }`}>
-                              {(d.supplier || 'Feishu').toLowerCase() === 'hemi' ? 'Hemi' : 'Feishu'}
-                            </span>
-                          </td>
-                        )}
-
-                        {/* Unit Price */}
-                        {visibleStockColumns.price && (
-                          <td className="py-3.5 px-3 text-center font-mono font-bold text-slate-800 dark:text-slate-200">
-                            ${Number(d.price || 29).toFixed(2)}
-                          </td>
-                        )}
-
-                        {/* Registration Date */}
-                        {visibleStockColumns.intakeDate && (
-                          <td className="py-3.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                            {d.created_at ? new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Aug 30, 2026'}
-                          </td>
-                        )}
-
-                        {/* Warehouse Notes */}
-                        {visibleStockColumns.notes && (
-                          <td className="py-3.5 px-3 text-slate-600 dark:text-slate-400 max-w-[220px] truncate" title={d.notes}>
-                            {d.notes || t('warehouseReadyTested', 'Warehouse Ready (Tested)')}
-                          </td>
-                        )}
-
-                        {/* Operations */}
-                        {visibleStockColumns.operation && (
-                          <td className="py-3.5 px-4 text-center">
-                            <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
-                              <button
-                                type="button"
-                                onClick={() => openSellStockModal(d)}
-                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                              >
-                                <span>{t('sellDevice', 'Sell')}</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => openEditDeviceModal(d)}
-                                className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                              >
-                                <span>{t('edit', 'Edit')}</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => openDeleteDeviceModal(d)}
-                                className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                                title={t('delete', 'Delete')}
-                              >
-                                <span>{t('delete', 'Delete')}</span>
-                              </button>
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={12} className="py-12 text-center text-slate-400 text-sm">
-                        No warehouse stock items match the specified filters.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Bottom Pagination Controls */}
-            {renderPaginationNumeration({
-              currentPage: stockPage,
-              totalPages: totalStockPages,
-              totalItems: filteredStockDevices.length,
-              pageSize: stockPageSize,
-              onPageChange: setStockPage,
-              onPageSizeChange: setStockPageSize,
-              goToPageVal: stockGoToPage,
-              setGoToPageVal: setStockGoToPage
-            })}
-
-          </div>
-
-          {/* Mobile & Tablet Stock Cards (< lg) */}
-          <div className="lg:hidden grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {paginatedStockDevices.length > 0 ? (
-              paginatedStockDevices.map((d) => (
-                <div 
-                  key={d.id || d.device_sn}
-                  className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3 shadow-2xs hover:shadow-sm transition"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center shrink-0">
-                        <Smartphone className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <span className="font-mono font-bold text-xs text-slate-900 dark:text-white block truncate">
-                          {d.device_sn || d.device_id}
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-mono">ID: #{d.id}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        (d.supplier || 'Feishu').toLowerCase() === 'hemi'
-                          ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                          : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
-                      }`}>
-                        {(d.supplier || 'Feishu').toLowerCase() === 'hemi' ? 'Hemi' : 'Feishu'}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        (d.device_type === 'Display Soundbox' || String(d.device_type || '').toLowerCase().includes('display'))
-                          ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
-                          : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                      }`}>
-                        {(d.device_type === 'Display Soundbox' || String(d.device_type || '').toLowerCase().includes('display'))
-                          ? 'Display'
-                          : 'Standard'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                    <span className="truncate">{d.notes || 'Warehouse Shelf (Available)'}</span>
-                    <span className="font-mono font-bold text-slate-900 dark:text-white shrink-0 ml-2">
-                      ${Number(d.price || 29).toFixed(2)}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                    <span className="text-[11px] text-slate-400 font-mono">
-                      Reg: {d.created_at ? new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Aug 30'}
-                    </span>
-                    
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => openSellStockModal(d)}
-                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs touch-manipulation"
-                      >
-                        <span>{t('sellDevice', 'Sell')}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openEditDeviceModal(d)}
-                        className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 active:scale-95 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold transition cursor-pointer touch-manipulation"
-                        title={t('edit', 'Edit')}
-                      >
-                        <span>{t('edit', 'Edit')}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openDeleteDeviceModal(d)}
-                        className="px-2.5 py-1.5 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 active:scale-95 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-semibold transition cursor-pointer touch-manipulation"
-                        title={t('delete', 'Delete')}
-                      >
-                        <span>{t('delete', 'Delete')}</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="col-span-full text-center py-10 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
-                No warehouse stock devices match the specified filters.
-              </div>
-            )}
-          </div>
-
-          {/* Mobile & Tablet Stock Pagination (< lg) */}
-          <div className="lg:hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs">
-            {renderPaginationNumeration({
-              currentPage: stockPage,
-              totalPages: totalStockPages,
-              totalItems: filteredStockDevices.length,
-              pageSize: stockPageSize,
-              onPageChange: setStockPage,
-              onPageSizeChange: setStockPageSize,
-              goToPageVal: stockGoToPage,
-              setGoToPageVal: setStockGoToPage
-            })}
-          </div>
-
-        </div>
+      {/* ======================================================== */}
+      {/* TAB 3E: BRANCHES                                         */}
+      {/* ======================================================== */}
+      {adminTab === 'branches' && (
+        <BranchesPage onChanged={fetchAllData} />
       )}
 
 
@@ -4177,83 +3825,6 @@ export default function AdminDashboard() {
       {/* ======================================================== */}
       {(adminTab === 'sales' || adminTab === 'sales_history') && (
         <div className="space-y-4 sm:space-y-5">
-          {/* Top Sales KPI Banner */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            {/* KPI 1: Gross Sales Revenue */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  {t('totalRevenue', 'Total Revenue')}
-                </span>
-                <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-                  <DollarSign className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                ${Number(salesTotalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <p className="text-[11px] text-slate-400">
-                {isKhmer ? 'ចំណូលលក់ឧបករណ៍សរុប' : 'Total gross device revenue'}
-              </p>
-            </div>
-
-            {/* KPI 2: Total Recorded Sales Orders */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  {t('salesOrders', 'Sales Orders')}
-                </span>
-                <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
-                  <ShoppingBag className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                {salesTotalCount}
-              </div>
-              <p className="text-[11px] text-slate-400">
-                {isKhmer ? 'ចំនួនការលក់ដែលបានកត់ត្រា' : 'Total units sold & registered'}
-              </p>
-            </div>
-
-            {/* KPI 3: Average Order Value */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  {t('avgOrderValue', 'Avg Order Value')}
-                </span>
-                <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
-                  <Tag className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                ${salesList.length > 0 ? (salesTotalRevenue / salesList.length).toFixed(2) : '0.00'}
-              </div>
-              <p className="text-[11px] text-slate-400">
-                {isKhmer ? 'តម្លៃលក់ជាមធ្យមក្នុងមួយគ្រឿង' : 'Average realized price per unit'}
-              </p>
-            </div>
-
-            {/* KPI 4: Completed vs Pending Setup */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Order Statuses
-                </span>
-                <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
-                  <CheckCircle2 className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <span className="text-emerald-600 dark:text-emerald-400">{salesList.filter(s => (s.status || 'COMPLETED') === 'COMPLETED').length} Done</span>
-                <span className="text-slate-300 dark:text-slate-700">/</span>
-                <span className="text-amber-600 dark:text-amber-400">{salesList.filter(s => s.status === 'PENDING').length} Pending</span>
-              </div>
-              <p className="text-[11px] text-slate-400">
-                Active deployed vs pending setup
-              </p>
-            </div>
-          </div>
-
           {/* Sales Filter & Action Toolbar */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-3.5">
             <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
@@ -4282,10 +3853,9 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={handleExportSalesCSV}
-                  className="hidden sm:flex px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 transition items-center gap-1.5 shadow-2xs cursor-pointer touch-manipulation"
+                  className="hidden sm:flex px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 transition items-center justify-center shadow-2xs cursor-pointer touch-manipulation"
                   title="Export Sales to CSV"
                 >
-                  <Download className="w-3.5 h-3.5" />
                   <span>{t('exportCsv', 'Export CSV')}</span>
                 </button>
 
@@ -4293,10 +3863,10 @@ export default function AdminDashboard() {
                   type="button"
                   onClick={() => fetchSales(salesSearchTerm)}
                   disabled={salesLoading}
-                  className="p-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 transition flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                  className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 transition flex items-center justify-center shadow-2xs cursor-pointer disabled:opacity-50 touch-manipulation"
                   title="Refresh Sales"
                 >
-                  <RefreshCw className={`w-4 h-4 ${salesLoading ? 'animate-spin text-emerald-500' : ''}`} />
+                  <span>{salesLoading ? 'Refreshing...' : t('refresh', 'Refresh')}</span>
                 </button>
               </div>
             </div>
@@ -4393,17 +3963,17 @@ export default function AdminDashboard() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs min-w-[960px]">
-                  <thead className="bg-slate-50/80 dark:bg-slate-800/70 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200 dark:border-slate-800">
+                  <thead className="bg-slate-50/80 dark:bg-slate-800/70 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-xs border-b border-slate-200 dark:border-slate-800">
                     <tr>
-                      <th className="px-4 py-3">Order / Date</th>
-                      <th className="px-4 py-3">Invoice Ref</th>
-                      <th className="px-4 py-3">Soundbox / SN</th>
-                      <th className="px-4 py-3">Store / Customer</th>
-                      <th className="px-4 py-3">Sold By</th>
+                      <th className="px-4 py-3 text-left">Order / Date</th>
+                      <th className="px-4 py-3 text-left">Invoice Ref</th>
+                      <th className="px-4 py-3 text-left">Soundbox / SN</th>
+                      <th className="px-4 py-3 text-left">Store / Customer</th>
+                      <th className="px-4 py-3 text-left">Sold By</th>
                       <th className="px-4 py-3 text-center">Qty</th>
                       <th className="px-4 py-3 text-right">Price & Discount</th>
-                      <th className="px-4 py-3">Warranty</th>
-                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-left">Warranty</th>
+                      <th className="px-4 py-3 text-center">Status</th>
                       <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
@@ -4411,7 +3981,7 @@ export default function AdminDashboard() {
                     {paginatedSales.map((sale) => (
                       <tr key={sale.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-850/60 transition">
                         {/* Order & Date */}
-                        <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                        <td className="py-3.5 px-4 align-middle text-left whitespace-nowrap">
                           <div className="font-mono font-bold text-slate-900 dark:text-white text-xs">
                             #ORD-{String(sale.id).padStart(4, '0')}
                           </div>
@@ -4421,7 +3991,7 @@ export default function AdminDashboard() {
                         </td>
 
                         {/* Invoice Ref */}
-                        <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                        <td className="py-3.5 px-4 align-middle text-left whitespace-nowrap">
                           {sale.invoice_reference ? (
                             <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
                               {sale.invoice_reference}
@@ -4432,7 +4002,7 @@ export default function AdminDashboard() {
                         </td>
 
                         {/* Soundbox & SN */}
-                        <td className="px-4 py-3.5 align-top">
+                        <td className="py-3.5 px-4 align-middle text-left">
                           <div className="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-xs flex items-center gap-1.5">
                             <span>{sale.device_sn}</span>
                           </div>
@@ -4451,7 +4021,7 @@ export default function AdminDashboard() {
                         </td>
 
                         {/* Store / Customer */}
-                        <td className="px-4 py-3.5 align-top">
+                        <td className="py-3.5 px-4 align-middle text-left">
                           {sale.store_name ? (
                             <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                               <span>{sale.store_name}</span>
@@ -4471,7 +4041,7 @@ export default function AdminDashboard() {
                         </td>
 
                         {/* Sold By */}
-                        <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                        <td className="py-3.5 px-4 align-middle text-left whitespace-nowrap">
                           <div className="text-slate-800 dark:text-slate-200 font-semibold text-xs">
                             {sale.sold_by_name || 'Admin'}
                           </div>
@@ -4483,14 +4053,14 @@ export default function AdminDashboard() {
                         </td>
 
                         {/* Quantity */}
-                        <td className="px-4 py-3.5 align-top text-center whitespace-nowrap">
+                        <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap">
                           <span className="inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-md font-mono font-bold text-xs bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
                             {sale.quantity || 1}
                           </span>
                         </td>
 
                         {/* Price & Discount */}
-                        <td className="px-4 py-3.5 align-top text-right whitespace-nowrap">
+                        <td className="py-3.5 px-4 align-middle text-right whitespace-nowrap">
                           <div className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
                             ${Number(sale.final_price ?? sale.price ?? 0).toFixed(2)}
                           </div>
@@ -4516,7 +4086,7 @@ export default function AdminDashboard() {
                         </td>
 
                         {/* Warranty */}
-                        <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                        <td className="py-3.5 px-4 align-middle text-left whitespace-nowrap">
                           <div className="text-slate-800 dark:text-slate-200 font-semibold text-xs flex items-center gap-1">
                             <span>{sale.warranty_days ? `${sale.warranty_days} days` : 'No warranty'}</span>
                           </div>
@@ -4528,7 +4098,7 @@ export default function AdminDashboard() {
                         </td>
 
                         {/* Status */}
-                        <td className="px-4 py-3.5 align-top whitespace-nowrap">
+                        <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                             sale.status === 'COMPLETED'
                               ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
@@ -4546,7 +4116,7 @@ export default function AdminDashboard() {
                         </td>
 
                         {/* Actions */}
-                        <td className="px-4 py-3.5 align-top text-right whitespace-nowrap">
+                        <td className="py-3.5 px-4 align-middle text-right whitespace-nowrap">
                           <button
                             type="button"
                             onClick={() => {
@@ -4588,64 +4158,6 @@ export default function AdminDashboard() {
       {(adminTab === 'user_activity' || adminTab === 'logs' || adminTab === 'user_logs') && (
         <div className="space-y-4">
           
-          {/* Top User Activity KPI Banner */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total User Actions</span>
-                <div className="p-1.5 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 rounded-lg">
-                  <Activity className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
-                {userActivities.length} <span className="text-xs font-normal text-slate-400">actions</span>
-              </div>
-              <span className="text-[11px] text-slate-400">Merchant operations & events</span>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Store Registrations</span>
-                <div className="p-1.5 bg-blue-50 dark:bg-blue-950/60 text-blue-600 rounded-lg">
-                  <Store className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-blue-600 dark:text-blue-400 font-mono tracking-tight">
-                {stores.length} <span className="text-xs font-normal text-slate-400">stores</span>
-              </div>
-              <span className="text-[11px] text-slate-400">Branches created by merchants</span>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Soundbox Linkings</span>
-                <div className="p-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 rounded-lg">
-                  <Smartphone className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-tight">
-                {devices.filter(d => d.merchant_id).length} <span className="text-xs font-normal text-slate-400">devices</span>
-              </div>
-              <span className="text-[11px] text-indigo-500 font-medium flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>QR scanned & assigned</span>
-              </span>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Active Merchants</span>
-                <div className="p-1.5 bg-amber-50 dark:bg-amber-950/60 text-amber-600 rounded-lg">
-                  <Users className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                {users.filter(u => String(u.role).toUpperCase() === 'MERCHANT' || String(u.role).toUpperCase() === 'USER').length}
-              </div>
-              <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">Active merchant accounts</span>
-            </div>
-          </div>
-
           {/* User Activity Card */}
           <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
             
@@ -4653,7 +4165,6 @@ export default function AdminDashboard() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100 dark:border-slate-800">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-emerald-600" />
                   <span>{isKhmer ? 'កំណត់ត្រាសកម្មភាពអ្នកប្រើប្រាស់' : 'User & Merchant Activity Log'}</span>
                 </h3>
                 <p className="text-xs text-slate-400">
@@ -4665,10 +4176,10 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={fetchAllData}
-                  className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition cursor-pointer"
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold transition cursor-pointer"
                   title="Refresh user activities"
                 >
-                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  <span>{loading ? 'Refreshing...' : t('refresh', 'Refresh')}</span>
                 </button>
               </div>
             </div>
@@ -4743,8 +4254,8 @@ export default function AdminDashboard() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse min-w-[850px]">
                       <thead>
-                        <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                          <th className="py-4 px-4 w-12 text-center">
+                        <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          <th className="py-3.5 px-4 w-12 text-center">
                             <button
                               type="button"
                               onClick={() => toggleSelectAllUserAct(paginatedUserActs)}
@@ -4757,12 +4268,12 @@ export default function AdminDashboard() {
                               )}
                             </button>
                           </th>
-                          <th className="py-4 px-5">User / Merchant</th>
-                          <th className="py-4 px-5">Action / Activity</th>
-                          <th className="py-4 px-5">Target Entity</th>
-                          <th className="py-4 px-5">Source / Platform</th>
-                          <th className="py-4 px-5">Status</th>
-                          <th className="py-4 px-5">Timestamp</th>
+                          <th className="px-4 py-3 text-left">User / Merchant</th>
+                          <th className="px-4 py-3 text-left">Action / Activity</th>
+                          <th className="px-4 py-3 text-left">Target Entity</th>
+                          <th className="px-4 py-3 text-left">Source / Platform</th>
+                          <th className="px-4 py-3 text-center">Status</th>
+                          <th className="px-4 py-3 text-left">Timestamp</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
@@ -4773,7 +4284,7 @@ export default function AdminDashboard() {
                             userActSelectedIds.includes(act.id) ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : ''
                           }`}
                         >
-                          <td className="py-3.5 px-3.5 text-center">
+                          <td className="py-3.5 px-4 w-12 text-center align-middle">
                             <button
                               type="button"
                               onClick={() => toggleUserActSelection(act.id)}
@@ -4786,13 +4297,13 @@ export default function AdminDashboard() {
                               )}
                             </button>
                           </td>
-                          <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white">
+                          <td className="py-3.5 px-4 text-left align-middle font-semibold text-slate-900 dark:text-white">
                             <div>{act.user_name || 'Merchant'}</div>
                             {act.user_phone && (
                               <div className="text-[11px] text-slate-400 font-mono font-normal">{act.user_phone}</div>
                             )}
                           </td>
-                          <td className="py-3.5 px-4 whitespace-nowrap">
+                          <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap">
                             <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full ${
                               act.category === 'STORE_REGISTER'
                                 ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60'
@@ -4805,20 +4316,20 @@ export default function AdminDashboard() {
                               <span>{act.action_label}</span>
                             </span>
                           </td>
-                          <td className="py-3.5 px-4">
+                          <td className="py-3.5 px-4 text-left align-middle">
                             <div className="font-semibold text-slate-900 dark:text-white">{act.target_name}</div>
                             <div className="text-[10px] text-slate-400">{act.details}</div>
                           </td>
-                          <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">
+                          <td className="py-3.5 px-4 text-left align-middle text-slate-600 dark:text-slate-400">
                             <div>{act.platform}</div>
                             <div className="font-mono text-[10px] text-slate-400">IP: {act.ip_address}</div>
                           </td>
-                          <td className="py-3.5 px-4 whitespace-nowrap">
+                          <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                               <span>{act.status}</span>
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 whitespace-nowrap text-slate-400 font-mono text-[11px]">
+                          <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap text-slate-400 font-mono text-[11px]">
                             {new Date(act.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                           </td>
                         </tr>
@@ -4854,61 +4365,6 @@ export default function AdminDashboard() {
       {(adminTab === 'admin_activity' || adminTab === 'admin_logs') && (
         <div className="space-y-4">
           
-          {/* Top Admin Activity KPI Banner */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Admin Actions</span>
-                <div className="p-1.5 bg-rose-50 dark:bg-rose-950/60 text-rose-600 rounded-lg">
-                  <ShieldAlert className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-rose-600 dark:text-rose-400 font-mono tracking-tight">
-                {adminActivities.length} <span className="text-xs font-normal text-slate-400">actions</span>
-              </div>
-              <span className="text-[11px] text-slate-400">Administrative & hardware events</span>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Stock & Deployments</span>
-                <div className="p-1.5 bg-amber-50 dark:bg-amber-950/60 text-amber-600 rounded-lg">
-                  <Warehouse className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-amber-600 dark:text-amber-400 font-mono tracking-tight">
-                {devices.length} <span className="text-xs font-normal text-slate-400">units</span>
-              </div>
-              <span className="text-[11px] text-amber-600 font-medium">Warehouse inventory managed</span>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Remote Commands</span>
-                <div className="p-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 rounded-lg">
-                  <Send className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-tight">
-                {logs.filter(l => l.log_category === 'SECURITY').length} <span className="text-xs font-normal text-slate-400">commands</span>
-              </div>
-              <span className="text-[11px] text-slate-400">Voice tests, volume & reboots</span>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Users Provisioned</span>
-                <div className="p-1.5 bg-blue-50 dark:bg-blue-950/60 text-blue-600 rounded-lg">
-                  <Users className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="text-2xl font-black text-blue-600 dark:text-blue-400 font-mono tracking-tight">
-                {users.length} <span className="text-xs font-normal text-slate-400">accounts</span>
-              </div>
-              <span className="text-[11px] text-blue-500 font-medium">Role access provisioned</span>
-            </div>
-          </div>
-
           {/* Admin Activity Card */}
           <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 space-y-4">
             
@@ -4916,7 +4372,6 @@ export default function AdminDashboard() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100 dark:border-slate-800">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <ShieldAlert className="w-5 h-5 text-rose-600" />
                   <span>{isKhmer ? 'កំណត់ត្រាសកម្មភាពអ្នកគ្រប់គ្រង' : 'Admin & System Operation Audit Log'}</span>
                 </h3>
                 <p className="text-xs text-slate-400">
@@ -4928,10 +4383,10 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={fetchAllData}
-                  className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition cursor-pointer"
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold transition cursor-pointer"
                   title="Refresh admin activities"
                 >
-                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  <span>{loading ? 'Refreshing...' : t('refresh', 'Refresh')}</span>
                 </button>
               </div>
             </div>
@@ -5007,8 +4462,8 @@ export default function AdminDashboard() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse min-w-[850px]">
                       <thead>
-                        <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                          <th className="py-3 px-3.5 w-10 text-center">
+                        <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          <th className="py-3.5 px-4 w-12 text-center">
                             <button
                               type="button"
                               onClick={() => toggleSelectAllAdminAct(paginatedAdminActs)}
@@ -5021,12 +4476,12 @@ export default function AdminDashboard() {
                               )}
                             </button>
                           </th>
-                          <th className="py-3 px-4">Admin Operator</th>
-                          <th className="py-3 px-4">Action Type</th>
-                          <th className="py-3 px-4">Target Resource</th>
-                          <th className="py-3 px-4">Operation Summary</th>
-                          <th className="py-3 px-4">Status</th>
-                          <th className="py-3 px-4">Timestamp</th>
+                          <th className="px-4 py-3 text-left">Admin Operator</th>
+                          <th className="px-4 py-3 text-left">Action Type</th>
+                          <th className="px-4 py-3 text-left">Target Resource</th>
+                          <th className="px-4 py-3 text-left">Operation Summary</th>
+                          <th className="px-4 py-3 text-center">Status</th>
+                          <th className="px-4 py-3 text-left">Timestamp</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
@@ -5037,7 +4492,7 @@ export default function AdminDashboard() {
                               adminActSelectedIds.includes(act.id) ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : ''
                             }`}
                           >
-                            <td className="py-3.5 px-3.5 text-center">
+                            <td className="py-3.5 px-4 w-12 text-center align-middle">
                               <button
                                 type="button"
                                 onClick={() => toggleAdminActSelection(act.id)}
@@ -5050,11 +4505,11 @@ export default function AdminDashboard() {
                                 )}
                               </button>
                             </td>
-                            <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+                            <td className="py-3.5 px-4 text-left align-middle font-bold text-slate-900 dark:text-white">
                               <div>{act.operator}</div>
                               <div className="text-[10px] text-slate-400 font-mono font-normal">SuperAdmin Role</div>
                             </td>
-                            <td className="py-3.5 px-4">
+                            <td className="py-3.5 px-4 text-left align-middle">
                               <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full ${
                                 act.category === 'STOCK_INTAKE'
                                   ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60'
@@ -5067,18 +4522,18 @@ export default function AdminDashboard() {
                                 <span>{act.action_label}</span>
                               </span>
                             </td>
-                            <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white">
+                            <td className="py-3.5 px-4 text-left align-middle font-semibold text-slate-900 dark:text-white">
                               {act.target_name}
                             </td>
-                            <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400 max-w-sm">
+                            <td className="py-3.5 px-4 text-left align-middle text-slate-600 dark:text-slate-400 max-w-sm">
                               {act.details}
                             </td>
-                            <td className="py-3.5 px-4 whitespace-nowrap">
+                            <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
                               <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                                 <span>{act.status}</span>
                               </span>
                             </td>
-                            <td className="py-3.5 px-4 whitespace-nowrap text-slate-400 font-mono text-[11px]">
+                            <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap text-slate-400 font-mono text-[11px]">
                               {new Date(act.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </td>
                           </tr>
@@ -5109,9 +4564,13 @@ export default function AdminDashboard() {
 
 
 
-      {/* Modal: Create User */}
-      <Modal isOpen={isAddUserOpen} onClose={() => setIsAddUserOpen(false)} title={t('addNewUser', 'Create New User Account')}>
-        <form onSubmit={handleCreateUser} className="space-y-4">
+      {/* Modal: Create Administrator Account */}
+      <Modal isOpen={isAddUserOpen} onClose={() => setIsAddUserOpen(false)} title={t('createAdminAccount', 'Create Administrator Account')}>
+        <form onSubmit={handleAddUser} className="space-y-4">
+          <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-600 dark:text-slate-400">
+            {t('adminCreationNotice', 'Provision a new administrator account. Standard users (merchants) must register via the public sign-up page.')}
+          </div>
+
           <div>
             <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
               {t('phoneNumber', 'Phone Number')} <span className="text-rose-500">*</span>
@@ -5128,6 +4587,7 @@ export default function AdminDashboard() {
               <Phone className="w-4 h-4 text-slate-400 absolute inset-y-0 left-3 my-auto pointer-events-none" />
             </div>
           </div>
+
           <div>
             <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
               {t('fullName', 'Full Name')} <span className="text-rose-500">*</span>
@@ -5141,6 +4601,7 @@ export default function AdminDashboard() {
               required
             />
           </div>
+
           <div>
             <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
               {t('password', 'Initial Password')} <span className="text-rose-500">*</span>
@@ -5154,20 +4615,21 @@ export default function AdminDashboard() {
               required
             />
           </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">{t('role', 'Role')}</label>
-              <select
-                value={newRole}
-                onChange={(e) => setNewRole(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
-              >
-                <option value="USER">{t('merchant', 'User / Merchant')}</option>
-                <option value="ADMIN">{t('admin', 'Administrator')}</option>
-              </select>
+              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
+                {t('role', 'Role')}
+              </label>
+              <div className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold text-purple-700 dark:text-purple-300 flex items-center justify-between">
+                <span>ADMIN</span>
+                <span className="text-[10px] bg-purple-100 dark:bg-purple-950 px-1.5 py-0.5 rounded font-mono uppercase">Fixed</span>
+              </div>
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">{t('status', 'Status')}</label>
+              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
+                {t('status', 'Status')}
+              </label>
               <select
                 value={newStatus}
                 onChange={(e) => setNewStatus(e.target.value)}
@@ -5178,25 +4640,430 @@ export default function AdminDashboard() {
               </select>
             </div>
           </div>
+
+          {/* Branch Assignment: Minimal All Branches Checkbox / Selector */}
+          {currentAdmin?.branch_id ? (
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl">
+              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
+                {t('assignedBranch', 'Assigned Branch')}
+              </label>
+              <div className="text-sm font-medium text-slate-900 dark:text-white">
+                {currentAdmin.branch_name || `Branch #${currentAdmin.branch_id}`}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                {t('branchLockedNotice', 'New admin will automatically be scoped to your branch.')}
+              </p>
+            </div>
+          ) : (
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl space-y-2.5">
+              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300">
+                {t('branchAssignment', 'Branch Assignment')}
+              </label>
+
+              <label className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isAllBranches}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setIsAllBranches(checked);
+                    if (checked) {
+                      setNewUserBranchId('');
+                    } else if (branchesList.length > 0 && !newUserBranchId) {
+                      setNewUserBranchId(String(branchesList[0].id));
+                    }
+                  }}
+                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                />
+                <span>{t('allBranchesSuperAdmin', 'All Branches')}</span>
+              </label>
+
+              {!isAllBranches && (
+                <div className="pt-1">
+                  <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">
+                    {t('selectSpecificBranch', 'Select Specific Branch')}
+                  </label>
+                  <select
+                    value={newUserBranchId}
+                    onChange={(e) => setNewUserBranchId(e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500"
+                    required={!isAllBranches}
+                  >
+                    <option value="" disabled>{t('selectBranch', '— Select a branch —')}</option>
+                    {branchesList.map(b => (
+                      <option key={b.id} value={b.id}>
+                        {b.branch_name} ({b.branch_code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
             <button
               type="button"
               onClick={() => setIsAddUserOpen(false)}
-              className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-300"
+              className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-300 cursor-pointer"
             >
               {t('cancel', 'Cancel')}
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm cursor-pointer disabled:opacity-60"
             >
-              {submitting ? t('saving', 'Creating...') : t('save', 'Create Account')}
+              {submitting ? t('saving', 'Creating...') : t('createAdminBtn', 'Create Admin')}
             </button>
           </div>
         </form>
       </Modal>
 
+      {/* Modal: Edit Administrator Account */}
+      <Modal isOpen={isEditUserOpen} onClose={() => setIsEditUserOpen(false)} title={t('editAdminAccount', 'Edit Administrator Account')}>
+        <form onSubmit={handleUpdateUser} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
+              {t('phoneNumber', 'Phone Number')} <span className="text-rose-500">*</span>
+            </label>
+            <div className="relative">
+              <input
+                type="tel"
+                value={editUserPhone}
+                onChange={(e) => setEditUserPhone(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono focus:ring-2 focus:ring-emerald-500"
+                required
+              />
+              <Phone className="w-4 h-4 text-slate-400 absolute inset-y-0 left-3 my-auto pointer-events-none" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
+              {t('fullName', 'Full Name')} <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={editUserName}
+              onChange={(e) => setEditUserName(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
+                {t('role', 'Role')}
+              </label>
+              <div className="px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-300 font-semibold flex items-center justify-between">
+                <span>{t('admin', 'Administrator')}</span>
+                <span className="text-[10px] bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300 px-1.5 py-0.5 rounded uppercase font-bold">ADMIN</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
+                {t('status', 'Status')}
+              </label>
+              <select
+                value={editUserStatus}
+                onChange={(e) => setEditUserStatus(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium"
+              >
+                <option value="ACTIVE">{t('active', 'Active')}</option>
+                <option value="SUSPENDED">{t('inactive', 'Suspended')}</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Branch Assignment for Admin: Minimal All Branches Checkbox / Selector */}
+          {editUserRole === 'ADMIN' && (
+            currentAdmin?.branch_id ? (
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl">
+                <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
+                  {t('assignedBranch', 'Assigned Branch')}
+                </label>
+                <div className="text-sm font-medium text-slate-900 dark:text-white">
+                  {selectedUser?.branch_name || (branchesList.find(b => String(b.id) === String(selectedUser?.branch_id))?.branch_name) || `Branch #${currentAdmin.branch_id}`}
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl space-y-2.5">
+                <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300">
+                  {t('branchAssignment', 'Branch Assignment')}
+                </label>
+
+                <label className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={editIsAllBranches}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setEditIsAllBranches(checked);
+                      if (checked) {
+                        setEditUserBranchId('');
+                      } else if (branchesList.length > 0 && !editUserBranchId) {
+                        setEditUserBranchId(String(branchesList[0].id));
+                      }
+                    }}
+                    className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                  />
+                  <span>{t('allBranchesSuperAdmin', 'All Branches')}</span>
+                </label>
+
+                {!editIsAllBranches && (
+                  <div className="pt-1">
+                    <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">
+                      {t('selectSpecificBranch', 'Select Specific Branch')}
+                    </label>
+                    <select
+                      value={editUserBranchId}
+                      onChange={(e) => setEditUserBranchId(e.target.value)}
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500"
+                      required={!editIsAllBranches}
+                    >
+                      <option value="" disabled>{t('selectBranch', '— Select a branch —')}</option>
+                      {branchesList.map(b => (
+                        <option key={b.id} value={b.id}>
+                          {b.branch_name} ({b.branch_code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )
+          )}
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={() => setIsEditUserOpen(false)}
+              className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-300 cursor-pointer"
+            >
+              {t('cancel', 'Cancel')}
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm cursor-pointer disabled:opacity-60"
+            >
+              {submitting ? t('saving', 'Saving...') : t('saveChanges', 'Save Changes')}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: User Details */}
+      <Modal
+        isOpen={isUserDetailsOpen}
+        onClose={() => setIsUserDetailsOpen(false)}
+        maxWidth="max-w-xl"
+        title={userDetailsData?.full_name || selectedUser?.full_name || `User Profile: ${selectedUser?.phone_number || ''}`}
+      >
+        <div className="space-y-3">
+          {loadingUserDetails ? (
+            <div className="py-12 text-center text-slate-400 text-sm flex flex-col items-center gap-2">
+              <RefreshCw className="w-5 h-5 animate-spin text-emerald-500" />
+              <span>{t('loadingDetails', 'Loading profile and records...')}</span>
+            </div>
+          ) : (() => {
+            const account = userDetailsData || selectedUser || {};
+            const isAdmin = String(account.role || '').toUpperCase() === 'ADMIN';
+            // The API returns `devices`; older shapes used `soundboxes`
+            const stores = account.stores || [];
+            const devices = account.devices || account.soundboxes || [];
+            const perms = account.permissions || {};
+            const tabs = Array.isArray(perms.tabs) ? perms.tabs : [];
+            const crud = Array.isArray(perms.crud) ? perms.crud : [];
+            const chip = 'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase';
+            const fmtDate = (v) => (v ? new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
+            const fmtStamp = (v) => (v ? new Date(v).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : t('never', 'Never'));
+
+            return (
+              <>
+                {/* Who this is */}
+                <div className="p-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                        {account.full_name || '—'}
+                      </div>
+                      <div className="font-mono text-xs text-slate-500 dark:text-slate-400">{account.phone_number}</div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className={`${chip} ${isAdmin
+                        ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300'
+                        : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'}`}>
+                        {account.role}
+                      </span>
+                      <span className={`${chip} ${String(account.status).toUpperCase() === 'ACTIVE'
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                        : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'}`}>
+                        {account.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs pt-1 border-t border-slate-200/70 dark:border-slate-700/70">
+                    {isAdmin && (
+                      <div className="flex items-center justify-between gap-2 col-span-2">
+                        <dt className="text-slate-400">{t('branch', 'Branch')}</dt>
+                        <dd className="font-semibold text-slate-800 dark:text-slate-200">
+                          {account.branch_name || t('allBranchesSuperAdmin', 'All Branches')}
+                          {account.branch_code ? <span className="font-normal text-slate-400"> ({account.branch_code})</span> : null}
+                        </dd>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between gap-2">
+                      <dt className="text-slate-400">{t('createdAt', 'Joined')}</dt>
+                      <dd className="font-mono text-slate-600 dark:text-slate-300">{fmtDate(account.created_at)}</dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <dt className="text-slate-400">{t('lastLogin', 'Last login')}</dt>
+                      <dd className="font-mono text-slate-600 dark:text-slate-300">{fmtStamp(account.last_login_at)}</dd>
+                    </div>
+                  </dl>
+                </div>
+
+                {/* An admin is described by what they may do, not by stores they do not own */}
+                {isAdmin ? (
+                  <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-2.5">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span>{t('permissions', 'Permissions')}</span>
+                    </div>
+
+                    <div className="space-y-2 text-xs">
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wider text-slate-400 mb-1">{t('tabsAccess', 'Sections')}</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {tabs.includes('all') ? (
+                            <span className={`${chip} bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300`}>
+                              {t('allSections', 'All sections')}
+                            </span>
+                          ) : tabs.length > 0 ? tabs.map((tab) => (
+                            <span key={tab} className={`${chip} bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300`}>{tab}</span>
+                          )) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wider text-slate-400 mb-1">{t('crudAccess', 'Actions')}</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {crud.includes('all') ? (
+                            <span className={`${chip} bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300`}>
+                              {t('allActions', 'Full access')}
+                            </span>
+                          ) : crud.length > 0 ? crud.map((action) => (
+                            <span key={action} className={`${chip} ${action === 'view_cost'
+                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>{action}</span>
+                          )) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* A merchant is described by their stores and the devices in them */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl text-center">
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400">{t('ownedStores', 'Owned Stores')}</div>
+                        <div className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">{stores.length}</div>
+                      </div>
+                      <div className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl text-center">
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400">{t('soundboxDevices', 'Assigned Soundboxes')}</div>
+                        <div className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">{devices.length}</div>
+                      </div>
+                    </div>
+
+                    {stores.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                          <Store className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{t('storesDirectory', 'Registered Stores')}</span>
+                        </h4>
+                        <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
+                          {stores.map((store) => (
+                            <div key={store.id} className="p-3 bg-white dark:bg-slate-900 flex items-center justify-between gap-2 text-xs">
+                              <div className="min-w-0">
+                                <div className="font-semibold text-slate-900 dark:text-white truncate">{store.name}</div>
+                                <div className="text-slate-400 text-[11px] truncate">{store.location || store.place || t('noLocation', 'No location set')}</div>
+                              </div>
+                              <span className="text-[10px] font-mono text-slate-400 shrink-0">#{store.merchant_id || store.id}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {devices.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                          <Volume2 className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{t('soundboxDevices', 'Assigned Soundbox Devices')}</span>
+                        </h4>
+                        <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
+                          {devices.map((device) => (
+                            <div key={device.id || device.device_sn} className="p-3 bg-white dark:bg-slate-900 flex items-center justify-between gap-2 text-xs">
+                              <div className="min-w-0">
+                                <div className="font-mono font-bold text-slate-900 dark:text-white truncate">{device.device_sn || device.serial_number}</div>
+                                <div className="text-slate-400 text-[11px] truncate">
+                                  {[device.device_type, device.store_name].filter(Boolean).join(' · ') || 'Soundbox'}
+                                </div>
+                              </div>
+                              <span className={`${chip} shrink-0 ${String(device.status).toUpperCase() === 'ACTIVE'
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                                {device.status || '—'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {stores.length === 0 && devices.length === 0 && (
+                      <p className="p-3 text-center text-xs text-slate-400 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+                        {t('noStoresOrDevices', 'No stores or soundboxes under this account yet.')}
+                      </p>
+                    )}
+                  </>
+                )}
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsUserDetailsOpen(false);
+                        openEditUserModal(userDetailsData || selectedUser);
+                      }}
+                      className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 text-xs font-semibold rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      <span>{t('editAdminAccount', 'Edit Administrator Account')}</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setIsUserDetailsOpen(false)}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
+                  >
+                    {t('close', 'Close')}
+                  </button>
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      </Modal>
 
 
       {/* Modal: Reset Password */}
@@ -5285,37 +5152,37 @@ export default function AdminDashboard() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">{t('deviceType', 'Device Type')}</label>
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">
+                {t('stockProduct', 'Product')}
+              </label>
               <select
-                value={editDeviceType}
+                value={editProductId}
                 onChange={(e) => {
-                  setEditDeviceType(e.target.value);
-                  if (e.target.value === 'Display Soundbox') setEditDevicePrice('39.00');
-                  else setEditDevicePrice('29.00');
+                  setEditProductId(e.target.value);
+                  const picked = productsList.find(p => String(p.id) === e.target.value);
+                  if (picked?.base_price != null) setEditDevicePrice(Number(picked.base_price).toFixed(2));
                 }}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
               >
-                <option value="Display Soundbox">{t('displaySoundboxOpt', 'Display Soundbox (Screen QR)')}</option>
-                <option value="Standard Soundbox">{t('standardSoundboxOpt', 'Standard Soundbox (Printed QR)')}</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">{t('supplier', 'Supplier')}</label>
-              <select
-                value={editSupplier}
-                onChange={(e) => setEditSupplier(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium"
-              >
-                {suppliersList.map((s) => (
-                  <option key={s.id} value={s.name}>
-                    {s.name}
+                <option value="">{isKhmer ? '-- មិនបានកំណត់ --' : '-- Not set --'}</option>
+                {productsList.map((p) => (
+                  <option key={p.id} value={String(p.id)}>
+                    {p.product_name}{p.sku ? ` (${p.sku})` : ''}
                   </option>
                 ))}
               </select>
+              {/* The supplier and model belong to the product, so they are shown, not edited */}
+              <p className="mt-1 text-[11px] text-slate-400">
+                {(() => {
+                  const picked = productsList.find(p => String(p.id) === editProductId);
+                  if (!picked) return isKhmer ? 'ជ្រើសរើសផលិតផលដើម្បីកំណត់អ្នកផ្គត់ផ្គង់ និងម៉ូដែល' : 'Pick a product to set the supplier and model.';
+                  return [picked.device_model, picked.supplier_name].filter(Boolean).join(' · ') || '—';
+                })()}
+              </p>
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">{t('originalPrice', 'Unit Price ($)')}</label>
+              <label className="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">{t('basePrice', 'Base Price')}</label>
               <input
                 type="number"
                 step="0.01"
@@ -5402,7 +5269,9 @@ export default function AdminDashboard() {
 
               {editDiscountType === 'AMOUNT' && (
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('discountAmount', 'Discount Amount ($)')}:</label>
+                  <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                    {t('discountAmount', 'Discount Amount ($)')}{sellTotals.count > 1 ? ` ${isKhmer ? 'ក្នុងមួយឯកតា' : 'per unit'}` : ''}:
+                  </label>
                   <input
                     type="number"
                     min="0"
@@ -6062,318 +5931,237 @@ export default function AdminDashboard() {
           const wInfo = calculateWarrantyCountdown(selectedDeviceDetail);
 
           return (
-            <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
-              
-              {/* Header Hero */}
-              <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300 flex items-center justify-center font-bold">
-                    <Volume2 className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <div className="font-bold text-slate-900 dark:text-white text-base font-mono">
+            <div className="space-y-3">
+
+              {/* What this device is */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="w-11 h-11 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300 flex items-center justify-center shrink-0">
+                    <Volume2 className="w-5 h-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="font-bold text-slate-900 dark:text-white text-sm font-mono truncate">
                       {selectedDeviceDetail.device_id || selectedDeviceDetail.device_sn}
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      <span>
-                        {selectedDeviceDetail.device_type === 'Display Soundbox' || String(selectedDeviceDetail.device_model || '').includes('Display')
-                          ? 'Display Soundbox (Screen QR)' 
-                          : 'Standard Soundbox (Printed QR)'}
-                      </span>
-                      <span>•</span>
-                      <span className="font-semibold text-slate-700 dark:text-slate-300">
-                        {t('supplier', 'Supplier')}: {(selectedDeviceDetail.supplier || 'Feishu').toLowerCase() === 'hemi' ? 'Hemi' : 'Feishu'}
-                      </span>
+                    <div className="text-xs text-slate-600 dark:text-slate-300 truncate">
+                      {selectedDeviceDetail.device_type || '-'}
                     </div>
-                  </div>
-                </div>
-
-                {!visibleColumns.status && (
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${
-                    String(selectedDeviceDetail.status).toUpperCase() === 'PENDING'
-                      ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
-                      : String(selectedDeviceDetail.status || '').toLowerCase() === 'online' || String(selectedDeviceDetail.status || '').toUpperCase() === 'ACTIVE'
-                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                      : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
-                  }`}>
-                    {String(selectedDeviceDetail.status).toUpperCase() === 'PENDING'
-                      ? (isKhmer ? 'រង់ចាំការចុះឈ្មោះ' : 'Waiting for Registration')
-                      : selectedDeviceDetail.status || 'Offline'}
-                  </span>
-                )}
-              </div>
-
-              {/* 1. Merchant & Store Assignment Card (Key User Request) */}
-              <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                    <span>{t('merchantAndStoreInfo', 'Merchant & Store Assignment')}</span>
-                  </div>
-                  {displayPhone !== '—' && (
-                    <a
-                      href={`tel:${displayPhone}`}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 text-xs font-semibold hover:bg-emerald-100 transition cursor-pointer"
-                    >
-                      <PhoneCall className="w-3 h-3" />
-                      <span>{t('callMerchant', 'Call')}</span>
-                    </a>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  {/* Merchant Name */}
-                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
-                    <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
-                      <User className="w-3 h-3 text-slate-400" />
-                      <span>{t('merchantName', 'Merchant / Owner Name')}</span>
-                    </div>
-                    <div className="font-bold text-slate-900 dark:text-white text-sm mt-1">
-                      {displayMerchantName}
-                    </div>
-                  </div>
-
-                  {/* Phone Number */}
-                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
-                    <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center justify-between">
-                      <span className="flex items-center gap-1">
-                        <Phone className="w-3 h-3 text-slate-400" />
-                        <span>{t('merchantPhone', 'Merchant Phone Number')}</span>
-                      </span>
-                      {displayPhone !== '—' && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(displayPhone);
-                            showToast({ type: 'success', title: 'Copied', message: t('copySuccess', 'Phone number copied to clipboard!') });
-                          }}
-                          title="Copy phone"
-                          className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
-                        >
-                          <Copy className="w-3 h-3" />
-                        </button>
+                    <div className="text-[11px] text-slate-400 dark:text-slate-500 flex flex-wrap items-center gap-x-1.5">
+                      <span className="font-mono">{selectedDeviceDetail.device_model || '—'}</span>
+                      <span>·</span>
+                      <span>{hasScreen(selectedDeviceDetail.device_type, selectedDeviceDetail.device_model) ? 'Screen QR' : 'Printed QR'}</span>
+                      {selectedDeviceDetail.supplier && (
+                        <>
+                          <span>·</span>
+                          <span>{selectedDeviceDetail.supplier}</span>
+                        </>
                       )}
                     </div>
-                    <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-sm mt-1">
-                      {displayPhone}
-                    </div>
-                  </div>
-
-                  {/* Store Name (Hidden if already shown in table) */}
-                  {!visibleColumns.merchantId && (
-                    <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
-                      <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
-                        <Store className="w-3 h-3 text-slate-400" />
-                        <span>{t('assignedStoreBranch', 'Assigned Store Branch')}</span>
-                      </div>
-                      <div className="font-bold text-slate-900 dark:text-white mt-1 truncate">
-                        {displayStoreName}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Telegram Chat ID */}
-                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
-                    <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
-                      <Send className="w-3 h-3 text-slate-400" />
-                      <span>{t('telegramBinding', 'Telegram Bot Notification')}</span>
-                    </div>
-                    <div className="font-mono font-semibold text-slate-800 dark:text-slate-200 mt-1 truncate">
-                      {selectedDeviceDetail.telegram_chat_id || (isKhmer ? 'មិនទាន់ភ្ជាប់' : 'Not linked')}
-                    </div>
-                  </div>
-
-                  {/* Payment QR Code on LCD Screen */}
-                  {selectedDeviceDetail.qr_code && (
-                    <div className="col-span-full p-2.5 bg-emerald-50/60 dark:bg-emerald-950/30 rounded-xl border border-emerald-200/80 dark:border-emerald-800/60">
-                      <div className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase font-semibold flex items-center gap-1">
-                        <QrCode className="w-3 h-3 text-emerald-500" />
-                        <span>{t('paymentQrCode', 'LCD Screen Payment QR')}</span>
-                      </div>
-                      <div className="font-mono font-semibold text-emerald-900 dark:text-emerald-200 mt-1 truncate text-xs">
-                        {selectedDeviceDetail.qr_code}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Location Address */}
-                <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60 text-xs">
-                  <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-rose-500" />
-                    <span>{t('storeAddressHierarchy', 'Location & Address')}</span>
-                  </div>
-                  <div className="font-medium text-slate-800 dark:text-slate-200 mt-1">
-                    {fullAddress}
                   </div>
                 </div>
+
+                <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap shrink-0 ${
+                  String(selectedDeviceDetail.status).toUpperCase() === 'PENDING'
+                    ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
+                    : String(selectedDeviceDetail.status || '').toUpperCase() === 'IN_STOCK'
+                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                    : String(selectedDeviceDetail.status || '').toUpperCase() === 'ACTIVE'
+                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                    : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                }`}>
+                  {String(selectedDeviceDetail.status).toUpperCase() === 'PENDING'
+                    ? (isKhmer ? 'រង់ចាំការចុះឈ្មោះ' : 'Waiting for Registration')
+                    : String(selectedDeviceDetail.status || '').toUpperCase() === 'IN_STOCK'
+                    ? t('inStock', 'In Stock')
+                    : selectedDeviceDetail.status || 'Offline'}
+                </span>
               </div>
 
-              {/* 2. Commercial & Pricing Card */}
-              {(!visibleColumns.price || selectedDeviceDetail.notes) && (
-                <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+                {/* Who holds it */}
+                <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2.5">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>{t('merchantAndStoreInfo', 'Merchant & Store')}</span>
+                  </div>
+
+                  {displayMerchantName === '—' && !selectedDeviceDetail.store_name ? (
+                    <p className="text-xs text-slate-400 dark:text-slate-500 py-1">
+                      {String(selectedDeviceDetail.status).toUpperCase() === 'PENDING'
+                        ? t('awaitingStoreLink', 'Awaiting Store Link')
+                        : t('warehouseStock', 'Warehouse Stock')}
+                    </p>
+                  ) : (
+                    <dl className="space-y-2 text-xs">
+                      <div className="flex items-start justify-between gap-2">
+                        <dt className="text-slate-400">{t('assignedStoreBranch', 'Store')}</dt>
+                        <dd className="font-semibold text-slate-900 dark:text-white text-right truncate max-w-[60%]">{displayStoreName}</dd>
+                      </div>
+                      <div className="flex items-start justify-between gap-2">
+                        <dt className="text-slate-400">{t('merchantName', 'Merchant')}</dt>
+                        <dd className="text-slate-700 dark:text-slate-200 text-right truncate max-w-[60%]">{displayMerchantName}</dd>
+                      </div>
+                      <div className="flex items-start justify-between gap-2">
+                        <dt className="text-slate-400">{t('merchantPhone', 'Phone')}</dt>
+                        <dd className="flex items-center gap-1.5 justify-end">
+                          <span className="font-mono text-slate-700 dark:text-slate-200">{displayPhone}</span>
+                          {displayPhone !== '—' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(displayPhone);
+                                showToast({ type: 'success', title: 'Copied', message: t('copySuccess', 'Phone number copied to clipboard!') });
+                              }}
+                              title="Copy phone"
+                              className="text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </button>
+                          )}
+                        </dd>
+                      </div>
+                      <div className="flex items-start justify-between gap-2">
+                        <dt className="text-slate-400">{t('telegramBinding', 'Telegram')}</dt>
+                        <dd className="font-mono text-slate-700 dark:text-slate-200 text-right truncate max-w-[60%]">
+                          {selectedDeviceDetail.telegram_chat_id || (isKhmer ? 'មិនទាន់ភ្ជាប់' : 'Not linked')}
+                        </dd>
+                      </div>
+                      {fullAddress !== '—' && (
+                        <div className="flex items-start justify-between gap-2">
+                          <dt className="text-slate-400 flex items-center gap-1"><MapPin className="w-3 h-3 text-rose-500" />{t('storeAddressHierarchy', 'Address')}</dt>
+                          <dd className="text-slate-700 dark:text-slate-200 text-right max-w-[60%]">{fullAddress}</dd>
+                        </div>
+                      )}
+                      {selectedDeviceDetail.qr_code && (
+                        <div className="flex items-start justify-between gap-2">
+                          <dt className="text-slate-400 flex items-center gap-1"><QrCode className="w-3 h-3 text-emerald-500" />{t('paymentQrCode', 'Payment QR')}</dt>
+                          <dd className="font-mono text-emerald-700 dark:text-emerald-300 text-right truncate max-w-[60%]">{selectedDeviceDetail.qr_code}</dd>
+                        </div>
+                      )}
+                    </dl>
+                  )}
+                </div>
+
+                {/* What it sold for, and how long it is covered */}
+                <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2.5">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                     <DollarSign className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                    <span>{t('commercialSalesInfo', 'Commercial & Sales Details')}</span>
+                    <span>{t('salesAndWarranty', 'Sales & Warranty')}</span>
                   </div>
 
-                  {!visibleColumns.price && (
-                    <div className="grid grid-cols-3 gap-2.5 text-xs text-center">
-                      <div className="p-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
-                        <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('originalPrice', 'Price')}</span>
-                        <div className="font-mono font-bold text-slate-800 dark:text-slate-200 mt-0.5">
-                          ${Number(selectedDeviceDetail.price || 29).toFixed(2)}
+                  {(() => {
+                    // base = selling price, charged = what the customer paid, cost = supplier price
+                    const base = Number(selectedDeviceDetail.price) || 0;
+                    const charged = selectedDeviceDetail.final_price != null ? Number(selectedDeviceDetail.final_price) : base;
+                    const saved = base > charged ? base - charged : 0;
+                    return (
+                      <div className="space-y-2.5">
+                        {/* The money, read left to right: asking price, discount, what was paid */}
+                        <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                          <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+                            <span className="block text-[10px] uppercase tracking-wider text-slate-400">{t('priceBase', 'Base')}</span>
+                            <span className="block font-mono text-xs text-slate-700 dark:text-slate-200 mt-0.5">${base.toFixed(2)}</span>
+                          </div>
+                          <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+                            <span className="block text-[10px] uppercase tracking-wider text-slate-400">{t('priceDiscount', 'Discount')}</span>
+                            <span className={`block font-mono text-xs mt-0.5 ${saved > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                              {saved > 0 ? `-$${saved.toFixed(2)}` : '—'}
+                            </span>
+                          </div>
+                          <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
+                            <span className="block text-[10px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400">{t('priceCharged', 'Charged')}</span>
+                            <span className="block font-mono font-bold text-xs text-emerald-700 dark:text-emerald-300 mt-0.5">${charged.toFixed(2)}</span>
+                          </div>
                         </div>
+
+                        <dl className="space-y-2 text-xs">
+                          <div className="flex items-center justify-between gap-2">
+                            <dt className="text-slate-400 whitespace-nowrap">{t('warrantyPeriod', 'Warranty')}</dt>
+                            <dd className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-right min-w-0">
+                              {wInfo.status === 'NO_WARRANTY' ? (
+                                <span className="text-slate-400">—</span>
+                              ) : (
+                                <>
+                                  {wInfo.endDate && (
+                                    <span className="font-mono text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                      {wInfo.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    </span>
+                                  )}
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${
+                                    wInfo.status === 'EXPIRED'
+                                      ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
+                                      : wInfo.status === 'EXPIRING_SOON'
+                                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                                      : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                                  }`}>
+                                    {wInfo.text}
+                                  </span>
+                                </>
+                              )}
+                            </dd>
+                          </div>
+                        </dl>
                       </div>
-
-                      <div className="p-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
-                        <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('discount', 'Discount')}</span>
-                        <div className="font-mono font-bold text-amber-600 dark:text-amber-400 mt-0.5">
-                          {Number(selectedDeviceDetail.discount_percent) > 0 
-                            ? `${selectedDeviceDetail.discount_percent}%` 
-                            : Number(selectedDeviceDetail.discount_amount) > 0 
-                            ? `$${Number(selectedDeviceDetail.discount_amount).toFixed(2)}` 
-                            : '0%'}
-                        </div>
-                      </div>
-
-                      <div className="p-2 bg-emerald-50/70 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800">
-                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase font-bold">{t('finalPrice', 'Final Price')}</span>
-                        <div className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-sm mt-0.5">
-                          ${Number(selectedDeviceDetail.final_price || selectedDeviceDetail.price || 29).toFixed(2)}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedDeviceDetail.notes && (
-                    <div className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg text-slate-600 dark:text-slate-400 text-xs">
-                      <span className="text-[10px] uppercase font-semibold text-slate-400 block">{t('warehouseNotes', 'Warehouse / Notes')}</span>
-                      <span className="text-slate-800 dark:text-slate-200">{selectedDeviceDetail.notes}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* 3. Warranty 90-Day Live Countdown Card (Hidden if warranty on table) */}
-              {!visibleColumns.warranty && wInfo.status !== 'NO_WARRANTY' && (
-                <div className="p-4 bg-gradient-to-br from-emerald-50/70 to-teal-50/50 dark:from-emerald-950/40 dark:to-slate-900/60 rounded-2xl border border-emerald-100 dark:border-emerald-900/50 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                      <div>
-                        <div className="text-xs font-bold text-slate-900 dark:text-white">
-                          {t('warrantyPeriod', '90-Day Warranty Protection')}
-                        </div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                          {selectedDeviceDetail.warranty_days || 90} {t('daysRemaining', 'Days Standard Coverage')}
-                        </div>
-                      </div>
-                    </div>
-
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      wInfo.status === 'EXPIRED'
-                        ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                        : wInfo.status === 'EXPIRING_SOON'
-                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                    }`}>
-                      {wInfo.text}
-                    </span>
-                  </div>
-
-                  {/* Visual Progress bar */}
-                  <div className="space-y-1">
-                    <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full transition-all duration-500 ${
-                          wInfo.status === 'EXPIRED'
-                            ? 'bg-rose-500'
-                            : wInfo.status === 'EXPIRING_SOON'
-                            ? 'bg-amber-500'
-                            : 'bg-emerald-500'
-                        }`}
-                        style={{ width: `${wInfo.progress}%` }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between text-[10px] font-mono text-slate-400">
-                      <span>{t('warrantyStart', 'Start')}: {wInfo.startDate ? wInfo.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
-                      <span>{t('warrantyEnd', 'Expires')}: {wInfo.endDate ? wInfo.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 4. Hardware Telemetry & Firmware Grid (Hidden if all telemetry on table) */}
-              {(!visibleColumns.battery || !visibleColumns.signal || !visibleColumns.version4g || !visibleColumns.versionWifi) && (
-                <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2.5">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2">
-                    <Smartphone className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                    <span>{t('hardwareTelemetryTitle', 'Hardware & Telemetry Status')}</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-                    {!visibleColumns.battery && (
-                      <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
-                        <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('battery', 'Battery')}</span>
-                        <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mt-0.5">
-                          <Battery className="w-4 h-4 text-emerald-500" />
-                          {selectedDeviceDetail.battery || '100%'}
-                        </div>
-                      </div>
-                    )}
-
-                    {!visibleColumns.signal && (
-                      <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
-                        <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('signal', 'Signal Quality')}</span>
-                        <div className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1.5 mt-0.5">
-                          <Signal className="w-4 h-4" />
-                          {selectedDeviceDetail.signal || 'Good'}
-                        </div>
-                      </div>
-                    )}
-
-                    {!visibleColumns.version4g && (
-                      <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
-                        <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('version4G', '4G Firmware')}</span>
-                        <div className="font-mono text-slate-700 dark:text-slate-300 font-bold mt-0.5 truncate" title={selectedDeviceDetail.version_4g}>
-                          {selectedDeviceDetail.version_4g || 'Y6_STD_1605_V1.0'}
-                        </div>
-                      </div>
-                    )}
-
-                    {!visibleColumns.versionWifi && (
-                      <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
-                        <span className="text-[10px] text-slate-400 uppercase font-semibold">{t('versionWifi', 'WiFi Firmware')}</span>
-                        <div className="font-mono text-slate-700 dark:text-slate-300 font-bold mt-0.5 truncate" title={selectedDeviceDetail.version_wifi}>
-                          {selectedDeviceDetail.version_wifi || 'esp32c2x_2M_OTA'}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* 5. Timestamps */}
-              <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/60 text-xs space-y-1.5">
-                {!visibleColumns.lastTime && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Last Telemetry Heartbeat:</span>
-                    <span className="font-mono text-slate-700 dark:text-slate-300">
-                      {selectedDeviceDetail.last_time || (selectedDeviceDetail.last_heartbeat ? new Date(selectedDeviceDetail.last_heartbeat).toLocaleString() : '—')}
-                    </span>
-                  </div>
-                )}
-                <div className={`flex justify-between ${!visibleColumns.lastTime ? 'border-t border-slate-200/60 dark:border-slate-700/60 pt-1.5' : ''}`}>
-                  <span className="text-slate-400">Created / Registered At:</span>
-                  <span className="font-mono text-slate-700 dark:text-slate-300">
-                    {selectedDeviceDetail.created_at ? new Date(selectedDeviceDetail.created_at).toLocaleString() : '—'}
-                  </span>
+                    );
+                  })()}
                 </div>
               </div>
 
-              {/* Close Button */}
-              <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
+              {/* How the hardware is doing */}
+              <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2.5">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <Smartphone className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>{t('hardwareTelemetryTitle', 'Hardware & Telemetry')}</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-slate-400">{t('battery', 'Battery')}</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                      <Battery className="w-3.5 h-3.5 text-emerald-500" />{selectedDeviceDetail.battery || '—'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-slate-400">{t('signal', 'Signal')}</span>
+                    <span className="font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                      <Signal className="w-3.5 h-3.5" />{selectedDeviceDetail.signal || '—'}
+                    </span>
+                  </div>
+                  <div className="flex items-start justify-between gap-2 col-span-2 sm:col-span-1">
+                    <span className="text-slate-400 shrink-0">{t('version4G', '4G')}</span>
+                    <span className="font-mono text-slate-700 dark:text-slate-300 text-right break-all">
+                      {selectedDeviceDetail.version_4g || '—'}
+                    </span>
+                  </div>
+                  <div className="flex items-start justify-between gap-2 col-span-2 sm:col-span-1">
+                    <span className="text-slate-400 shrink-0">{t('versionWifi', 'WiFi')}</span>
+                    <span className="font-mono text-slate-700 dark:text-slate-300 text-right break-all">
+                      {selectedDeviceDetail.version_wifi || '—'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-slate-400 whitespace-nowrap">{t('lastTime', 'Last heartbeat')}</span>
+                    <span className="font-mono text-slate-600 dark:text-slate-300">
+                      {selectedDeviceDetail.last_heartbeat || selectedDeviceDetail.last_time
+                        ? new Date(selectedDeviceDetail.last_heartbeat || selectedDeviceDetail.last_time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        : '—'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-slate-400 whitespace-nowrap">{t('createdAt', 'Registered')}</span>
+                    <span className="font-mono text-slate-600 dark:text-slate-300">
+                      {selectedDeviceDetail.created_at
+                        ? new Date(selectedDeviceDetail.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        : '—'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-1">
                 <button
                   type="button"
                   onClick={() => setIsDeviceDetailOpen(false)}
@@ -6532,7 +6320,7 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-2 gap-2.5">
             {Object.entries({
               deviceId: t('deviceId', 'Device SN'),
-              deviceType: t('deviceType', 'Device Type'),
+              deviceType: t('stockProduct', 'Product'),
               supplier: t('supplier', 'Supplier'),
               merchantId: t('merchantStore', 'Assigned Store'),
               status: t('status', 'Status'),
@@ -6593,69 +6381,6 @@ export default function AdminDashboard() {
         </div>
       </Modal>
 
-      {/* Modal: Warehouse Stock - Columns Customizer */}
-      <Modal
-        isOpen={isStockColumnsModalOpen}
-        onClose={() => setIsStockColumnsModalOpen(false)}
-        title="Customize Stock Table Columns"
-      >
-        <div className="space-y-4">
-          <p className="text-xs text-slate-500">
-            Select the columns you wish to display in the Warehouse Stock table:
-          </p>
-
-          <div className="grid grid-cols-2 gap-2.5">
-            {Object.entries({
-              deviceId: 'Device SN',
-              deviceType: 'Device Type',
-              supplier: 'Supplier',
-              price: 'Unit Price ($)',
-              intakeDate: 'Registration Date',
-              notes: 'Warehouse Notes',
-              operation: 'Operations'
-            }).map(([key, label]) => (
-              <label 
-                key={key} 
-                className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-xs cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={visibleStockColumns[key]}
-                  onChange={(e) => setVisibleStockColumns(prev => ({ ...prev, [key]: e.target.checked }))}
-                  className="accent-amber-600 rounded"
-                />
-                <span className="font-medium text-slate-800 dark:text-slate-200">{label}</span>
-              </label>
-            ))}
-          </div>
-
-          <div className="flex justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
-            <button
-              type="button"
-              onClick={() => setVisibleStockColumns({
-                deviceId: true,
-                deviceType: true,
-                supplier: true,
-                price: true,
-                intakeDate: true,
-                notes: true,
-                operation: true
-              })}
-              className="text-xs text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
-            >
-              Reset to Default
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsStockColumnsModalOpen(false)}
-              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-xl shadow-xs transition cursor-pointer"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      </Modal>
-
       {/* Modal: Warehouse Stock Intake */}
       <Modal
         isOpen={isStockModalOpen}
@@ -6668,9 +6393,138 @@ export default function AdminDashboard() {
         title={isKhmer ? "បន្ថែមឧបករណ៍ទៅក្នុងស្តុកឃ្លាំង" : "Add Soundbox Device to Stock"}
       >
         <div className="space-y-4">
-          {/* Live Camera Scanner Banner for SN */}
-          {isStockSnScanning && (
-            <FieldQRScanner 
+          {/* Mode Switcher: Single Unit vs Bulk Batch */}
+          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setStockModalTab('SINGLE')}
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${
+                stockModalTab === 'SINGLE'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
+              }`}
+            >
+              {isKhmer ? 'ស្កេនម្តងមួយ (Single)' : 'Single Unit (Scan / Input)'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setStockModalTab('BULK')}
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${
+                stockModalTab === 'BULK'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
+              }`}
+            >
+              {isKhmer ? 'បញ្ចូលជាបាច់ (Bulk)' : 'Bulk Batch Import'}
+            </button>
+          </div>
+
+          {/* Step 1-3: supplier, then its products, then the destination branch */}
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <span className="text-slate-400 font-mono mr-1">1.</span>
+                  {t('supplier', 'Supplier')} <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={intakeSupplierId}
+                  onChange={(e) => setIntakeSupplierId(e.target.value)}
+                  disabled={intakeSupplierOptions.length === 0}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-amber-500 disabled:opacity-60"
+                >
+                  <option value="">{isKhmer ? '-- ជ្រើសរើសអ្នកផ្គត់ផ្គង់ --' : '-- Select Supplier --'}</option>
+                  {intakeSupplierOptions.map(sup => (
+                    <option key={sup.id} value={sup.id}>{sup.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <span className="text-slate-400 font-mono mr-1">2.</span>
+                  {t('productName', 'Product Name')} <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={intakeProductId}
+                  onChange={(e) => setIntakeProductId(e.target.value)}
+                  disabled={!intakeSupplierId || intakeProductOptions.length === 0}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-amber-500 disabled:opacity-60"
+                >
+                  {!intakeSupplierId ? (
+                    <option value="">{isKhmer ? 'ជ្រើសរើសអ្នកផ្គត់ផ្គង់ជាមុនសិន' : 'Select a supplier first'}</option>
+                  ) : intakeProductOptions.length === 0 ? (
+                    <option value="">{isKhmer ? 'គ្មានផលិតផល' : 'No products for this supplier'}</option>
+                  ) : (
+                    intakeProductOptions.map(p => (
+                      <option key={p.id} value={String(p.id)}>
+                        {p.product_name}{p.sku ? ` (${p.sku})` : ''}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <span className="text-slate-400 font-mono mr-1">3.</span>
+                {t('branchName', 'Branch Name')} <span className="text-rose-500">*</span>
+              </label>
+              {currentAdmin?.branch_id ? (
+                <div className="px-3 py-2 text-xs bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 font-semibold flex items-center justify-between">
+                  <span>{currentAdmin.branch_name || `Branch #${currentAdmin.branch_id}`}</span>
+                  <span className="text-[10px] font-normal text-slate-400">(Your Branch)</span>
+                </div>
+              ) : (
+                <select
+                  value={intakeBranchId}
+                  onChange={(e) => setIntakeBranchId(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="">{isKhmer ? '-- ជ្រើសរើសសាខា --' : '-- Select Branch --'}</option>
+                  {branchesList.map(b => (
+                    <option key={b.id} value={String(b.id)}>
+                      {b.branch_name} ({b.branch_code})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <span className="text-slate-400 font-mono mr-1">4.</span>
+                {t('basePrice', 'Base Price')}
+                <span className="font-normal text-slate-400"> ({isKhmer ? 'តម្លៃលក់ក្នុងមួយឯកតា' : 'selling price per unit'})</span>
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-3 flex items-center text-xs text-slate-400 pointer-events-none">$</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={intakeBasePrice}
+                  onChange={(e) => setIntakeBasePrice(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full pl-6 pr-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+              </div>
+              {intakeProduct && (
+                <p className="mt-1 text-[11px] text-slate-400">
+                  {isKhmer ? 'តម្លៃដើមពីអ្នកផ្គត់ផ្គង់' : 'Purchase price from supplier'}:{' '}
+                  <span className="font-mono">
+                    {intakeProduct.purchase_price != null ? `$${Number(intakeProduct.purchase_price).toFixed(2)}` : '—'}
+                  </span>
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Live Camera Scanner Banner for SN (Single Mode Only) */}
+          {stockModalTab === 'SINGLE' && isStockSnScanning && (
+            <FieldQRScanner
               targetName={isKhmer ? 'លេខស៊េរីឧបករណ៍ (SN)' : 'Device Serial Number (SN)'}
               onScanSuccess={(decodedText) => {
                 const text = decodedText.trim();
@@ -6687,118 +6541,104 @@ export default function AdminDashboard() {
             />
           )}
 
-          <form onSubmit={handleSingleIntakeStock} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                {isKhmer ? 'លេខស៊េរីឧបករណ៍ (SN)' : 'Soundbox Serial Number (SN)'} <span className="text-rose-500">*</span>
-              </label>
+          <form onSubmit={handleIntakeStock} className="space-y-4">
+            {stockModalTab === 'SINGLE' ? (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <span className="text-slate-400 font-mono mr-1">5.</span>
+                  {isKhmer ? 'លេខស៊េរីឧបករណ៍ (SN)' : 'Soundbox Serial Number (SN)'} <span className="text-rose-500">*</span>
+                </label>
 
-              <div className="relative">
-                <input
-                  type="text"
-                  value={singleSnInput}
-                  onChange={(e) => setSingleSnInput(e.target.value)}
-                  placeholder={isKhmer ? 'ឧទាហរណ៍៖ 6152608110099' : 'e.g. 6152608110099'}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={singleSnInput}
+                    onChange={(e) => setSingleSnInput(e.target.value)}
+                    placeholder={isKhmer ? 'ឧទាហរណ៍៖ 6152608110099' : 'e.g. 6152608110099'}
+                    required
+                    className="w-full pl-3 pr-10 py-2.5 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsStockSnScanning(!isStockSnScanning)}
+                    className={`absolute inset-y-0 right-0 pr-3 flex items-center transition cursor-pointer ${
+                      isStockSnScanning ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400'
+                    }`}
+                    title={isKhmer ? 'ស្កេន QR / Barcode ដោយកាមេរ៉ា' : 'Scan QR / Barcode with Camera'}
+                  >
+                    <QrCode className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="mt-1.5 flex items-center justify-between text-xs">
+                  <span className="text-[11px] text-slate-400">
+                    {isKhmer ? 'ស្កេនស្ទីកឃ័រ QR/Barcode ឬវាយបញ្ចូលដោយដៃ' : 'Scan QR/Barcode sticker or enter manually'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => stockFileInputRef.current?.click()}
+                    className="text-amber-600 hover:text-amber-700 dark:text-amber-400 font-medium flex items-center gap-1 transition cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{isKhmer ? 'ផ្ទុកឡើងរូបភាព QR' : 'Upload QR Image'}</span>
+                  </button>
+                  <input
+                    type="file"
+                    ref={stockFileInputRef}
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleUploadStockSnImage}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    <span className="text-slate-400 font-mono mr-1">5.</span>
+                    {isKhmer ? 'បញ្ជីលេខស៊េរី (SN) មួយជួរម្តង' : 'Serial Numbers (One per line or comma-separated)'} <span className="text-rose-500">*</span>
+                  </label>
+                  <span className="text-[11px] font-mono font-bold text-amber-600 dark:text-amber-400">
+                    {intakeSerials.length} Serials
+                  </span>
+                </div>
+                {intakeDuplicateCount > 0 && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 mb-1">
+                    {isKhmer
+                      ? `បានដកលេខស៊េរីស្ទួនចំនួន ${intakeDuplicateCount} ចេញ`
+                      : `${intakeDuplicateCount} duplicate serial(s) will be ignored.`}
+                  </p>
+                )}
+                <textarea
+                  rows={4}
+                  value={bulkSnInput}
+                  onChange={(e) => setBulkSnInput(e.target.value)}
+                  placeholder={'6152608110001\n6152608110002\n6152608110003'}
                   required
-                  className="w-full pl-3 pr-10 py-2.5 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  className="w-full p-3 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500"
                 />
-                <button
-                  type="button"
-                  onClick={() => setIsStockSnScanning(!isStockSnScanning)}
-                  className={`absolute inset-y-0 right-0 pr-3 flex items-center transition cursor-pointer ${
-                    isStockSnScanning ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400'
-                  }`}
-                  title={isKhmer ? 'ស្កេន QR / Barcode ដោយកាមេរ៉ា' : 'Scan QR / Barcode with Camera'}
-                >
-                  <QrCode className="w-5 h-5" />
-                </button>
               </div>
+            )}
 
-              <div className="mt-1.5 flex items-center justify-between text-xs">
-                <span className="text-[11px] text-slate-400">
-                  {isKhmer ? 'ស្កេនស្ទីកឃ័រ QR/Barcode ឬវាយបញ្ចូលដោយដៃ' : 'Scan QR/Barcode sticker or enter manually'}
+            {/* Intake Summary */}
+            <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-900/60 text-xs">
+              <div className="col-span-2 font-semibold text-slate-800 dark:text-slate-100 truncate">
+                {intakeProduct?.product_name || '-'}
+                <span className="font-normal text-slate-500 dark:text-slate-400">
+                  {' · '}{currentAdmin?.branch_id ? (currentAdmin.branch_name || `Branch #${currentAdmin.branch_id}`) : (intakeTargetBranch?.branch_name || (isKhmer ? 'មិនទាន់ជ្រើសសាខា' : 'No branch selected'))}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => stockFileInputRef.current?.click()}
-                  className="text-amber-600 hover:text-amber-700 dark:text-amber-400 font-medium flex items-center gap-1 transition cursor-pointer"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>{isKhmer ? 'ផ្ទុកឡើងរូបភាព QR' : 'Upload QR Image'}</span>
-                </button>
-                <input
-                  type="file"
-                  ref={stockFileInputRef}
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleUploadStockSnImage}
-                />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase tracking-wider block">{isKhmer ? 'កំពុងបន្ថែម' : 'Adding'}</span>
+                <span className="font-mono font-bold text-sm text-amber-700 dark:text-amber-300">+{intakeSerials.length}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase tracking-wider block">{t('availableQuantity', 'Available Quantity')}</span>
+                <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">
+                  {intakeCurrentQty === null ? '-' : `${intakeCurrentQty} → ${intakeCurrentQty + intakeSerials.length}`}
+                </span>
               </div>
             </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                {isKhmer ? 'ប្រភេទ Soundbox' : 'Device Type'} <span className="text-rose-500">*</span>
-              </label>
-              <select
-                value={singleType}
-                onChange={(e) => {
-                  setSingleType(e.target.value);
-                  if (e.target.value === 'Display Soundbox') setSinglePrice('39.00');
-                  else setSinglePrice('29.00');
-                }}
-                className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
-              >
-                <option value="Display Soundbox">Display Soundbox (Screen QR)</option>
-                <option value="Standard Soundbox">Standard Soundbox (Printed QR)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                {isKhmer ? 'អ្នកផ្គត់ផ្គង់ (Supplier)' : 'Supplier'} <span className="text-rose-500">*</span>
-              </label>
-              <select
-                value={singleSupplier}
-                onChange={(e) => setSingleSupplier(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer font-medium"
-              >
-                {suppliersList.map((s) => (
-                  <option key={s.id} value={s.name}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                {isKhmer ? 'តម្លៃឯកតា ($ USD)' : 'Unit Price ($ USD)'}
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={singlePrice}
-                onChange={(e) => setSinglePrice(e.target.value)}
-                placeholder="39.00"
-                className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Warehouse Notes (Optional)
-            </label>
-            <input
-              type="text"
-              value={singleNotes}
-              onChange={(e) => setSingleNotes(e.target.value)}
-              placeholder="e.g. Warehouse Shelf A-01, sample unit"
-              className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
-            />
-          </div>
 
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
             <button
@@ -6811,8 +6651,8 @@ export default function AdminDashboard() {
             </button>
             <button
               type="submit"
-              disabled={stockSubmitting}
-              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+              disabled={stockSubmitting || !intakeProduct || !intakeTargetBranchId || intakeSerials.length === 0}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
             >
               {stockSubmitting ? (
                 <>
@@ -6831,454 +6671,205 @@ export default function AdminDashboard() {
         </div>
       </Modal>
 
-      {/* Modal 1: Sell Device from Stock */}
+      {/* Modal 1: Sell Device from Stock (one unit, or every unit ticked in the stock window) */}
       <Modal
         isOpen={isSellStockOpen}
         onClose={() => setIsSellStockOpen(false)}
-        title={t('sellDeviceTitle', 'Sell Device to Customer')}
+        maxWidth="max-w-xl"
+        title={sellTotals.count > 1
+          ? `${t('sellDeviceTitle', 'Sell Device to Customer')} · ${sellTotals.count} ${isKhmer ? 'ឧបករណ៍' : 'units'}`
+          : t('sellDeviceTitle', 'Sell Device to Customer')}
       >
         {sellTargetDevice && (
-          <form onSubmit={handleConfirmSellAndProceedToPairing} className="space-y-4">
-            
-            {/* Device Info Banner */}
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <div className="flex items-center gap-3 font-mono">
-                <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-300 flex items-center justify-center font-bold">
-                  <Smartphone className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="font-bold text-slate-900 dark:text-white text-sm">
-                    {sellTargetDevice.device_sn || sellTargetDevice.device_id}
+          <form onSubmit={handleConfirmSellAndProceedToPairing} className="space-y-3">
+
+            {/* What is being sold */}
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 overflow-hidden">
+              <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-300 flex items-center justify-center shrink-0">
+                    <Smartphone className="w-4 h-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-slate-900 dark:text-white truncate font-mono">
+                      {sellTotals.count > 1
+                        ? `${sellTotals.count} ${t('unitsSelected', 'units selected')}`
+                        : (sellTargetDevice.device_sn || sellTargetDevice.device_id)}
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                      {sellTargetDevice.device_type || t('sellDevice', 'Sell')}
+                    </div>
                   </div>
-                  <div className="text-[11px] text-slate-400 font-sans mt-0.5">
-                    {sellTargetDevice.device_type === 'Display Soundbox' ? t('displaySoundboxOpt', 'Display Soundbox (Screen QR)') : t('standardSoundboxOpt', 'Standard Soundbox (Printed QR)')}
-                  </div>
                 </div>
+                <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 shrink-0">
+                  ${sellTotals.subtotal.toFixed(2)}
+                </span>
               </div>
 
-              <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                ${Number(sellTargetDevice.price || (sellTargetDevice.device_type === 'Display Soundbox' ? 39 : 29)).toFixed(2)}
-              </span>
+              <div className="border-t border-slate-200 dark:border-slate-800">
+                <div className="px-3.5 pt-2 text-xs font-semibold text-slate-600 dark:text-slate-300">{t('basePrice', 'Base Price')} ($) · {t('perUnit', 'per unit')}</div>
+                <div className="max-h-52 overflow-y-auto divide-y divide-slate-200/60 dark:divide-slate-800/60">
+                  {sellTargets.map((unit) => {
+                    const enteredPrice = sellBasePrices[sellPriceKey(unit)];
+                    const purchasePrice = Object.hasOwn(unit, 'product_purchase_price')
+                      ? unit.product_purchase_price
+                      : productsList.find(product => String(product.id) === String(unit.product_id))?.purchase_price;
+                    const belowCost = enteredPrice !== '' && enteredPrice != null && purchasePrice != null
+                      && Number.isFinite(Number(enteredPrice)) && Number.isFinite(Number(purchasePrice))
+                      && Number(enteredPrice) >= 0 && Number(enteredPrice) < Number(purchasePrice);
+                    const warningId = `sale-price-warning-${sellPriceKey(unit)}`;
+                    return (
+                    <div key={sellPriceKey(unit)}>
+
+                    <label className="flex items-center justify-between gap-3 px-3.5 py-2 text-xs">
+                      <span className="font-mono text-slate-700 dark:text-slate-300 truncate">{unit.device_sn || unit.device_id || unit.serial_number}</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
+                        required
+                        disabled={sellSubmitting}
+                        aria-label={`${t('basePrice', 'Base Price')} ($) — ${unit.device_sn || unit.device_id || unit.serial_number}`}
+                        aria-describedby={belowCost ? warningId : undefined}
+                        value={sellBasePrices[sellPriceKey(unit)] ?? ''}
+                        onChange={(event) => setSellBasePrices(previous => ({ ...previous, [sellPriceKey(unit)]: event.target.value }))}
+                        className="w-28 shrink-0 px-3 py-2 text-right font-mono rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
+                      />
+                    </label>
+                    {belowCost && (
+                      <p id={warningId} role="alert" className="mx-3.5 mb-2 flex items-center gap-1.5 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-xs font-medium text-amber-800 dark:text-amber-300">
+                        <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+                        {isKhmer ? 'ការលក់ក្នុងតម្លៃនេះនឹងខាត' : 'Selling at this price will lose'}
+                      </p>
+                    )}
+                    </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
-            {/* Discount Calculation Card */}
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
-              <div className="flex items-center justify-between">
+            {/* Discount */}
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                   <Tag className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>{t('discount', 'Discount Calculation')}</span>
+                  <span>{t('discount', 'Discount')}</span>
                 </span>
-                <span className="text-[11px] font-bold font-mono text-emerald-600 dark:text-emerald-400">
-                  {t('finalPrice', 'Final Price')}: ${(() => {
-                    const bp = Number(sellTargetDevice.price) || (sellTargetDevice.device_type === 'Display Soundbox' ? 39.0 : 29.0);
-                    let da = 0;
-                    if (sellDiscountType === 'PERCENT') da = ((Number(sellDiscountPercent) || 0) / 100.0) * bp;
-                    else if (sellDiscountType === 'AMOUNT') da = Number(sellDiscountAmount) || 0;
-                    return Math.max(0, bp - da).toFixed(2);
-                  })()}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSellDiscountType('NONE')}
-                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition cursor-pointer ${
-                    sellDiscountType === 'NONE'
-                      ? 'bg-white dark:bg-slate-700 border-blue-500 text-blue-600 dark:text-blue-300 shadow-2xs'
-                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-                  }`}
-                >
-                  {t('noDiscount', 'No Discount')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setSellDiscountType('PERCENT'); if (sellDiscountPercent === 0) setSellDiscountPercent(10); }}
-                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition cursor-pointer flex items-center justify-center gap-1 ${
-                    sellDiscountType === 'PERCENT'
-                      ? 'bg-white dark:bg-slate-700 border-emerald-500 text-emerald-600 dark:text-emerald-300 shadow-2xs'
-                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-                  }`}
-                >
-                  <Percent className="w-3 h-3" />
-                  <span>{t('percentageDiscount', '% Off')}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setSellDiscountType('AMOUNT'); if (sellDiscountAmount === 0) setSellDiscountAmount(5); }}
-                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition cursor-pointer flex items-center justify-center gap-1 ${
-                    sellDiscountType === 'AMOUNT'
-                      ? 'bg-white dark:bg-slate-700 border-indigo-500 text-indigo-600 dark:text-indigo-300 shadow-2xs'
-                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-                  }`}
-                >
-                  <DollarSign className="w-3 h-3" />
-                  <span>{t('fixedDiscount', '$ Off')}</span>
-                </button>
-              </div>
-
-              {sellDiscountType === 'PERCENT' && (
-                <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('discountPercent', 'Discount %')}:</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={sellDiscountPercent}
-                    onChange={(e) => setSellDiscountPercent(Number(e.target.value))}
-                    className="w-24 px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white"
-                  />
-                  <span className="text-xs text-slate-400 font-mono">
-                    (-${(((Number(sellDiscountPercent) || 0) / 100.0) * (Number(sellTargetDevice.price) || 29)).toFixed(2)})
+                {sellTotals.discount > 0 && (
+                  <span className="text-[11px] font-semibold font-mono text-emerald-600 dark:text-emerald-400">
+                    {t('youSave', 'You save')} ${sellTotals.discount.toFixed(2)}
                   </span>
-                </div>
-              )}
-
-              {sellDiscountType === 'AMOUNT' && (
-                <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('discountAmount', 'Discount Amount ($)')}:</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    value={sellDiscountAmount}
-                    onChange={(e) => setSellDiscountAmount(Number(e.target.value))}
-                    className="w-24 px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Warranty Period Configuration */}
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
-                  <span>{t('warrantyPeriod', 'Warranty Period & Countdown')}</span>
-                </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
-                  {sellWarrantyDays} {t('daysRemaining', 'Days')}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('warrantyPeriod', 'Duration')}</label>
-                  <select
-                    value={sellWarrantyDays}
-                    onChange={(e) => setSellWarrantyDays(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-xs text-slate-900 dark:text-white cursor-pointer"
-                  >
-                    <option value={90}>{t('duration90Days', '90 Days (3 Months)')}</option>
-                    <option value={180}>{t('duration180Days', '180 Days (6 Months)')}</option>
-                    <option value={365}>{t('duration365Days', '365 Days (1 Year)')}</option>
-                    <option value={30}>{t('duration30Days', '30 Days (1 Month)')}</option>
-                    <option value={60}>{t('duration60Days', '60 Days (2 Months)')}</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('warrantyStart', 'Start Date')}</label>
-                  <input
-                    type="date"
-                    value={sellWarrantyStartDate}
-                    onChange={(e) => setSellWarrantyStartDate(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-xs text-slate-900 dark:text-white"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Payment Method Checkbox Selection: QR Code by default else Cash */}
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  {t('paymentMethod', 'Payment Method')}
-                </span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                  sellPaymentMethod === 'QR_SCAN'
-                    ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300'
-                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                }`}>
-                  {sellPaymentMethod === 'QR_SCAN' ? t('paymentQrScan', 'QR Code') : t('paymentCash', 'Cash')}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                {/* QR Code Checkbox (Default) */}
-                <label
-                  className={`flex items-center gap-3 p-3 rounded-xl border transition cursor-pointer select-none ${
-                    sellPaymentMethod === 'QR_SCAN'
-                      ? 'bg-indigo-50/80 dark:bg-indigo-950/40 border-indigo-500 text-indigo-950 dark:text-indigo-100 shadow-2xs ring-1 ring-indigo-500'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={sellPaymentMethod === 'QR_SCAN'}
-                    onChange={(e) => setSellPaymentMethod(e.target.checked ? 'QR_SCAN' : 'CASH')}
-                    className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
-                  />
-                  <div>
-                    <div className="text-xs font-bold">{t('paymentQrScan', 'QR Code')}</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">Bakong / KHQR</div>
-                  </div>
-                </label>
-
-                {/* Cash Checkbox */}
-                <label
-                  className={`flex items-center gap-3 p-3 rounded-xl border transition cursor-pointer select-none ${
-                    sellPaymentMethod === 'CASH'
-                      ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-500 text-emerald-950 dark:text-emerald-100 shadow-2xs ring-1 ring-emerald-500'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={sellPaymentMethod === 'CASH'}
-                    onChange={(e) => setSellPaymentMethod(e.target.checked ? 'CASH' : 'QR_SCAN')}
-                    className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
-                  />
-                  <div>
-                    <div className="text-xs font-bold">{t('paymentCash', 'Cash')}</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">{t('paymentMethodCashDesc', 'Direct cash')}</div>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            {/* Quantity & Invoice Reference Configuration */}
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
-              <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                {t('orderReferences', 'Order & Invoice References')}
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                    {t('quantity', 'Quantity')}
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={sellQuantity}
-                    onChange={(e) => setSellQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                    {t('invoiceReference', 'Invoice Ref')}
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. INV-2026-001"
-                    value={sellInvoiceRef}
-                    onChange={(e) => setSellInvoiceRef(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-xs text-slate-900 dark:text-white font-mono"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-              <button
-                type="button"
-                onClick={() => setIsSellStockOpen(false)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
-              >
-                {t('cancel', 'Cancel')}
-              </button>
-              <button
-                type="submit"
-                disabled={sellSubmitting}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              >
-                {sellSubmitting ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Processing...</span>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>{t('confirmSaleAndDeploy', 'Confirm Sale')}</span>
-                  </>
                 )}
-              </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {[
+                  { type: 'PERCENT', label: t('percentageDiscount', 'Percentage Discount (%)') },
+                  { type: 'AMOUNT', label: t('fixedDiscount', 'Fixed Amount Discount ($)') },
+                ].map(option => (
+                  <label key={option.type} className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-medium cursor-pointer ${sellDiscountType === option.type ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200' : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'}`}>
+                    <input
+                      type="checkbox"
+                      checked={sellDiscountType === option.type}
+                      disabled={sellSubmitting}
+                      onChange={event => setSellDiscountType(event.target.checked ? option.type : 'NONE')}
+                      className="w-4 h-4 shrink-0 accent-emerald-600"
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
+              {sellDiscountType === 'NONE' && <p className="text-xs text-slate-500">{t('noDiscount', 'No Discount')}</p>}
+              {sellDiscountType !== 'NONE' && (
+                <div className="space-y-1.5">
+                  <label htmlFor="sale-discount-value" className="block text-xs font-medium text-slate-600 dark:text-slate-300">
+                    {sellDiscountType === 'PERCENT' ? t('discountPercent', 'Discount (%)') : t('discountAmount', 'Discount Amount ($)')}
+                  </label>
+                  <input
+                    id="sale-discount-value"
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    max={sellDiscountType === 'PERCENT' ? 100 : undefined}
+                    step="0.01"
+                    required
+                    disabled={sellSubmitting}
+                    value={sellDiscountType === 'PERCENT' ? sellDiscountPercent : sellDiscountAmount}
+                    onChange={(event) => (sellDiscountType === 'PERCENT' ? setSellDiscountPercent : setSellDiscountAmount)(event.target.value)}
+                    placeholder={sellDiscountType === 'PERCENT' ? '10' : '5.00'}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
+                  />
+                  {sellTotals.count > 1 && <p className="text-xs text-slate-500">{t('perUnit', 'per unit')}</p>}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 space-y-2.5">
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                {t('paymentMethod', 'Payment Method')}
+              </span>
+
+              <select
+                aria-label={t('paymentMethod', 'Payment Method')}
+                value={sellPaymentMethod}
+                onChange={(event) => setSellPaymentMethod(event.target.value)}
+                disabled={sellSubmitting}
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
+              >
+                <option value="QR_SCAN">{t('paymentQrScan', 'QR Code')}</option>
+                <option value="CASH">{t('paymentCash', 'Cash')}</option>
+              </select>
+            </div>
+
+            {/* Total and actions stay in view while the form scrolls */}
+            <div className="sticky bottom-0 -mx-4 sm:-mx-6 -mb-4 px-4 sm:px-6 pt-3 pb-4 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <span className="block text-[10px] uppercase tracking-wider text-slate-400">{t('totalPrice', 'Total')}</span>
+                <span className="block text-base font-bold font-mono text-emerald-600 dark:text-emerald-400 leading-tight">
+                  ${sellTotals.total.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsSellStockOpen(false)}
+                  className="px-3.5 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
+                >
+                  {t('cancel', 'Cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={sellSubmitting}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {sellSubmitting ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>
+                        {sellProgress && sellProgress.total > 1
+                          ? `${isKhmer ? 'កំពុងលក់' : 'Selling'} ${sellProgress.done + 1} / ${sellProgress.total}...`
+                          : `${isKhmer ? 'កំពុងដំណើរការ' : 'Processing'}...`}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>
+                        {sellTotals.count > 1
+                          ? `${t('confirmSaleAndDeploy', 'Confirm Sale')} · ${sellTotals.count}`
+                          : t('confirmSaleAndDeploy', 'Confirm Sale')}
+                      </span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </form>
         )}
       </Modal>
 
-      {/* Modal: Manage Suppliers */}
-      <Modal
-        isOpen={isSupplierModalOpen}
-        onClose={() => {
-          setIsSupplierModalOpen(false);
-          setEditingSupplierId(null);
-          setSupplierFormName('');
-          setSupplierFormContact('');
-          setSupplierFormPhone('');
-          setSupplierFormEmail('');
-        }}
-        title={t('manageSuppliers', 'Manage Suppliers')}
-      >
-        <div className="space-y-5">
-          {/* Add / Edit Supplier Form */}
-          <form onSubmit={handleSaveSupplier} className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                <span>{editingSupplierId ? t('editSupplier', 'Edit Supplier') : t('addSupplier', 'Add New Supplier')}</span>
-              </h4>
-              {editingSupplierId && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingSupplierId(null);
-                    setSupplierFormName('');
-                    setSupplierFormContact('');
-                    setSupplierFormPhone('');
-                    setSupplierFormEmail('');
-                  }}
-                  className="text-[11px] text-rose-500 hover:underline cursor-pointer"
-                >
-                  Cancel Edit
-                </button>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('supplierName', 'Supplier Name')} <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={supplierFormName}
-                  onChange={(e) => setSupplierFormName(e.target.value)}
-                  placeholder="e.g. Feishu, Hemi, Foxconn"
-                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  {t('contactPerson', 'Contact Person')}
-                </label>
-                <input
-                  type="text"
-                  value={supplierFormContact}
-                  onChange={(e) => setSupplierFormContact(e.target.value)}
-                  placeholder="e.g. John Doe / Manager"
-                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  Phone
-                </label>
-                <input
-                  type="text"
-                  value={supplierFormPhone}
-                  onChange={(e) => setSupplierFormPhone(e.target.value)}
-                  placeholder="e.g. 012 345 678"
-                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={supplierFormEmail}
-                  onChange={(e) => setSupplierFormEmail(e.target.value)}
-                  placeholder="e.g. contact@supplier.com"
-                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-1">
-              <button
-                type="submit"
-                disabled={supplierSubmitting}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              >
-                {supplierSubmitting ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Saving...</span>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>{editingSupplierId ? t('saveChanges', 'Save Changes') : t('addSupplier', 'Add Supplier')}</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-
-          {/* Suppliers Table List */}
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-              Existing Suppliers ({suppliersList.length})
-            </h4>
-            <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
-              {suppliersList.map((supp) => (
-                <div key={supp.id} className="p-3.5 bg-white dark:bg-slate-900 flex items-center justify-between gap-3 hover:bg-slate-50/80 dark:hover:bg-slate-850 transition">
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-2">
-                        <span>{supp.name}</span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                          {supp.device_count ?? 0} {supp.device_count === 1 ? 'device' : 'devices'}
-                        </span>
-                        {supp.is_active === false && (
-                          <span className="px-1.5 py-0.2 rounded text-[10px] bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
-                            Inactive
-                          </span>
-                        )}
-                      </div>
-                      {(supp.contact_person || supp.phone || supp.email) && (
-                        <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2">
-                          {supp.contact_person && <span>👤 {supp.contact_person}</span>}
-                          {supp.phone && <span>📞 {supp.phone}</span>}
-                          {supp.email && <span>✉️ {supp.email}</span>}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEditSupplierModal(supp)}
-                      className="p-1.5 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-lg transition cursor-pointer"
-                      title="Edit"
-                    >
-                      <Edit className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteSupplier(supp)}
-                      className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition cursor-pointer"
-                      title="Delete / Deactivate"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </Modal>
 
     </div>
   );

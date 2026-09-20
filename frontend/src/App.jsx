@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider } from './context/LanguageContext';
@@ -7,12 +7,13 @@ import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import UserDashboard from './pages/UserDashboard';
-import AdminDashboard from './pages/AdminDashboard';
+const RegisterStore = lazy(() => import('./pages/RegisterStore'));
+const UserDashboard = lazy(() => import('./pages/UserDashboard'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 import { RefreshCw } from 'lucide-react';
 
 function MainLayout() {
-  const { user, loading } = useAuth();
+  const { user, loading, authError, retryAuth, logout } = useAuth();
   const [authMode, setAuthMode] = useState(() => {
     if (typeof window !== 'undefined' && window.location.pathname === '/register') {
       return 'register';
@@ -32,14 +33,20 @@ function MainLayout() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // When user is logged in, clean up URL pathname so it doesn't stay on /login
+  const needsStore = !!user && String(user.role).trim().toUpperCase() !== 'ADMIN' && !user.has_store;
   useEffect(() => {
-    if (user && typeof window !== 'undefined') {
-      if (window.location.pathname === '/login' || window.location.pathname === '/register') {
+    if (loading || !user) return undefined;
+    const syncPath = () => {
+      if (needsStore) {
+        window.history.replaceState(null, '', '/register-store');
+      } else if (['/login', '/register', '/register-store'].includes(window.location.pathname)) {
         window.history.replaceState(null, '', '/');
       }
-    }
-  }, [user]);
+    };
+    syncPath();
+    window.addEventListener('popstate', syncPath);
+    return () => window.removeEventListener('popstate', syncPath);
+  }, [user, loading, needsStore]);
 
   const handleSwitchToRegister = () => {
     setAuthMode('register');
@@ -89,6 +96,16 @@ function MainLayout() {
     );
   }
 
+  if (authError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50 dark:bg-slate-950 p-6">
+        <p role="alert" className="text-sm text-slate-600 dark:text-slate-300">{authError}</p>
+        <button onClick={retryAuth} className="rounded-xl bg-emerald-600 text-white px-5 py-2 cursor-pointer">Try again</button>
+        <button onClick={logout} className="text-sm text-slate-500 cursor-pointer">Sign out</button>
+      </div>
+    );
+  }
+
   // Unauthenticated Flow
   if (!user) {
     if (authMode === 'register') {
@@ -96,6 +113,8 @@ function MainLayout() {
     }
     return <Login onSwitchToRegister={handleSwitchToRegister} />;
   }
+
+  if (needsStore) return <RegisterStore key={user.id} />;
 
   // Authenticated Flow (Case-insensitive role validation)
   const isAdmin = String(user?.role || '').trim().toUpperCase() === 'ADMIN';
@@ -142,7 +161,9 @@ export default function App() {
         <LanguageProvider>
           <AuthProvider>
             <ToastProvider>
-              <MainLayout />
+              <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950"><RefreshCw aria-label="Loading page" className="w-8 h-8 text-emerald-600 animate-spin" /></div>}>
+                <MainLayout />
+              </Suspense>
             </ToastProvider>
           </AuthProvider>
         </LanguageProvider>

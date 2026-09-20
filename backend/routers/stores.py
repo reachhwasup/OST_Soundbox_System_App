@@ -41,11 +41,9 @@ class StoreUpdateSchema(BaseModel):
 @router.get("/my-store")
 async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)):
     pool = await get_db_pool()
-    phone_clean = str(current_user.get("phone_number", "")).strip()
-    phone_alt = phone_clean.lstrip("0") if phone_clean.startswith("0") else ("0" + phone_clean)
 
     async with pool.acquire() as conn:
-        # Fetch all stores belonging to this user (matching user_id or phone variations)
+        # Store access requires an explicit user assignment; phone numbers are not proof of ownership.
         try:
             stores = await conn.fetch(
                 """
@@ -59,11 +57,9 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
                        created_at
                 FROM merchants 
                 WHERE user_id = $1 
-                   OR owner_phone = $2 
-                   OR owner_phone = $3
                 ORDER BY id ASC
                 """,
-                current_user["id"], phone_clean, phone_alt
+                current_user["id"]
             )
         except Exception as q_err:
             logger.warning(f"Full store query failed: {q_err}. Using basic store query...")
@@ -77,20 +73,10 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
                        owner_phone, place, location, created_at
                 FROM merchants 
                 WHERE user_id = $1 
-                   OR owner_phone = $2 
-                   OR owner_phone = $3
                 ORDER BY id ASC
                 """,
-                current_user["id"], phone_clean, phone_alt
+                current_user["id"]
             )
-
-        # Link any unlinked stores to user_id
-        for s in stores:
-            if s["user_id"] is None or s["user_id"] != current_user["id"]:
-                try:
-                    await conn.execute("UPDATE merchants SET user_id = $1 WHERE id::text = $2::text OR merchant_id::text = $2::text", current_user["id"], str(s["id"]))
-                except Exception:
-                    pass
 
         if not stores:
             return {
@@ -117,9 +103,9 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
                 try:
                     devices = await conn.fetch(
                         """
-                        SELECT d.id, d.device_sn, 
-                               COALESCE(d.device_type, 'Soundbox') AS device_type,
-                               d.device_model, d.telegram_chat_id, 
+                        SELECT d.id, d.device_id AS device_sn,
+                               COALESCE(dp.name, 'Soundbox') AS device_type,
+                               dp.device_model, d.telegram_chat_id,
                                COALESCE(d.qr_code, '') AS qr_code,
                                d.status,
                                COALESCE(d.price, 29.00) AS price,
@@ -134,12 +120,16 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
                                COALESCE(d.last_online, d.last_heartbeat, d.updated_at, d.created_at) AS last_active,
                                d.last_online, d.last_heartbeat, d.created_at, d.updated_at
                         FROM devices d
+                        LEFT JOIN products dp ON dp.id = d.product_id
                         LEFT JOIN LATERAL (
-                            SELECT s_order.price, s_order.discount_amount, s_order.discount_percent, s_order.final_price,
-                                   s_order.warranty_days, s_order.warranty_start_date, s_order.warranty_end_date
-                            FROM sales s_order
-                            WHERE s_order.device_id = d.id OR s_order.device_sn = d.device_sn
-                            ORDER BY s_order.id DESC
+                            SELECT st.unit_price AS price, st.discount_amount, st.discount_percent,
+                                   (st.unit_price - COALESCE(st.discount_amount, 0.00)) AS final_price,
+                                   COALESCE((st.warranty_expired_date - st.created_at::date), 90) AS warranty_days,
+                                   st.created_at AS warranty_start_date,
+                                   st.warranty_expired_date AS warranty_end_date
+                            FROM v_sales st
+                            WHERE st.serial_number = d.device_id
+                            ORDER BY st.transaction_id DESC
                             LIMIT 1
                         ) latest_sale ON true
                         WHERE d.merchant_id::text = $1 OR d.merchant_id::text = $2
@@ -155,9 +145,13 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
                 try:
                     transactions = await conn.fetch(
                         """
-                        SELECT t.id, t.bank_name, t.bank_tx_id, t.amount, t.currency, t.payer_name, t.status, t.created_at, d.device_sn
+                        SELECT t.id, t.bank_name, t.bank_tx_id, t.amount, t.currency, t.payer_name, t.status, t.created_at, d.device_id AS device_sn
                         FROM transactions t
-                        JOIN devices d ON (t.device_id::text = d.id::text OR t.device_id::text = d.device_sn::text OR t.device_id::text = d.device_id::text)
+                        JOIN LATERAL (
+                            SELECT dev.* FROM devices dev
+                            WHERE dev.device_id = t.device_id::text OR dev.id::text = t.device_id::text
+                            ORDER BY (dev.device_id = t.device_id::text) DESC, dev.id DESC LIMIT 1
+                        ) d ON true
                         WHERE d.merchant_id::text = $1 OR d.merchant_id::text = $2
                         ORDER BY t.created_at DESC
                         LIMIT 20
@@ -173,9 +167,13 @@ async def get_my_stores(current_user: Dict[str, Any] = Depends(get_current_user)
                     alerts = await conn.fetch(
                         """
                         SELECT a.id, a.alert_type, a.severity, a.bank_name, a.bank_tx_id, a.amount, a.currency, 
-                               a.sender_user_id, a.sender_name, a.reason, a.created_at, d.device_sn
+                               a.sender_user_id, a.sender_name, a.reason, a.created_at, d.device_id AS device_sn
                         FROM security_alerts a
-                        LEFT JOIN devices d ON (a.device_id::text = d.id::text OR a.device_id::text = d.device_sn::text OR a.device_id::text = d.device_id::text)
+                        LEFT JOIN LATERAL (
+                            SELECT dev.* FROM devices dev
+                            WHERE dev.device_id = a.device_id::text OR dev.id::text = a.device_id::text
+                            ORDER BY (dev.device_id = a.device_id::text) DESC, dev.id DESC LIMIT 1
+                        ) d ON true
                         WHERE a.merchant_id::text = $1 OR a.merchant_id::text = $2
                         ORDER BY a.created_at DESC
                         LIMIT 20
@@ -325,15 +323,6 @@ async def register_store(
     mch_code = f"MCH-{int(time.time())}"
 
     async with pool.acquire() as conn:
-        # Preemptively relax restrictive constraints if present in the database
-        try:
-            await conn.execute("""
-                ALTER TABLE merchants ALTER COLUMN merchant_id DROP NOT NULL;
-                ALTER TABLE merchants ALTER COLUMN merchant_name DROP NOT NULL;
-                ALTER TABLE merchants DROP CONSTRAINT IF EXISTS merchants_owner_phone_key;
-            """)
-        except Exception:
-            pass
 
         try:
             # Insert new store for user (supplying merchant_id to satisfy legacy NOT NULL constraints)
@@ -350,37 +339,11 @@ async def register_store(
                 province, district, commune, village, street
             )
         except Exception as e:
-            logger.warning(f"Standard store registration insert failed: {e}. Attempting schema auto-heal and fallback...")
-            try:
-                # Auto-heal missing columns or drop restrictive legacy unique constraints
-                await conn.execute("""
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS merchant_id VARCHAR(100);
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS merchant_name VARCHAR(255);
-                    ALTER TABLE merchants ALTER COLUMN merchant_id DROP NOT NULL;
-                    ALTER TABLE merchants ALTER COLUMN merchant_name DROP NOT NULL;
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS user_id INT REFERENCES users(id) ON DELETE SET NULL;
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS owner_phone VARCHAR(50);
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS province VARCHAR(100);
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS district VARCHAR(100);
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS commune VARCHAR(100);
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS village VARCHAR(100);
-                    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS street VARCHAR(255);
-                    ALTER TABLE merchants DROP CONSTRAINT IF EXISTS merchants_owner_phone_key;
-                """)
-                store_id = await conn.fetchval(
-                    """
-                    INSERT INTO merchants (merchant_id, merchant_name, user_id, name, owner_phone, place, location)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7)
-                    RETURNING id
-                    """,
-                    mch_code, clean_name, target_user_id, clean_name, target_phone, clean_place, clean_location
-                )
-            except Exception as final_e:
-                logger.error(f"Store registration permanently failed: {final_e}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Failed to register store: {str(final_e)}"
-                )
+            logger.error(f"Store registration failed: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to register store: {str(e)}"
+            )
 
         return {
             "status": "success",
@@ -422,8 +385,8 @@ async def update_store(
                           province, district, commune, village, street 
                    FROM merchants 
                    WHERE (id::text = $1::text OR merchant_id::text = $1::text) 
-                     AND ($2 = 'ADMIN' OR user_id = $3 OR owner_phone = $4)""",
-                str(store_id), current_user["role"], current_user["id"], current_user["phone_number"]
+                     AND ($2 = 'ADMIN' OR user_id = $3)""",
+                str(store_id), current_user["role"], current_user["id"]
             )
         else:
             store = await conn.fetchrow(
@@ -431,9 +394,9 @@ async def update_store(
                           COALESCE(merchant_name, name) AS name, place, location, 
                           province, district, commune, village, street 
                    FROM merchants 
-                   WHERE user_id = $1 OR owner_phone = $2 
+                   WHERE user_id = $1
                    ORDER BY id ASC LIMIT 1""",
-                current_user["id"], current_user["phone_number"]
+                current_user["id"]
             )
 
         if not store:
@@ -507,8 +470,8 @@ async def delete_store(
                       COALESCE(merchant_name, name) AS name 
                FROM merchants 
                WHERE (id::text = $1::text OR merchant_id::text = $1::text) 
-                 AND ($2 = 'ADMIN' OR user_id = $3 OR owner_phone = $4)""",
-            str(store_id), current_user["role"], current_user["id"], current_user["phone_number"]
+                 AND ($2 = 'ADMIN' OR user_id = $3)""",
+            str(store_id), current_user["role"], current_user["id"]
         )
         if not store:
             raise HTTPException(
