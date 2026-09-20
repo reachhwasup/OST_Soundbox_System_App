@@ -23,4 +23,4 @@ The merchant frontend is exposed on port 3000 and its backend on port 8001. The 
 - cd frontend && npm run lint
 - cd frontend && npm run build
 
-Pre-push validation: 43 backend tests and 4 frontend tests passed. Frontend build passed. Lint reported 74 warnings and no errors; the build also reported a large-chunk warning. See SECURITY_REVIEW.md for the security review and remaining limitations.
+Pre-push validation: 44 backend tests and 4 frontend tests passed. Frontend build passed. Lint reported 74 warnings and no errors; the build also reported a large-chunk warning. See SECURITY_REVIEW.md for the security review and remaining limitations.

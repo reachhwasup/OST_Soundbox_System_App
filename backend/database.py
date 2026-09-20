@@ -9,7 +9,9 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres@localhost:5432/postgres")
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable is required")
 
 
 db_pool: Optional[asyncpg.Pool] = None
@@ -20,7 +22,7 @@ async def get_db_pool() -> asyncpg.Pool:
     if db_pool is None:
         for attempt in range(1, 11):
             try:
-                db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=10)
+                db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=20, command_timeout=60)
                 logger.info(f"Connected to PostgreSQL database pool on attempt {attempt}.")
                 break
             except Exception as e:

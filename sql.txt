@@ -1,0 +1,461 @@
+-- ==============================================================================
+-- 1. CLEANUP (Allows you to safely re-run the script during development)
+-- ==============================================================================
+DROP VIEW IF EXISTS view_current_stock;
+DROP VIEW IF EXISTS view_stock_in_report;
+DROP VIEW IF EXISTS view_stock_out_report;
+DROP TABLE IF EXISTS pos_invoice_items CASCADE;
+DROP TABLE IF EXISTS pos_invoices CASCADE;
+DROP TABLE IF EXISTS discounts CASCADE;
+DROP TABLE IF EXISTS inventory_logs CASCADE;
+DROP TABLE IF EXISTS inventory_serials CASCADE;
+DROP TABLE IF EXISTS products CASCADE;
+
+-- ==============================================================================
+-- 2. TABLE CREATION
+-- ==============================================================================
+
+-- Master Products Catalog
+CREATE TABLE products (
+    id BIGSERIAL PRIMARY KEY,
+    sku VARCHAR(50) UNIQUE NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    base_price NUMERIC(10,2) NOT NULL,
+    default_warranty_months INT DEFAULT 12,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Advanced Stock Tracking (By Serial Number)
+CREATE TABLE inventory_serials (
+    id BIGSERIAL PRIMARY KEY,
+    product_id BIGINT REFERENCES products(id) ON DELETE CASCADE,
+    serial_number VARCHAR(100) UNIQUE NOT NULL,
+    status VARCHAR(20) DEFAULT 'IN_STOCK', -- IN_STOCK, SOLD, DEFECTIVE, RETURNED, LOST
+    warehouse_location VARCHAR(50),
+    received_date TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Audit Trail for Inventory Adjustments (RMA / Defects)
+CREATE TABLE inventory_logs (
+    id BIGSERIAL PRIMARY KEY,
+    inventory_serial_id BIGINT REFERENCES inventory_serials(id) ON DELETE CASCADE,
+    previous_status VARCHAR(20),
+    new_status VARCHAR(20),
+    changed_by BIGINT, -- Corresponds to user_id in your users table
+    changed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT
+);
+
+-- Discount Rules Engine
+CREATE TABLE discounts (
+    id BIGSERIAL PRIMARY KEY,
+    code VARCHAR(50) UNIQUE NOT NULL,
+    discount_type VARCHAR(20) NOT NULL, -- PERCENTAGE or FIXED
+    discount_value NUMERIC(10,2) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+-- POS Invoices (Header)
+CREATE TABLE pos_invoices (
+    id BIGSERIAL PRIMARY KEY,
+    receipt_no VARCHAR(50) UNIQUE NOT NULL,
+    subtotal NUMERIC(10,2) NOT NULL,
+    total_discount NUMERIC(10,2) DEFAULT 0.00,
+    grand_total NUMERIC(10,2) NOT NULL,
+    payment_method VARCHAR(20) NOT NULL, -- CASH, KHQR, CARD
+    cashier_id BIGINT NOT NULL,
+    sale_date TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- POS Invoice Items (Line details with specific Serial & Warranty)
+CREATE TABLE pos_invoice_items (
+    id BIGSERIAL PRIMARY KEY,
+    invoice_id BIGINT REFERENCES pos_invoices(id) ON DELETE CASCADE,
+    product_id BIGINT REFERENCES products(id),
+    inventory_serial_id BIGINT REFERENCES inventory_serials(id),
+    original_price NUMERIC(10,2) NOT NULL,
+    discount_id BIGINT REFERENCES discounts(id),
+    discount_amount NUMERIC(10,2) DEFAULT 0.00,
+    final_price NUMERIC(10,2) NOT NULL,
+    warranty_start_date TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    warranty_end_date TIMESTAMPTZ NOT NULL,
+    warranty_status VARCHAR(20) DEFAULT 'ACTIVE' -- ACTIVE, EXPIRED, VOID
+);
+
+-- ==============================================================================
+-- 3. INDEXES FOR PERFORMANCE
+-- ==============================================================================
+CREATE INDEX idx_inventory_serial_lookup ON inventory_serials(serial_number);
+CREATE INDEX idx_inventory_status ON inventory_serials(status);
+CREATE INDEX idx_invoice_receipt ON pos_invoices(receipt_no);
+CREATE INDEX idx_invoice_items_serial ON pos_invoice_items(inventory_serial_id);
+CREATE INDEX idx_logs_serial ON inventory_logs(inventory_serial_id);
+
+-- កូដសម្រាប់បន្ថែម Field តម្លៃដើមទិញចូល
+ALTER TABLE inventory_serials 
+ADD COLUMN purchase_price NUMERIC(10,2) DEFAULT 0.00;
+
+
+ALTER TABLE inventory_serials
+ADD COLUMN branch_id BIGINT REFERENCES branches(branch_id);
+
+ALTER TABLE pos_invoices
+ADD COLUMN branch_id BIGINT REFERENCES branches(branch_id) NOT NULL;
+
+
+ALTER TABLE inventory_logs 
+ADD COLUMN branch_id INTEGER REFERENCES branches(branch_id);
+
+
+ALTER TABLE products 
+ADD COLUMN is_order INTEGER ;
+
+---------
+INSERT INTO inventory_serials (product_id, serial_number, warehouse_location, purchase_price) 
+VALUES 
+(1, 'SN-PRO-003', 'Shelf A', 30.00), -- ទិញចូលតម្លៃ ៣០ដុល្លារ
+(1, 'SN-PRO-004', 'Shelf A', 32.50); -- Batch ក្រោយឡើងថ្លៃ ទិញចូល ៣២.៥ដុល្លារ
+
+
+INSERT INTO inventory_serials (product_id, serial_number, warehouse_location, purchase_price) 
+VALUES 
+(1, 'SN-PRO-005', 'Shelf A', 30.00), 
+(1, 'SN-PRO-006', 'Shelf A', 32.50);
+-- ==============================================================================
+-- 4. SAMPLE MOCK DATA
+-- ==============================================================================
+
+-- Insert Master Products
+INSERT INTO products (sku, name, base_price, default_warranty_months) VALUES 
+('SBX-PRO', 'Soundbox Pro 4G', 55.00, 12),
+('SBX-MINI', 'Soundbox Mini WiFi', 35.00, 6);
+
+-- Insert Discount Rules
+INSERT INTO discounts (code, discount_type, discount_value) VALUES 
+('PROMO-5', 'FIXED', 5.00),
+('TEN-PERCENT', 'PERCENTAGE', 10.00);
+
+-- Insert Inventory (Stock In)
+INSERT INTO inventory_serials (product_id, serial_number, warehouse_location) VALUES 
+(1, 'SN-PRO-001', 'Shelf A'),
+(1, 'SN-PRO-002', 'Shelf A'),
+(1, 'SN-PRO-003', 'Shelf A'),
+(2, 'SN-MINI-001', 'Shelf B'),
+(2, 'SN-MINI-002', 'Shelf B');
+
+-- Record an initial adjustment log for testing
+INSERT INTO inventory_logs (inventory_serial_id, previous_status, new_status, changed_by, notes)
+VALUES (3, 'IN_STOCK', 'DEFECTIVE', 1, 'Speaker damaged out of box');
+
+-- Manually update one item to defective to reflect the log above
+UPDATE inventory_serials SET status = 'DEFECTIVE' WHERE id = 3;
+
+-- ==============================================================================
+-- 5. REPORTING VIEWS (Query these easily from your backend)
+-- ==============================================================================
+
+-- VIEW: Current Available Stock
+CREATE VIEW view_current_stock AS
+SELECT 
+    p.sku,
+    p.name AS product_name,
+    COUNT(s.id) AS available_quantity
+FROM products p
+LEFT JOIN inventory_serials s ON p.id = s.product_id AND s.status = 'IN_STOCK'
+GROUP BY p.sku, p.name;
+
+-- VIEW: Daily Stock In (Receiving)
+CREATE VIEW view_stock_in_report AS
+SELECT 
+    DATE(s.received_date) AS date_received,
+    p.sku,
+    p.name AS product_name,
+    COUNT(s.id) AS total_qty_in
+FROM inventory_serials s
+JOIN products p ON s.product_id = p.id
+GROUP BY DATE(s.received_date), p.sku, p.name;
+
+-- VIEW: Daily Stock Out (Sales)
+CREATE VIEW view_stock_out_report AS
+SELECT 
+    DATE(inv.sale_date) AS date_sold,
+    p.sku,
+    p.name AS product_name,
+    COUNT(item.id) AS total_qty_out,
+    SUM(item.final_price) AS total_sales_revenue
+FROM pos_invoices inv
+JOIN pos_invoice_items item ON inv.id = item.invoice_id
+JOIN products p ON item.product_id = p.id
+GROUP BY DATE(inv.sale_date), p.sku, p.name;
+
+
+
+---------------------
+
+BEGIN;
+
+-- 1. Mark the old, broken device as DEFECTIVE
+UPDATE inventory_serials
+SET status = 'DEFECTIVE', updated_at = CURRENT_TIMESTAMP
+WHERE serial_number = 'SN-PRO-001';
+
+-- 2. Log the receipt of the defective item
+INSERT INTO inventory_logs (inventory_serial_id, previous_status, new_status, changed_by, notes)
+VALUES (
+    (SELECT id FROM inventory_serials WHERE serial_number = 'SN-PRO-001'), 
+    'SOLD', 'DEFECTIVE', 1, 'Warranty claim - device won''t power on'
+);
+
+-- 3. CREATE THE MISSING INVOICE 
+-- (This satisfies the foreign key requirement for the next step)
+INSERT INTO pos_invoices (id, receipt_no, subtotal, total_discount, grand_total, payment_method, cashier_id, sale_date)
+VALUES (500, 'RMA-REP-001', 55.00, 55.00, 0.00, 'CASH', 1, CURRENT_TIMESTAMP);
+
+-- 4. "Sell" the new replacement device (SN-PRO-002) at $0 attached to invoice 500
+INSERT INTO pos_invoice_items (
+    invoice_id, product_id, inventory_serial_id, 
+    original_price, discount_amount, final_price, 
+    warranty_start_date, warranty_end_date
+)
+VALUES (
+    500, 
+    1, 
+    (SELECT id FROM inventory_serials WHERE serial_number = 'SN-PRO-002'), 
+    55.00, 55.00, 0.00, 
+    CURRENT_TIMESTAMP, 
+    CURRENT_TIMESTAMP + INTERVAL '12 months'
+);
+
+-- 5. Mark the new device as SOLD
+UPDATE inventory_serials
+SET status = 'SOLD', updated_at = CURRENT_TIMESTAMP
+WHERE serial_number = 'SN-PRO-002';
+
+COMMIT;
+
+
+--------------
+
+
+
+BEGIN;
+
+-- ១. ប្តូរស្ថានភាពឧបករណ៍នៅក្នុងស្តុក (ឧទាហរណ៍៖ ពី 'IN_STOCK' ទៅជា 'DEFECTIVE')
+UPDATE inventory_serials
+SET status = 'DEFECTIVE', updated_at = CURRENT_TIMESTAMP
+WHERE serial_number = 'SN-PRO-001';
+
+-- ២. កត់ត្រាប្រវត្តិផ្លាស់ប្តូរចូលទៅក្នុងតារាង Logs (Audit Trail) ទុកជាភស្តុតាង
+INSERT INTO inventory_logs (inventory_serial_id, previous_status, new_status, changed_by, notes)
+VALUES (
+    (SELECT id FROM inventory_serials WHERE serial_number = 'SN-PRO-001'), 
+    'IN_STOCK',  -- ស្ថានភាពចាស់
+    'DEFECTIVE', -- ស្ថានភាពថ្មី
+    1,           -- លេខសម្គាល់បុគ្គលិក (User ID) ដែលជាអ្នកធ្វើការកែតម្រូវ
+    'ឧបករណ៍មានបញ្ហាមិនលាន់សំឡេង (Speaker broken out of box)' -- មូលហេតុ
+);
+
+COMMIT;
+
+
+--------------
+
+-- ការបង្កើតវិក្កយបត្រមេ មុនពេលបញ្ចូលទំនិញលម្អិត
+INSERT INTO pos_invoices (
+    receipt_no, 
+    subtotal, 
+    total_discount, 
+    grand_total, 
+    payment_method, 
+    cashier_id, 
+    sale_date
+) VALUES (
+    'REC-20260914-001', 
+    55.00,       -- តម្លៃដើមសរុប (បូកបញ្ចូល original_price ពីគ្រប់ទំនិញ)
+    5.00,        -- ទឹកប្រាក់បញ្ចុះសរុប (បូកបញ្ចូល discount_amount ពីគ្រប់ទំនិញ)
+    50.00,       -- តម្លៃសរុបចុងក្រោយ (Grand Total) ដែលអតិថិជនត្រូវបង់ពិតប្រាកដ
+    'KHQR',      -- វិធីសាស្រ្តបង់ប្រាក់
+    1,           -- លេខសម្គាល់អ្នកគិតលុយ
+    CURRENT_TIMESTAMP
+) RETURNING id;
+
+
+-- ឧទាហរណ៍៖ លក់ Soundbox (តម្លៃដើម ៥៥$) ដោយប្រើកូដបញ្ចុះតម្លៃ PROMO-5 (discount_id = 1)
+INSERT INTO pos_invoice_items (
+    invoice_id, 
+    product_id, 
+    inventory_serial_id, 
+    original_price, 
+    discount_id, 
+    discount_amount, 
+    final_price, 
+    warranty_start_date, 
+    warranty_end_date
+)
+VALUES (
+    500,        -- លេខ ID វិក្កយបត្រមេ
+    1,          -- លេខ ID ផលិតផល
+    (SELECT id FROM inventory_serials WHERE serial_number = 'SN-PRO-001'), 
+    55.00,      -- តម្លៃដើម (original_price)
+    1,          -- លេខ ID នៃប្រូម៉ូសិន (discount_id)
+    5.00,       -- ចំនួនទឹកប្រាក់ដែលបានបញ្ចុះ (discount_amount) 
+    50.00,      -- តម្លៃចុងក្រោយដែលអតិថិជនត្រូវបង់ (final_price)
+    CURRENT_TIMESTAMP, 
+    CURRENT_TIMESTAMP + INTERVAL '12 months'
+);
+
+
+
+---------------
+
+លទ្ធផលនៃ Query នេះនឹងបង្រួមទិន្នន័យ ដោយបង្ហាញសរុបតែម្តងថា ក្នុងខែនេះ Soundbox ម៉ូដែលនីមួយៗលក់បានប៉ុន្មានគ្រឿង ចំណាយដើមសរុបអស់ប៉ុន្មាន ចំណូលបានប៉ុន្មាន និងចំណេញសុទ្ធសរុបប៉ុន្មាន។
+
+
+
+
+
+SELECT 
+    TO_CHAR(inv.sale_date, 'YYYY-MM') AS sale_month,
+    p.sku,
+    p.name AS product_name,
+    COUNT(item.id) AS total_units_sold,
+    SUM(s.purchase_price) AS total_cost,
+    SUM(item.final_price) AS total_revenue,
+    SUM(item.final_price - s.purchase_price) AS total_net_profit
+FROM pos_invoice_items item
+JOIN inventory_serials s ON item.inventory_serial_id = s.id
+JOIN products p ON item.product_id = p.id
+JOIN pos_invoices inv ON item.invoice_id = inv.id
+-- ដាក់លក្ខខណ្ឌដើម្បីទាញយកតែទិន្នន័យក្នុងខែបច្ចុប្បន្ន (ខែកញ្ញា ឆ្នាំ២០២៦)
+WHERE inv.sale_date >= DATE_TRUNC('month', CURRENT_DATE) 
+GROUP BY TO_CHAR(inv.sale_date, 'YYYY-MM'), p.sku, p.name
+ORDER BY total_net_profit DESC;
+
+
+
+--------------------------
+
+ការបន្ថែមទិន្នន័យកែតម្រូវស្តុក (Adjustments ដូចជាទំនិញខូច ឬបាត់បង់) ចូលទៅក្នុងរបាយការណ៍ប្រាក់ចំណេញ គឺជារឿងចាំបាច់បំផុត ដើម្បីរកឱ្យឃើញនូវ ប្រាក់ចំណេញសុទ្ធពិតប្រាកដ (True Net Profit)។
+
+
+
+
+WITH SalesSummary AS (
+    -- ផ្នែកទី១៖ គណនាចំណូល និងប្រាក់ចំណេញពីការលក់ (Sales)
+    SELECT 
+        TO_CHAR(inv.sale_date, 'YYYY-MM') AS report_month,
+        COUNT(item.id) AS qty_sold,
+        SUM(s.purchase_price) AS cost_of_goods_sold, -- ដើមទុនទំនិញលក់ចេញ
+        SUM(item.final_price) AS total_revenue -- ចំណូលសរុប
+    FROM pos_invoice_items item
+    JOIN inventory_serials s ON item.inventory_serial_id = s.id
+    JOIN pos_invoices inv ON item.invoice_id = inv.id
+    GROUP BY TO_CHAR(inv.sale_date, 'YYYY-MM')
+),
+AdjustmentSummary AS (
+    -- ផ្នែកទី២៖ គណនាការខាតបង់ពីការកែតម្រូវស្តុក (Defective/Lost) ផ្អែកលើ Logs
+    SELECT 
+        TO_CHAR(l.changed_at, 'YYYY-MM') AS report_month,
+        COUNT(l.id) AS qty_adjusted,
+        SUM(s.purchase_price) AS total_adjustment_loss -- ដើមទុនដែលខាតបង់
+    FROM inventory_logs l
+    JOIN inventory_serials s ON l.inventory_serial_id = s.id
+    WHERE l.new_status IN ('DEFECTIVE', 'LOST')
+    GROUP BY TO_CHAR(l.changed_at, 'YYYY-MM')
+)
+-- ផ្នែកទី៣៖ ភ្ជាប់ទិន្នន័យទាំង២ បង្ហាញជារបាយការណ៍ចុងក្រោយ
+SELECT 
+    COALESCE(s.report_month, a.report_month) AS month,
+    COALESCE(s.qty_sold, 0) AS items_sold,
+    COALESCE(s.total_revenue, 0.00) AS total_revenue,
+    
+    COALESCE(a.qty_adjusted, 0) AS items_defective_lost,
+    COALESCE(a.total_adjustment_loss, 0.00) AS adjustment_loss,
+    
+    -- គណនាប្រាក់ចំណេញសុទ្ធចុងក្រោយ៖ ចំណូល - ដើមទុនលក់ចេញ - ដើមទុនខាតបង់
+    (COALESCE(s.total_revenue, 0.00) - COALESCE(s.cost_of_goods_sold, 0.00) - COALESCE(a.total_adjustment_loss, 0.00)) AS final_net_profit
+    
+FROM SalesSummary s
+FULL OUTER JOIN AdjustmentSummary a ON s.report_month = a.report_month
+ORDER BY month DESC;
+
+-------
+
+មើលស្តុកផលិតផលទាំងអស់ នៅក្នុង "សាខា A"
+
+
+
+SELECT 
+    b.branch_name,
+    p.sku,
+    p.name AS product_name,
+    COUNT(s.id) AS stock_qty
+FROM inventory_serials s
+JOIN products p ON s.product_id = p.id
+JOIN branches b ON s.branch_id = b.branch_id
+WHERE s.status = 'IN_STOCK' 
+  AND b.branch_name = 'Branch A' -- ប្តូរឈ្មោះសាខា ឬប្រើ b.branch_id = 1
+GROUP BY b.branch_name, p.sku, p.name
+ORDER BY p.name;
+
+
+---
+មើលស្តុកផលិតផលទាំងអស់ នៅក្នុង "សាខា B"
+
+SELECT 
+    b.branch_name,
+    p.sku,
+    p.name AS product_name,
+    COUNT(s.id) AS stock_qty
+FROM inventory_serials s
+JOIN products p ON s.product_id = p.id
+JOIN branches b ON s.branch_id = b.branch_id
+WHERE s.status = 'IN_STOCK' 
+  AND b.branch_name = 'Branch B' -- ប្តូរទៅ Branch B
+GROUP BY b.branch_name, p.sku, p.name
+ORDER BY p.name;
+
+
+----
+របៀបមើលស្តុកគ្រប់សាខាទាំងអស់ក្នុងពេលតែមួយ (ងាយស្រួលប្រៀបធៀប)
+
+
+SELECT 
+    p.name AS product_name,
+    b.branch_name,
+    COUNT(s.id) AS stock_qty
+FROM inventory_serials s
+JOIN products p ON s.product_id = p.id
+JOIN branches b ON s.branch_id = b.branch_id
+WHERE s.status = 'IN_STOCK'
+GROUP BY p.name, b.branch_name
+ORDER BY p.name, b.branch_name;
+
+
+---------
+
+
+របៀបឆែកមើលថាតើទំនិញ (Serial Number ណាមួយ) នៅសល់ធានាឬអត់
+
+
+SELECT 
+    s.serial_number,
+    s.status AS inventory_status,
+    p.name AS product_name,
+    COALESCE(i.receipt_no, 'គ្មានវិក្កយបត្រ (មិនទាន់លក់)') AS receipt_no,
+    pii.warranty_start_date,
+    pii.warranty_end_date,
+    CASE 
+        WHEN s.status = 'IN_STOCK' THEN 'ទំនិញថ្មីក្នុងស្តុក (មិនទាន់លក់)'
+        WHEN s.status = 'DEFECTIVE' THEN 'ទំនិញខូច (Defective)'
+        WHEN s.status = 'SOLD' AND pii.warranty_end_date >= CURRENT_DATE THEN 'ស្ថិតក្នុងរយៈពេលធានា (Under Warranty)'
+        WHEN s.status = 'SOLD' AND pii.warranty_end_date < CURRENT_DATE THEN 'អស់សុពលភាពធានា (Expired)'
+        ELSE 'មិនមានទិន្នន័យធានា'
+    END AS evaluation_result
+FROM inventory_serials s
+JOIN products p ON s.product_id = p.id
+LEFT JOIN pos_invoice_items pii ON s.id = pii.inventory_serial_id
+LEFT JOIN pos_invoices i ON pii.invoice_id = i.id
+WHERE s.serial_number = 'SN-PRO-006'; -- ប្តូរជា Serial Number ជាក់ស្តែងដែលចង់ឆែក
